@@ -38,8 +38,10 @@ html[data-theme="dark"] header{background:#061019}
 header .brand{flex:1;min-width:0}
 header .brand b{display:block;font-size:16px;letter-spacing:-.02em}
 header .brand span{display:block;font-size:11px;color:#8FB8C4;letter-spacing:.08em;text-transform:uppercase}
+.iconbtn.on{background:var(--teal);color:#fff}
 .iconbtn{background:rgba(255,255,255,.1);border:0;color:#fff;width:36px;height:36px;
  border-radius:10px;display:grid;place-items:center;font-size:16px;cursor:pointer}
+.iconbtn.avatar{border-radius:50%;overflow:hidden}
 .iconbtn:active{transform:scale(.94)}
 
 main{padding:16px 14px 20px;max-width:760px;margin:0 auto}
@@ -211,6 +213,9 @@ a{color:var(--teal)}
       <button class="btn" style="margin-top:14px" onclick="fazerLogin()" id="ag_btn">Entrar</button>
     </div>
     <p style="text-align:center;color:#8FB8C4;font-size:11.5px;margin-top:14px">Os dados sincronizam entre seus aparelhos automaticamente.</p>
+    <p id="ag_teste" style="text-align:center;margin-top:10px;display:none">
+      <a href="#" onclick="modoTeste();return false" style="color:#8FB8C4;font-size:11.5px;text-decoration:underline">Modo teste (sem login, só localmente)</a>
+    </p>
   </div>
 </div>
 
@@ -221,7 +226,7 @@ a{color:var(--teal)}
     <span>Monte das Cerejeiras · 8 meses</span>
   </div>
   <button class="iconbtn" id="themeBtn" title="Tema">◐</button>
-  <button class="iconbtn" id="menuBtn" title="Mais">⋯</button>
+  <button class="iconbtn avatar" id="avatarBtn" title="Conta"></button>
 </header>
 <nav>
   <button class="on" data-v="painel"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Painel</button>
@@ -230,6 +235,7 @@ a{color:var(--teal)}
   <button data-v="itens"><svg viewBox="0 0 24 24"><path d="M20.5 7.3 12 12l-8.5-4.7M12 12v9.3M20.5 7.3 12 3 3.5 7.3l8.5 4.7 8.5-4.7z"/></svg>Itens</button>
   <button data-v="fotos"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8.5 7l1.5-2.5h4L15.5 7"/></svg>Fotos</button>
   <button data-v="rel"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Indicadores</button>
+  <button data-v="io"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>Importações</button>
 </nav>
 </div>
 
@@ -384,9 +390,12 @@ a{color:var(--teal)}
   <input type="file" id="impInput" accept=".json" hidden>
 </section>
 
+<section class="view" id="v-io"><div id="ioBody"></div></section>
+
 </main>
 
 <input type="file" id="anexoInput" accept="image/*,.pdf" multiple hidden>
+<input type="file" id="fotoPerfilInput" accept="image/*" hidden>
 <datalist id="dlProdutos"></datalist>
 <datalist id="dlCategorias"></datalist>
 <div class="sheet" id="sheet"><div class="bg" onclick="fechar()"></div><div class="panel" id="panel"></div></div>
@@ -401,9 +410,16 @@ let SESSAO=null, SYNC_TIMER=null, SYNC_OK=true;
 
 async function iniciarAuth(){
   document.getElementById('ag_senha').addEventListener('keydown',e=>{if(e.key==='Enter')fazerLogin()});
+  try{ if(window.self!==window.top) document.getElementById('ag_teste').style.display='block'; }catch(e){ document.getElementById('ag_teste').style.display='block'; }
   const {data}=await supa.auth.getSession();
   if(data&&data.session){ await entrarNoApp(data.session); }
   else{ document.getElementById('authGate').style.display='flex'; }
+}
+function modoTeste(){
+  SESSAO=null;
+  document.getElementById('authGate').style.display='none';
+  carregar();
+  render();
 }
 async function fazerLogin(){
   const email=document.getElementById('ag_email').value.trim();
@@ -737,6 +753,8 @@ function rebuildNumeros(){
 function render(){
   refreshDatalists();
   rebuildNumeros();
+  renderIO();
+  renderAvatar();
   const pagos=DB.lanc.filter(isPago);
   let adm=0,con=0;
   pagos.forEach(l=>partes(l).forEach(p=>{ if(cat(p.cat).g==='adm') adm+=p.valor; else con+=p.valor; }));
@@ -1265,7 +1283,7 @@ function abrirCfg(){
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
 }
 function salvarCfg(){
-  DB.cfg={inicio:val('k_ini'),meses:+val('k_mes')||8,area:+val('k_area')||0,at:Date.now()};
+  DB.cfg={...DB.cfg,inicio:val('k_ini'),meses:+val('k_mes')||8,area:+val('k_area')||0,at:Date.now()};
   salvar();fechar();render();toast('Indicadores atualizados');
 }
 
@@ -1828,6 +1846,29 @@ function exportJSON(){
   }
   baixar(nome,txt,'application/json');toast('Backup gerado');
 }
+function verBackupNovoTexto(){
+  const alterado=x=>!x.id.startsWith('sd-')||(+x.at||0)>0;
+  const novo={
+    lanc:DB.lanc.filter(alterado),
+    cot:DB.cot.filter(alterado),
+    fotos:DB.fotos.filter(x=>!x.id.startsWith('sd-')),
+    catExtra:DB.catExtra||[]
+  };
+  const qtd=novo.lanc.length+novo.cot.length+novo.fotos.length;
+  const txt=JSON.stringify(novo);
+  abrir(`<h2>Só o que eu digitei</h2>
+  <p class="sub">${qtd} registro(s) novo(s) ou alterado(s) — inclui cotações de exemplo que viraram compra. Toque na caixa, selecione tudo e copie.</p>
+  <textarea readonly onclick="this.select()" style="width:100%;height:220px;margin-top:10px;font-family:monospace;font-size:11px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink)">${txt}</textarea>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function verBackupTexto(){
+  DB.meta={ver:2,em:new Date().toISOString()};
+  const txt=JSON.stringify(DB);
+  abrir(`<h2>Backup em texto</h2>
+  <p class="sub">Toque na caixa, selecione tudo e copie. Cole em uma mensagem (pra você mesmo, por e-mail ou WhatsApp) pra guardar como arquivo.</p>
+  <textarea readonly onclick="this.select()" style="width:100%;height:220px;margin-top:10px;font-family:monospace;font-size:11px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink)">${txt}</textarea>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
 
 /* junta duas bases pelo id, mantendo sempre a versão alterada por último */
 function fundir(local,vindo){
@@ -1934,8 +1975,9 @@ function excluirCategoria(id){
     rebuildCategorias(); salvar(); fechar(); render(); toast('Categoria removida da lista');
   },true);
 }
-document.getElementById('menuBtn').onclick=()=>abrir(`<h2>Obra Bananeiras C08</h2>
-  <p class="sub">Monte das Cerejeiras · residência unifamiliar · prazo de 8 meses</p>
+function renderIO(){
+  document.getElementById('ioBody').innerHTML=`<h2>Importações e exportações</h2>
+  <p class="sub">Backup, planilhas e sincronização entre aparelhos.</p>
   <div class="card" style="box-shadow:none;margin-top:10px">
     <div class="stat"><span>Lançamentos</span><b class="mono">${DB.lanc.length}</b></div>
     <div class="stat"><span>Cotações abertas</span><b class="mono">${DB.cot.filter(c=>c.status==='aberta').length}</b></div>
@@ -1944,17 +1986,77 @@ document.getElementById('menuBtn').onclick=()=>abrir(`<h2>Obra Bananeiras C08</h
     <div class="stat"><span>Conta</span><b style="font-size:12.5px">${SESSAO.user.email}</b></div>`:''}
   </div>
   <button class="btn dark" onclick="exportJSON()">Exportar backup</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verBackupTexto()">Ver backup como texto (copiar manualmente)</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verBackupNovoTexto()">Ver só o que eu digitei (sem dados de exemplo)</button>
   <div class="row2" style="margin-top:9px">
     <button class="btn ghost mini" onclick="exportCSV()">Gastos em CSV</button>
     <button class="btn ghost mini" onclick="document.getElementById('impInput').click()">Importar / juntar</button>
   </div>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirCfg()">Prazo e área construída</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirDuplicados()">Verificar duplicados</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="verCategorias()">Categorias personalizadas</button>
-  ${SESSAO?`<button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="sair()">Sair da conta</button>`:''}
   <p class="hint">Os dados sincronizam com a nuvem automaticamente. Continuam funcionando offline e são salvos também neste aparelho.</p>
-  <button class="btn ghost mini" style="margin-top:6px" onclick="fechar()">Fechar</button>`);
+  <div class="divider" style="margin:16px 0"></div>
+  <button class="btn ghost mini" onclick="abrirCfg()">Prazo e área construída</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirDuplicados()">Verificar duplicados</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verCategorias()">Categorias personalizadas</button>`;
+}
 
+/* ---------- avatar / conta / manual ---------- */
+function renderAvatar(){
+  const c=cfg();
+  document.getElementById('avatarBtn').innerHTML=c.foto
+    ? `<img src="${c.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+    : `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg>`;
+}
+document.getElementById('avatarBtn').onclick=()=>{
+  const c=cfg();
+  abrir(`<h2>Conta</h2>
+  <div style="text-align:center;margin:10px 0 16px">
+    ${c.foto?`<img src="${c.foto}" style="width:88px;height:88px;object-fit:cover;border-radius:50%">`
+      :`<div style="width:88px;height:88px;border-radius:50%;background:var(--surface-2);display:inline-flex;align-items:center;justify-content:center">
+        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="var(--ink-2)" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></div>`}
+  </div>
+  <button class="btn ghost mini" onclick="document.getElementById('fotoPerfilInput').click()">Alterar foto</button>
+  ${c.foto?`<button class="btn ghost mini" style="margin-top:9px" onclick="removerFotoPerfil()">Remover foto</button>`:''}
+  <div class="divider" style="margin:16px 0"></div>
+  <button class="btn ghost mini" onclick="verManual()">Manual do app</button>
+  <button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="sair()">Sair do app</button>`);
+};
+document.getElementById('fotoPerfilInput').onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const im=new Image();
+    im.onload=()=>{
+      const M=300, s=Math.min(1,M/Math.max(im.width,im.height));
+      const cv=document.createElement('canvas');
+      cv.width=im.width*s|0; cv.height=im.height*s|0;
+      cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+      cfg().foto=cv.toDataURL('image/jpeg',.7);
+      salvar(); renderAvatar(); document.getElementById('avatarBtn').click();
+      toast('Foto atualizada');
+    };
+    im.src=r.result;
+  };
+  r.readAsDataURL(f);
+  e.target.value='';
+};
+function removerFotoPerfil(){
+  delete cfg().foto; salvar(); renderAvatar(); fechar(); toast('Foto removida');
+}
+function verManual(){
+  abrir(`<h2>Manual do app</h2>
+  <p class="sub">Um resumo rápido de cada aba.</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <p><b>Painel</b> — total investido, fase atual da obra e contas a pagar.</p>
+    <p><b>Gastos</b> — todos os lançamentos, com busca, categoria, fornecedor e anexos.</p>
+    <p><b>Cotações</b> — orçamentos de fornecedores para comparar antes de comprar.</p>
+    <p><b>Itens</b> — resumo por material e por tipo de produto comprado.</p>
+    <p><b>Fotos</b> — álbum de fotos da obra.</p>
+    <p><b>Indicadores</b> — prazo, ritmo de gasto e gráficos mensais.</p>
+    <p><b>Importações</b> — backup, planilha CSV, importar/juntar dados e ajustes gerais.</p>
+  </div>
+  <p class="hint">Os dados ficam salvos neste aparelho e sincronizam automaticamente com a nuvem quando você está logado.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
 iniciarAuth();
 </script>
 </body>
