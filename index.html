@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Obra Bananeiras C08</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMEExRjJFIi8+CjxwYXRoIGQ9Ik0xNCAzMCBMMzIgMTYgTDUwIDMwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxNkEzOTQiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0yMCAyNyBWNDggSDQ0IFYyNyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTZBMzk0IiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8bGluZSB4MT0iMzIiIHkxPSIzNiIgeDI9IjMyIiB5Mj0iNDgiIHN0cm9rZT0iIzE2QTM5NCIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+Cg==">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMEExRjJFIi8+CjxwYXRoIGQ9Ik0xNCAzMCBMMzIgMTYgTDUwIDMwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxNkEzOTQiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0yMCAyNyBWNDggSDQ0IFYyNyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTZBMzk0IiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8bGluZSB4MT0iMzIiIHkxPSIzNiIgeDI9IjMyIiB5Mj0iNDgiIHN0cm9rZT0iIzE2QTM5NCIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+Cg==">
 <style>
 :root{
   --navy:#0A1F2E; --navy-2:#123449; --teal:#16A394; --teal-2:#0E7F74;
@@ -322,6 +324,7 @@ a{color:var(--teal)}
     <div id="cotFechadas" style="margin-top:9px"></div>
   </div>
   <button class="btn" onclick="abrirCot()">+ Nova cotação</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="document.getElementById('pdfCotInput').click()">📄 Importar orçamento em PDF</button>
 </section>
 
 <!-- ============ ITENS DA OBRA ============ -->
@@ -340,7 +343,12 @@ a{color:var(--teal)}
   <div class="card">
     <h3>Álbum da obra</h3>
     <input type="file" id="fotoInput" accept="image/*" capture="environment" hidden>
-    <button class="btn" onclick="document.getElementById('fotoInput').click()">📷 Registrar foto</button>
+    <input type="file" id="fotoInputGaleria" accept="image/*" hidden>
+    <div class="row2">
+      <button class="btn" onclick="document.getElementById('fotoInput').click()">📷 Tirar foto</button>
+      <button class="btn ghost" onclick="document.getElementById('fotoInputGaleria').click()">🖼️ Da galeria</button>
+    </div>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="verSequencia()">▶ Ver fotos em sequência</button>
     <p class="hint">A foto é reduzida e guardada no aparelho com data, hora e etapa. Para o arquivo original em alta, envie também para a pasta Fotos do Drive.</p>
   </div>
   <div id="fotosWrap"></div>
@@ -396,6 +404,7 @@ a{color:var(--teal)}
 
 <input type="file" id="anexoInput" accept="image/*,.pdf" multiple hidden>
 <input type="file" id="fotoPerfilInput" accept="image/*" hidden>
+<input type="file" id="pdfCotInput" accept="application/pdf,.pdf" hidden>
 <datalist id="dlProdutos"></datalist>
 <datalist id="dlCategorias"></datalist>
 <div class="sheet" id="sheet"><div class="bg" onclick="fechar()"></div><div class="panel" id="panel"></div></div>
@@ -1810,7 +1819,7 @@ function confirmarCompra(){
 }
 
 /* ---------- fotos ---------- */
-document.getElementById('fotoInput').onchange=e=>{
+function processarFoto(e){
   const f=e.target.files[0]; if(!f)return;
   const r=new FileReader();
   r.onload=()=>{const im=new Image();
@@ -1822,7 +1831,9 @@ document.getElementById('fotoInput').onchange=e=>{
       formFoto(cv.toDataURL('image/jpeg',.62));
     }; im.src=r.result};
   r.readAsDataURL(f); e.target.value='';
-};
+}
+document.getElementById('fotoInput').onchange=processarFoto;
+document.getElementById('fotoInputGaleria').onchange=processarFoto;
 function formFoto(img){
   const agora=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16);
   abrir(`<h2>Registrar foto</h2><p class="sub">Data e hora vêm do momento do registro.</p>
@@ -1840,14 +1851,49 @@ function salvarFoto(){
   DB.fotos.push({id:uid(),at:Date.now(),dh:val('f_dh'),cat:val('f_cat'),leg:val('f_leg').trim(),img:panel._img});
   salvar();fechar();render();toast('Foto salva no álbum');
 }
-function verFoto(id){
-  const f=DB.fotos.find(x=>x.id===id);
-  abrir(`<h2>${f.leg||'Sem legenda'}</h2>
-  <p class="sub">${f.dh.slice(8,10)}/${f.dh.slice(5,7)}/${f.dh.slice(0,4)} às ${f.dh.slice(11,16)} · ${cat(f.cat).n}</p>
-  <img src="${f.img}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
-  <button class="btn ghost mini" onclick="excluirFoto('${f.id}')">Excluir foto</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+let SEQ_FOTOS=[], SEQ_I=0;
+function verSequencia(){
+  if(!DB.fotos.length){toast('Álbum vazio ainda.');return}
+  SEQ_FOTOS=DB.fotos.slice().sort((a,b)=>a.dh.localeCompare(b.dh));
+  SEQ_I=0; mostrarSeq();
 }
+function verFoto(id){
+  SEQ_FOTOS=DB.fotos.slice().sort((a,b)=>a.dh.localeCompare(b.dh));
+  SEQ_I=SEQ_FOTOS.findIndex(x=>x.id===id);
+  mostrarSeq();
+}
+function mostrarSeq(){
+  const f=SEQ_FOTOS[SEQ_I]; if(!f)return;
+  abrir(`<h2>${f.leg||'Sem legenda'}</h2>
+  <p class="sub">${f.dh.slice(8,10)}/${f.dh.slice(5,7)}/${f.dh.slice(0,4)} às ${f.dh.slice(11,16)} · ${cat(f.cat).n} · ${SEQ_I+1} de ${SEQ_FOTOS.length}</p>
+  <div style="position:relative" id="seqImgWrap">
+    <img src="${f.img}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
+  </div>
+  <div class="row2">
+    <button class="btn ghost mini" ${SEQ_I<=0?'disabled style="opacity:.4"':''} onclick="seqNav(-1)">‹ Anterior</button>
+    <button class="btn ghost mini" ${SEQ_I>=SEQ_FOTOS.length-1?'disabled style="opacity:.4"':''} onclick="seqNav(1)">Próxima ›</button>
+  </div>
+  <button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="excluirFoto('${f.id}')">Excluir foto</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+  const wrap=document.getElementById('seqImgWrap');
+  let x0=null;
+  wrap.ontouchstart=e=>{x0=e.touches[0].clientX};
+  wrap.ontouchend=e=>{
+    if(x0===null)return;
+    const dx=e.changedTouches[0].clientX-x0;
+    if(dx>50)seqNav(-1); else if(dx<-50)seqNav(1);
+    x0=null;
+  };
+}
+function seqNav(d){
+  const novo=SEQ_I+d;
+  if(novo<0||novo>=SEQ_FOTOS.length)return;
+  SEQ_I=novo; mostrarSeq();
+}
+document.addEventListener('keydown',e=>{
+  if(!sheet.classList.contains('on')||!SEQ_FOTOS.length)return;
+  if(e.key==='ArrowLeft')seqNav(-1); else if(e.key==='ArrowRight')seqNav(1);
+});
 function excluirFoto(id){
   confirmar('Excluir foto','Não é possível desfazer.','Excluir',()=>{
     DB.fotos=DB.fotos.filter(f=>f.id!==id);salvar();fechar();render();toast('Foto excluída');
@@ -1990,6 +2036,158 @@ function importar(modo){
   if(d.cfg&&(+d.cfg.at||0)>(+((DB.cfg||{}).at)||0)) DB.cfg=d.cfg;
   salvar();fechar();render();toast('Bases juntadas');
 }
+/* ---------- importar orçamento em PDF (lido no próprio navegador) ---------- */
+const RE_MOEDA_PDF=/-?\d{1,3}(?:\.\d{3})+,\d{2}|-?\d+,\d{2}/g;
+const UNIDS_PDF=['un','und','unid','uni','pc','pç','pcs','mt','m','m2','m²','m3','m³','kg','g','cx','pct','sc','lt','l','par','jg','barra','bar','rl','fd','dz'];
+function nBR(s){return parseFloat(String(s).replace(/\./g,'').replace(',','.'))||0}
+function acharMoedas(t){
+  const out=[]; RE_MOEDA_PDF.lastIndex=0; let m;
+  while((m=RE_MOEDA_PDF.exec(t))!==null) out.push({s:m[0],i:m.index});
+  return out;
+}
+function limparDescPdf(desc,q){
+  let tk=desc.replace(/\s*R\$\s*$/i,'').split(/\s+/).filter(Boolean);
+  for(let j=0;j<Math.min(3,tk.length);j++){
+    if(/^[\d.,]+$/.test(tk[j])&&Math.abs(nBR(tk[j])-q)<0.001){
+      let corte=j+1;
+      if(tk[corte]&&UNIDS_PDF.includes(tk[corte].toLowerCase().replace(/\.$/,''))) corte++;
+      if(tk.slice(corte).join(' ').replace(/[^A-Za-zÀ-ÿ]/g,'').length>=3) tk=tk.slice(corte);
+      break;
+    }
+  }
+  for(let p=0;p<2;p++){
+    if(!tk.length)break;
+    const ult=tk[tk.length-1].toLowerCase().replace(/\.$/,'');
+    if(UNIDS_PDF.includes(ult)&&tk.length>1&&Math.abs(nBR(tk[tk.length-2])-q)<0.001){ tk.splice(-2); continue; }
+    if(/^[\d.,]+$/.test(ult)&&Math.abs(nBR(ult)-q)<0.001){ tk.pop(); continue; }
+    break;
+  }
+  return tk.join(' ').trim();
+}
+function parseOrcamento(linhas){
+  const itens=[];
+  linhas.forEach(t=>{
+    if(/^\s*(total|subtotal|desconto|frete|valor a pagar|vlr total)/i.test(t))return;
+    const ms=acharMoedas(t);
+    if(ms.length<2)return;
+    const total=nBR(ms[ms.length-1].s), unit=nBR(ms[ms.length-2].s);
+    if(!(unit>0)||!(total>0))return;
+    const q=Math.round(total/unit*1000)/1000;
+    if(!(q>0)||q>100000)return;
+    let desc=t.slice(0,ms[ms.length-2].i).trim(), cod='';
+    const mc=desc.match(/^(\d{3,6})\s+/);
+    if(mc){cod=mc[1];desc=desc.slice(mc[0].length)}
+    desc=limparDescPdf(desc,q).replace(/\s{2,}/g,' ');
+    if(desc.replace(/[^A-Za-zÀ-ÿ]/g,'').length<3)return;
+    itens.push({c:cod,d:desc,q,u:unit,f:''});
+  });
+  return itens;
+}
+function totalDeclarado(linhas){
+  let v=0;
+  linhas.forEach(t=>{if(/total/i.test(t)){const ms=acharMoedas(t);if(ms.length)v=Math.max(v,nBR(ms[ms.length-1].s))}});
+  return v;
+}
+function palpiteFornecedor(linhas){
+  for(const t of linhas.slice(0,8)){
+    const s=t.trim();
+    if(acharMoedas(s).length)continue;
+    if(s.replace(/[^A-Za-zÀ-ÿ]/g,'').length<4)continue;
+    if(/or[çc]amento|cnpj|cpf|endere|telefone|fone|data|p[áa]gina|descri/i.test(s))continue;
+    if(s.length>45)continue;
+    return s;
+  }
+  return '';
+}
+function palpiteValidade(linhas){
+  const t=linhas.join(' ');
+  const m=t.match(/valid[^\d]{0,25}(\d{2})\/(\d{2})\/(\d{4})/i);
+  return m?`${m[3]}-${m[2]}-${m[1]}`:'';
+}
+let PDF_LIDO=null;
+function carregarPdfJs(){
+  return new Promise((ok,err)=>{
+    if(window.pdfjsLib){ok();return}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{
+      try{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}catch(e){}
+      ok();
+    };
+    s.onerror=()=>err(new Error('cdn'));
+    document.head.appendChild(s);
+  });
+}
+async function linhasDoPdf(file){
+  await carregarPdfJs();
+  const buf=await file.arrayBuffer();
+  const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;
+  const linhas=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const pg=await pdf.getPage(p);
+    const tc=await pg.getTextContent();
+    const porY={};
+    tc.items.forEach(it=>{
+      if(!it.str||!it.str.trim())return;
+      const y=Math.round(it.transform[5]/2)*2;
+      (porY[y]=porY[y]||[]).push({x:it.transform[4],s:it.str});
+    });
+    Object.keys(porY).map(Number).sort((a,b)=>b-a).forEach(y=>{
+      const t=porY[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(' ').replace(/\s+/g,' ').trim();
+      if(t)linhas.push(t);
+    });
+  }
+  return linhas;
+}
+document.getElementById('pdfCotInput').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f)return;
+  toast('Lendo o PDF...');
+  let linhas;
+  try{ linhas=await linhasDoPdf(f); }
+  catch(x){ toast('Não consegui abrir o PDF. Precisa de internet na primeira vez.'); return; }
+  const itens=parseOrcamento(linhas), tot=totalDeclarado(linhas);
+  const soma=itens.reduce((s,i)=>s+i.q*i.u,0);
+  PDF_LIDO={itens,linhas,tot,soma,nome:f.name,forn:palpiteFornecedor(linhas),val:palpiteValidade(linhas)};
+  const dif=tot>0?Math.round((tot-soma)*100)/100:0;
+  if(!itens.length){
+    abrir(`<h2>Não achei os itens</h2>
+    <p class="sub">Esse PDF pode ser uma foto/scan, ou ter um layout fora do padrão de tabela.</p>
+    <button class="btn ghost mini" onclick="verTextoPdf()">Ver o texto extraído</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="abrirCot()">Criar cotação manualmente</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+    return;
+  }
+  abrir(`<h2>Orçamento lido</h2>
+  <p class="sub">${f.name}</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <div class="stat"><span>Itens encontrados</span><b class="mono">${itens.length}</b></div>
+    <div class="stat"><span>Soma dos itens</span><b class="mono">${brl(soma)}</b></div>
+    ${tot>0?`<div class="stat"><span>Total no PDF</span><b class="mono">${brl(tot)}</b></div>`:''}
+  </div>
+  ${Math.abs(dif)>=0.01?`<p class="hint">A soma não bate com o total do PDF (diferença de ${brl(dif)}) — normalmente é desconto ou frete.</p>
+  <button class="btn" onclick="usarOrcamentoLido(true)">Conferir, ajustando ao total do PDF</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="usarOrcamentoLido(false)">Conferir sem ajustar</button>`
+  :`<button class="btn" onclick="usarOrcamentoLido(false)">Conferir e criar cotação</button>`}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verTextoPdf()">Ver o texto extraído</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>
+  <p class="hint">Nada é salvo agora: a próxima tela é o formulário normal de cotação, já preenchido, para você conferir e corrigir antes de salvar.</p>`);
+};
+function usarOrcamentoLido(ajustar){
+  const p=PDF_LIDO; if(!p)return;
+  const itens=JSON.parse(JSON.stringify(p.itens));
+  const dif=Math.round((p.tot-p.soma)*100)/100;
+  if(ajustar&&Math.abs(dif)>=0.01) itens.push({c:'',d:dif<0?'Desconto negociado':'Frete / acréscimo',q:1,u:dif,f:''});
+  abrirCot({id:'',item:'',forn:p.forn||'',validade:p.val||'',itens,
+    obs:'Importado do PDF '+p.nome});
+}
+function verTextoPdf(){
+  const p=PDF_LIDO; if(!p)return;
+  abrir(`<h2>Texto extraído do PDF</h2>
+  <p class="sub">${p.linhas.length} linha(s). Se os itens não foram reconhecidos, copie este texto — dá para lançar manualmente a partir dele.</p>
+  <textarea readonly onclick="this.select()" style="width:100%;height:240px;margin-top:10px;font-family:monospace;font-size:11px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink)">${p.linhas.join('\n').replace(/</g,'&lt;')}</textarea>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+
 function verCategorias(){
   const custom=(DB.catExtra||[]).slice().sort((a,b)=>alfa(a.n,b.n));
   abrir(`<h2>Categorias personalizadas</h2>
@@ -2081,7 +2279,7 @@ function verManual(){
   <div class="card" style="box-shadow:none;margin-top:10px">
     <p><b>Painel</b> — total investido, fase atual da obra e contas a pagar.</p>
     <p><b>Gastos</b> — todos os lançamentos, com busca, categoria, fornecedor e anexos.</p>
-    <p><b>Cotações</b> — orçamentos de fornecedores para comparar antes de comprar.</p>
+    <p><b>Cotações</b> — orçamentos de fornecedores para comparar antes de comprar. Dá para importar um orçamento em PDF e conferir os itens antes de salvar.</p>
     <p><b>Itens</b> — resumo por material e por tipo de produto comprado.</p>
     <p><b>Fotos</b> — álbum de fotos da obra.</p>
     <p><b>Indicadores</b> — prazo, ritmo de gasto e gráficos mensais.</p>
