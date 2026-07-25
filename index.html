@@ -45,8 +45,29 @@ header .brand span{display:block;font-size:11px;color:#8FB8C4;letter-spacing:.08
  border-radius:10px;display:grid;place-items:center;font-size:16px;cursor:pointer}
 .iconbtn.avatar{border-radius:50%;overflow:hidden}
 .iconbtn:active{transform:scale(.94)}
+.acctWrap{position:relative}
+.acctMenu{position:absolute;top:calc(100% + 8px);right:0;width:230px;background:var(--surface);
+ color:var(--ink);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.22);padding:8px;z-index:80;
+ display:none;opacity:0;transform:translateY(-6px);transition:opacity .12s,transform .12s}
+.acctMenu.on{display:block;opacity:1;transform:translateY(0)}
+.acctMenu .who{padding:10px 10px 8px;border-bottom:1px solid var(--line);margin-bottom:6px;display:flex;gap:10px;align-items:center}
+.acctMenu .who img,.acctMenu .who .ph{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:0 0 auto;background:var(--surface-2);display:grid;place-items:center}
+.acctMenu .who small{display:block;color:var(--ink-2);font-size:11.5px;word-break:break-all}
+.acctMenu button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:0;border:0;
+ padding:9px 10px;border-radius:9px;font-size:14px;color:var(--ink);cursor:pointer}
+.acctMenu button:active{background:var(--surface-2)}
+.acctMenu button.danger{color:var(--red)}
+.acctMenu .div2{height:1px;background:var(--line);margin:6px 2px}
 
 main{padding:16px 14px 20px;max-width:760px;margin:0 auto}
+@media (min-width:860px){
+  main{max-width:920px;padding:22px 20px 28px}
+  .grid{grid-template-columns:repeat(4,1fr)}
+}
+@media (min-width:1180px){
+  main{max-width:1180px}
+  .grid{grid-template-columns:repeat(6,1fr)}
+}
 .view{display:none} .view.on{display:block;animation:fade .18s ease}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
@@ -227,8 +248,12 @@ a{color:var(--teal)}
     <b>Bananeiras C08</b>
     <span>Monte das Cerejeiras · 8 meses</span>
   </div>
+  <button class="iconbtn" id="olhoBtn" title="Mostrar/ocultar valores">🙈</button>
   <button class="iconbtn" id="themeBtn" title="Tema">◐</button>
-  <button class="iconbtn avatar" id="avatarBtn" title="Conta"></button>
+  <div class="acctWrap" id="acctWrap">
+    <button class="iconbtn avatar" id="avatarBtn" title="Conta"></button>
+    <div class="acctMenu" id="acctMenu"></div>
+  </div>
 </header>
 <nav>
   <button class="on" data-v="painel"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Painel</button>
@@ -267,7 +292,10 @@ a{color:var(--teal)}
   </div>
 
   <div class="card">
-    <h3>Fase atual · Canteiro e preparação</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <h3 id="faseTitulo" style="margin:0">Fase atual</h3>
+      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="abrirPendencias()">Gerenciar</button>
+    </div>
     <div id="passosList"></div>
     <div class="hint" id="passosResumo"></div>
   </div>
@@ -287,7 +315,8 @@ a{color:var(--teal)}
 
 <!-- ============ GASTOS ============ -->
 <section class="view" id="v-gastos">
-  <div class="card">
+  <button class="btn" onclick="abrirGasto()">+ Lançar gasto</button>
+  <div class="card" style="margin-top:12px">
     <input id="fBusca" placeholder="Buscar por descrição, fornecedor, categoria, nota, valor...">
     <div class="row2" style="margin-top:9px">
       <select id="fCat"><option value="">Todas as categorias</option></select>
@@ -302,10 +331,17 @@ a{color:var(--teal)}
       <option value="pago">Só pagos</option>
       <option value="aberto">Só a pagar</option>
     </select>
+    <label style="margin-top:9px">Período</label>
+    <div class="row2">
+      <input type="date" id="fDataIni">
+      <input type="date" id="fDataFim">
+    </div>
+    <label class="chkline" style="margin-top:8px;display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="fSemPeriodo" style="width:auto"> Todos os períodos
+    </label>
     <div class="stat" style="margin-top:10px"><span>Total filtrado</span><b class="mono" id="gTotal">R$ 0,00</b></div>
   </div>
   <div class="card" id="gastosCard"><div id="gastosList"></div></div>
-  <button class="btn" onclick="abrirGasto()">+ Lançar gasto</button>
 </section>
 
 <!-- ============ COTAÇÕES ============ -->
@@ -316,6 +352,14 @@ a{color:var(--teal)}
   </div>
   <div class="card">
     <input id="fBuscaCot" placeholder="Buscar por item, fornecedor...">
+    <label style="margin-top:9px">Período (pela data da cotação)</label>
+    <div class="row2">
+      <input type="date" id="fDataIniCot">
+      <input type="date" id="fDataFimCot">
+    </div>
+    <label class="chkline" style="margin-top:8px;display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="fSemPeriodoCot" style="width:auto"> Todos os períodos
+    </label>
   </div>
   <div class="card">
     <h3>Cotações abertas</h3>
@@ -331,9 +375,14 @@ a{color:var(--teal)}
 <section class="view" id="v-itens">
   <div class="card">
     <input id="fBuscaItens" placeholder="Buscar item ou fornecedor...">
-    <select id="fEtapaItens" style="margin-top:9px">
-      <option value="">Todas as etapas</option>
-    </select>
+    <div class="row2" style="margin-top:9px">
+      <select id="fEtapaItens">
+        <option value="">Todas as etapas</option>
+      </select>
+      <select id="fTipoItens">
+        <option value="">Todos os tipos</option>
+      </select>
+    </div>
   </div>
   <div id="itensObra"></div>
 </section>
@@ -607,13 +656,14 @@ function carregar(){
       itens:x.its.map(v=>({c:v[0],d:v[1],q:v[2],u:v[3],f:v[4]})),
       total:x.its.reduce((s,v)=>s+v[2]*v[3],0),
       validade:x.val,obs:x.ob,status:'aberta'}));
-    SEED.passos.forEach((t,i)=>DB.passos.push({id:'sd-p'+i,at:0,n:i+1,txt:t,ok:false}));
+    SEED.passos.forEach((t,i)=>DB.passos.push({id:'sd-p'+i,at:0,n:i+1,txt:t,ok:false,cat:'c00'}));
     salvar();
   }
   DB.fotos=DB.fotos||[];
   DB.catExtra=DB.catExtra||[];
   DB.exc=DB.exc||[];
   rebuildCategorias();
+  (DB.passos||[]).forEach(p=>{ if(!p.cat) p.cat='c00'; });
   (DB.lanc||[]).forEach(l=>{
     if(!l.anexos) l.anexos = l.link?[{id:uid(),tipo:'link',nome:'Link do Drive',dado:l.link}]:[];
   });
@@ -729,7 +779,8 @@ function addMeses(iso,n){
   const dt=new Date(y,m-1+n,Math.min(d,ult));
   return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
 }
-const brl=n=>'R$ '+(+n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+let OCULTAR=true;
+const brl=n=>OCULTAR?'R$ ••••••':'R$ '+(+n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 function dia(d){const p=d.split('-');return {d:p[2],m:MES[+p[1]-1]}}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');
@@ -805,13 +856,27 @@ function render(){
       <div class="val"><span class="tag pend">faltam ${falta.toLocaleString('pt-BR')}</span></div></div>`;
   }).join('');
 
-  /* passos */
-  document.getElementById('passosList').innerHTML=DB.passos.map(p=>
-    `<div class="step ${p.ok?'done':''}"><span class="n">${p.n}</span>
-      <div class="chk" onclick="togglePasso('${p.id}')">${p.ok?'✓':''}</div>
-      <div class="txt">${p.txt}</div></div>`).join('');
-  const f=DB.passos.filter(p=>p.ok).length;
-  document.getElementById('passosResumo').textContent=`${f} de ${DB.passos.length} concluídos`;
+  /* fase atual / pendências */
+  const etapasCon=CATS_AZ.filter(c=>c.g==='con');
+  const faseAberta=etapasCon.find(e=>DB.passos.some(p=>p.cat===e.id&&!p.ok));
+  const semNenhuma=!DB.passos.length;
+  if(faseAberta){
+    document.getElementById('faseTitulo').textContent='Fase atual · '+faseAberta.n.replace(/^\d+\s/,'');
+    const abertos=DB.passos.filter(p=>p.cat===faseAberta.id&&!p.ok).sort((a,b)=>(a.n||0)-(b.n||0));
+    document.getElementById('passosList').innerHTML=abertos.map(p=>
+      `<div class="step"><span class="n">${p.n||''}</span>
+        <div class="chk" onclick="togglePasso('${p.id}')"></div>
+        <div class="txt">${p.txt}</div></div>`).join('');
+    const totalFase=DB.passos.filter(p=>p.cat===faseAberta.id).length;
+    const feitosFase=totalFase-abertos.length;
+    document.getElementById('passosResumo').innerHTML=`${feitosFase} de ${totalFase} concluídos nesta fase · <a href="#" onclick="verConcluidas();return false">ver concluídas</a>`;
+  }else{
+    document.getElementById('faseTitulo').textContent='Fase atual';
+    document.getElementById('passosList').innerHTML=semNenhuma
+      ?`<div class="empty" style="padding:14px 0"><b>Nenhuma pendência cadastrada</b><p>Toque em "Gerenciar" para criar as pendências de cada etapa.</p></div>`
+      :`<div class="empty" style="padding:14px 0"><b>🎉 Todas as pendências concluídas</b></div>`;
+    document.getElementById('passosResumo').innerHTML=semNenhuma?'':'<a href="#" onclick="verConcluidas();return false">ver concluídas</a>';
+  }
 
   /* categorias */
   const tot=adm+con||1;
@@ -831,10 +896,16 @@ function render(){
 function renderGastos(){
   const sel=document.getElementById('fCat');
   if(sel.options.length<2) CATS_AZ.forEach(c=>sel.add(new Option(c.n,c.id)));
+  const iniEl=document.getElementById('fDataIni'), fimEl=document.getElementById('fDataFim'), semEl=document.getElementById('fSemPeriodo');
+  if(!iniEl.value&&!fimEl.value&&!iniEl.dataset.tocado){
+    iniEl.value=hoje().slice(0,8)+'01'; fimEl.value=hoje();
+  }
   const fc=sel.value, fg=document.getElementById('fGrupo').value, fs=document.getElementById('fSit').value;
   const busca=alfa2(document.getElementById('fBusca').value);
+  const semPeriodo=semEl.checked, dIni=iniEl.value, dFim=fimEl.value;
   let L=DB.lanc.filter(l=>(!fc||l.cat===fc)&&(!fg||cat(l.cat).g===fg)
-        &&(!fs||(fs==='pago'?isPago(l):!isPago(l))));
+        &&(!fs||(fs==='pago'?isPago(l):!isPago(l)))
+        &&(semPeriodo||((!dIni||l.data>=dIni)&&(!dFim||l.data<=dFim))));
   if(busca){
     L=L.filter(l=>{
       const alvo=[l.desc,l.forn,l.nf,l.obs,cat(l.cat).n,l.pag,brl(l.total),l.total,
@@ -859,13 +930,32 @@ document.getElementById('fCat').onchange=renderGastos;
 document.getElementById('fGrupo').onchange=renderGastos;
 document.getElementById('fSit').onchange=renderGastos;
 document.getElementById('fBusca').oninput=renderGastos;
+document.getElementById('fDataIni').onchange=e=>{e.target.dataset.tocado='1';renderGastos()};
+document.getElementById('fDataFim').onchange=e=>{e.target.dataset.tocado='1';renderGastos()};
+document.getElementById('fSemPeriodo').onchange=()=>{
+  const on=document.getElementById('fSemPeriodo').checked;
+  document.getElementById('fDataIni').disabled=on; document.getElementById('fDataFim').disabled=on;
+  renderGastos();
+};
 document.getElementById('fBuscaCot').oninput=renderCot;
+document.getElementById('fDataIniCot').onchange=e=>{e.target.dataset.tocado='1';renderCot()};
+document.getElementById('fDataFimCot').onchange=e=>{e.target.dataset.tocado='1';renderCot()};
+document.getElementById('fSemPeriodoCot').onchange=()=>{
+  const on=document.getElementById('fSemPeriodoCot').checked;
+  document.getElementById('fDataIniCot').disabled=on; document.getElementById('fDataFimCot').disabled=on;
+  renderCot();
+};
 
 /* cotações */
 function renderCot(){
   const buscaEl=document.getElementById('fBuscaCot');
   const busca=buscaEl?alfa2(buscaEl.value):'';
-  let C=DB.cot.filter(c=>c.status==='aberta');
+  const iniEl=document.getElementById('fDataIniCot'), fimEl=document.getElementById('fDataFimCot'), semEl=document.getElementById('fSemPeriodoCot');
+  if(!iniEl.value&&!fimEl.value&&!iniEl.dataset.tocado){
+    iniEl.value=hoje().slice(0,8)+'01'; fimEl.value=hoje();
+  }
+  const semPeriodo=semEl.checked, dIni=iniEl.value, dFim=fimEl.value;
+  let C=DB.cot.filter(c=>c.status==='aberta'&&(semPeriodo||((!dIni||c.data>=dIni)&&(!dFim||c.data<=dFim))));
   if(busca) C=C.filter(c=>alfa2([c.item,c.forn,c.obs,(c.itens||[]).map(i=>i.d).join(' ')].join(' ')).includes(busca));
   const chave=t=>String(t||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const G={};
@@ -959,12 +1049,20 @@ function renderItens(){
   if(selE.options.length<2) CATS_AZ.filter(c=>c.g==='con').forEach(c=>selE.add(new Option(c.n,c.id)));
   const fe=selE.value, busca=alfa2(document.getElementById('fBuscaItens').value);
 
+  const selT=document.getElementById('fTipoItens');
+  const tiposExistentes=[...new Set(DB.lanc.filter(l=>l.familia&&l.familia.trim()).map(l=>l.familia.trim()))].sort(alfa);
+  const antes=selT.value;
+  selT.innerHTML='<option value="">Todos os tipos</option>'+tiposExistentes.map(t=>`<option value="${t}">${t}</option>`).join('');
+  if(tiposExistentes.includes(antes)) selT.value=antes;
+  const ft=selT.value;
+
   /* resumo por material — soma no nível do lançamento, sem duplicar valor de rateio */
   const mat={};
   DB.lanc.filter(isPago).forEach(l=>{
     const ehCon=(l.rateio&&l.rateio.length)||cat(l.cat).g==='con';
     if(!ehCon)return;
     if(busca&&!alfa2([l.desc,l.forn].join(' ')).includes(busca))return;
+    if(ft&&(l.familia||'').trim()!==ft)return;
     if(fe){
       const bate=(l.rateio&&l.rateio.length)?l.rateio.some(r=>r.cat===fe):l.cat===fe;
       if(!bate)return;
@@ -982,6 +1080,7 @@ function renderItens(){
     const ehCon=(l.rateio&&l.rateio.length)||cat(l.cat).g==='con';
     if(!ehCon)return;
     if(busca&&!alfa2([l.desc,l.forn,l.familia].join(' ')).includes(busca))return;
+    if(ft&&(l.familia||'').trim()!==ft)return;
     if(fe){
       const bate=(l.rateio&&l.rateio.length)?l.rateio.some(r=>r.cat===fe):l.cat===fe;
       if(!bate)return;
@@ -1008,13 +1107,14 @@ function renderItens(){
        :'<div class="empty">Nenhum item neste filtro</div>'}
      ${resumo.length?'<p class="hint">Aqui a soma é por descrição exata — cada bitola de ferro conta separado.</p>':''}
      </div>`
-    + gruposEtapa(fe,busca);
+    + gruposEtapa(fe,busca,ft);
 }
-function gruposEtapa(fe,busca){
+function gruposEtapa(fe,busca,ft){
   const etapas=CATS_AZ.filter(c=>c.g==='con'&&(!fe||c.id===fe));
   return etapas.map(et=>{
     const linhas=[];
     DB.lanc.filter(isPago).forEach(l=>{
+      if(ft&&(l.familia||'').trim()!==ft)return;
       partes(l).forEach(p=>{
         if(p.cat!==et.id)return;
         if(busca&&!alfa2([l.desc,l.forn].join(' ')).includes(busca))return;
@@ -1035,6 +1135,7 @@ function gruposEtapa(fe,busca){
 }
 document.getElementById('fBuscaItens').oninput=renderItens;
 document.getElementById('fEtapaItens').onchange=renderItens;
+document.getElementById('fTipoItens').onchange=renderItens;
 
 function refreshDatalists(){
   const prods=new Set();
@@ -1084,7 +1185,8 @@ function comboFechar(input){
 function cfg(){DB.cfg=DB.cfg||{inicio:'',meses:8,area:0};return DB.cfg}
 const kpi=(l,v,u,cls)=>`<div class="kpi ${cls||''}"><small>${l}</small><b class="mono">${v}</b>${u?`<u>${u}</u>`:''}</div>`;
 const diasEntre=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
-const curto=n=>{n=+n||0;
+const curto=n=>{if(OCULTAR)return '••';
+  n=+n||0;
   if(n>=1e6) return (n/1e6).toFixed(1).replace('.',',')+'M';
   if(n>=1e3) return (n/1e3).toFixed(n>=1e4?0:1).replace('.',',')+'k';
   return n.toFixed(0);};
@@ -1321,7 +1423,59 @@ function salvarCfg(){
 }
 
 /* ---------- passos ---------- */
-function togglePasso(id){const p=DB.passos.find(x=>x.id===id);p.ok=!p.ok;p.at=Date.now();salvar();render()}
+function togglePasso(id){
+  const p=DB.passos.find(x=>x.id===id); if(!p)return;
+  p.ok=true; p.at=Date.now(); salvar(); render(); toast('Pendência concluída');
+}
+function desfazerPasso(id){
+  const p=DB.passos.find(x=>x.id===id); if(!p)return;
+  p.ok=false; p.at=Date.now(); salvar(); render(); abrirPendencias();
+}
+function verConcluidas(){
+  const feitos=DB.passos.filter(p=>p.ok).sort((a,b)=>(+b.at||0)-(+a.at||0));
+  abrir(`<h2>Pendências concluídas</h2>
+  ${feitos.length?feitos.map(p=>`<div class="step done"><div class="chk" onclick="desfazerPasso('${p.id}')">✓</div>
+    <div class="txt">${p.txt}<br><small style="color:var(--ink-2)">${cat(p.cat).n.replace(/^\d+\s/,'')}${p.at?' · '+new Date(+p.at).toLocaleDateString('pt-BR'):''}</small></div></div>`).join('')
+    :'<p class="sub">Nenhuma pendência concluída ainda.</p>'}
+  <p class="hint">Toque no ✓ para reabrir uma pendência marcada por engano.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function abrirPendencias(){
+  const etapasCon=CATS_AZ.filter(c=>c.g==='con');
+  const grupos=etapasCon.map(e=>{
+    const its=DB.passos.filter(p=>p.cat===e.id).sort((a,b)=>(a.ok-b.ok)||(a.n||0)-(b.n||0));
+    return {e,its};
+  }).filter(g=>g.its.length||true);
+  abrir(`<h2>Gerenciar pendências</h2>
+  <p class="sub">Organizadas por etapa da obra. Marque como concluída para tirar da lista da fase atual.</p>
+  <div style="margin:10px 0">
+    <label>Nova pendência</label>
+    <input id="pd_txt" placeholder="Ex: Fechar a laje">
+    <label style="margin-top:8px">Etapa</label>
+    <select id="pd_cat">${etapasCon.map(e=>`<option value="${e.id}">${e.n}</option>`).join('')}</select>
+    <button class="btn" style="margin-top:9px" onclick="novaPendencia()">+ Adicionar</button>
+  </div>
+  <div class="divider" style="margin:14px 0"></div>
+  ${grupos.map(g=>`<h4 style="margin:14px 0 6px">${g.e.n.replace(/^\d+\s/,'')}</h4>
+    ${g.its.length?g.its.map(p=>`<div class="step ${p.ok?'done':''}">
+      <div class="chk" onclick="${p.ok?`desfazerPasso('${p.id}')`:`togglePasso('${p.id}');abrirPendencias()`}">${p.ok?'✓':''}</div>
+      <div class="txt">${p.txt}</div>
+      <button class="iconbtn" style="width:30px;height:30px;background:transparent;color:var(--red)" onclick="excluirPendencia('${p.id}')" title="Excluir">✕</button>
+    </div>`).join(''):'<p class="hint">Nenhuma pendência nesta etapa.</p>'}`).join('')}
+  <button class="btn ghost mini" style="margin-top:14px" onclick="fechar()">Fechar</button>`);
+}
+function novaPendencia(){
+  const txt=val('pd_txt').trim(), cid=val('pd_cat');
+  if(!txt){toast('Escreva a pendência.');return}
+  const n=(DB.passos.filter(p=>p.cat===cid).reduce((m,p)=>Math.max(m,p.n||0),0))+1;
+  DB.passos.push({id:uid(),at:Date.now(),n,txt,cat:cid,ok:false});
+  salvar(); render(); abrirPendencias(); toast('Pendência criada');
+}
+function excluirPendencia(id){
+  confirmar('Excluir pendência','Não é possível desfazer.','Excluir',()=>{
+    DB.passos=DB.passos.filter(p=>p.id!==id); salvar(); render(); abrirPendencias(); toast('Pendência excluída');
+  },true);
+}
 
 /* ---------- gasto: form ---------- */
 function abrirGasto(l){
@@ -2236,21 +2390,29 @@ function renderAvatar(){
   document.getElementById('avatarBtn').innerHTML=c.foto
     ? `<img src="${c.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
     : `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg>`;
+  renderAcctMenu();
 }
-document.getElementById('avatarBtn').onclick=()=>{
+function renderAcctMenu(){
   const c=cfg();
-  abrir(`<h2>Conta</h2>
-  <div style="text-align:center;margin:10px 0 16px">
-    ${c.foto?`<img src="${c.foto}" style="width:88px;height:88px;object-fit:cover;border-radius:50%">`
-      :`<div style="width:88px;height:88px;border-radius:50%;background:var(--surface-2);display:inline-flex;align-items:center;justify-content:center">
-        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="var(--ink-2)" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></div>`}
-  </div>
-  <button class="btn ghost mini" onclick="document.getElementById('fotoPerfilInput').click()">Alterar foto</button>
-  ${c.foto?`<button class="btn ghost mini" style="margin-top:9px" onclick="removerFotoPerfil()">Remover foto</button>`:''}
-  <div class="divider" style="margin:16px 0"></div>
-  <button class="btn ghost mini" onclick="verManual()">Manual do app</button>
-  <button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="sair()">Sair do app</button>`);
-};
+  const foto=c.foto?`<img src="${c.foto}">`
+    :`<div class="ph"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--ink-2)" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></div>`;
+  document.getElementById('acctMenu').innerHTML=`
+    <div class="who">${foto}<div style="min-width:0"><b style="font-size:13.5px">Minha conta</b>
+      ${SESSAO?`<small>${SESSAO.user.email}</small>`:'<small>Modo teste</small>'}</div></div>
+    <button onclick="document.getElementById('fotoPerfilInput').click()">🖼️ Alterar foto</button>
+    ${c.foto?`<button onclick="removerFotoPerfil()">🗑️ Remover foto</button>`:''}
+    <div class="div2"></div>
+    <button onclick="fecharAcctMenu();verManual()">📘 Manual do app</button>
+    <div class="div2"></div>
+    <button class="danger" onclick="fecharAcctMenu();sair()">↩ Sair do app</button>`;
+}
+function toggleAcctMenu(){ document.getElementById('acctMenu').classList.toggle('on'); }
+function fecharAcctMenu(){ document.getElementById('acctMenu').classList.remove('on'); }
+document.getElementById('avatarBtn').onclick=e=>{ e.stopPropagation(); toggleAcctMenu(); };
+document.addEventListener('click',e=>{
+  const w=document.getElementById('acctWrap');
+  if(w&&!w.contains(e.target)) fecharAcctMenu();
+});
 document.getElementById('fotoPerfilInput').onchange=e=>{
   const f=e.target.files[0]; if(!f)return;
   const r=new FileReader();
@@ -2262,7 +2424,7 @@ document.getElementById('fotoPerfilInput').onchange=e=>{
       cv.width=im.width*s|0; cv.height=im.height*s|0;
       cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
       cfg().foto=cv.toDataURL('image/jpeg',.7);
-      salvar(); renderAvatar(); document.getElementById('avatarBtn').click();
+      salvar(); renderAvatar();
       toast('Foto atualizada');
     };
     im.src=r.result;
@@ -2271,23 +2433,29 @@ document.getElementById('fotoPerfilInput').onchange=e=>{
   e.target.value='';
 };
 function removerFotoPerfil(){
-  delete cfg().foto; salvar(); renderAvatar(); fechar(); toast('Foto removida');
+  delete cfg().foto; salvar(); renderAvatar(); toast('Foto removida');
 }
 function verManual(){
   abrir(`<h2>Manual do app</h2>
-  <p class="sub">Um resumo rápido de cada aba.</p>
+  <p class="sub">Um guia rápido de cada parte do sistema.</p>
   <div class="card" style="box-shadow:none;margin-top:10px">
-    <p><b>Painel</b> — total investido, fase atual da obra e contas a pagar.</p>
-    <p><b>Gastos</b> — todos os lançamentos, com busca, categoria, fornecedor e anexos.</p>
-    <p><b>Cotações</b> — orçamentos de fornecedores para comparar antes de comprar. Dá para importar um orçamento em PDF e conferir os itens antes de salvar.</p>
-    <p><b>Itens</b> — resumo por material e por tipo de produto comprado.</p>
-    <p><b>Fotos</b> — álbum de fotos da obra.</p>
-    <p><b>Indicadores</b> — prazo, ritmo de gasto e gráficos mensais.</p>
-    <p><b>Importações</b> — backup, planilha CSV, importar/juntar dados e ajustes gerais.</p>
+    <p><b>Painel</b> — total investido (dividido em administrativas e construção), fase atual da obra com pendências (toque em "Gerenciar" para criar, mover de etapa ou ver as já concluídas), contas a pagar, saldo de material a receber e gasto por categoria. O ícone de olho no topo esconde ou mostra os valores em tela.</p>
+    <p><b>Gastos</b> — todos os lançamentos. Dá para duplicar, repetir todo mês, ratear entre várias etapas de uma vez, controlar entregas parciais e anexar foto ou link do documento.</p>
+    <p><b>Cotações</b> — orçamentos para comparar fornecedores antes de comprar (não entra na conta ainda). Quando fechar, use "Virou compra" para virar gasto de verdade. Dá para importar um PDF de orçamento e o app já tenta preencher os itens sozinho, pra você só conferir.</p>
+    <p><b>Itens</b> — resumo por material e por tipo de produto comprado, com filtro por etapa.</p>
+    <p><b>Fotos</b> — álbum com data e hora. "Tirar foto" abre a câmera, "Da galeria" deixa escolher uma já existente. "Ver em sequência" mostra o álbum como uma linha do tempo, com setas ou arrastando o dedo.</p>
+    <p><b>Indicadores</b> — prazo da obra, ritmo de gasto, gráfico mensal, rankings e qualidade do registro.</p>
+    <p><b>Importações</b> — backup, planilha em CSV, importar/juntar dados de outro aparelho ou arquivo, prazo e área construída, verificar duplicados e categorias personalizadas.</p>
+    <p><b>Conta (canto superior direito)</b> — trocar sua foto de perfil, reler este manual e sair do app.</p>
   </div>
-  <p class="hint">Os dados ficam salvos neste aparelho e sincronizam automaticamente com a nuvem quando você está logado.</p>
+  <p class="hint">Os dados ficam salvos neste aparelho e sincronizam automaticamente com a nuvem quando você está logado — inclusive as exclusões, então apagar em um aparelho remove no outro também.</p>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
+document.getElementById('olhoBtn').onclick=()=>{
+  OCULTAR=!OCULTAR;
+  document.getElementById('olhoBtn').textContent=OCULTAR?'🙈':'👁️';
+  render();
+};
 iniciarAuth();
 </script>
 </body>
