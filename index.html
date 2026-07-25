@@ -193,8 +193,26 @@ svg.chart{width:100%;height:auto;display:block;overflow:visible}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(-4px)}
 a{color:var(--teal)}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
+
+<div id="authGate" style="position:fixed;inset:0;z-index:999;background:var(--navy);
+ display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="width:100%;max-width:340px">
+    <div style="text-align:center;margin-bottom:24px">
+      <b style="color:#fff;font-size:19px;letter-spacing:-.02em">Bananeiras C08</b>
+      <div style="color:#8FB8C4;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px">Controle da obra</div>
+    </div>
+    <div style="background:var(--surface);border-radius:16px;padding:20px;box-shadow:var(--shadow)">
+      <label>E-mail</label><input type="email" id="ag_email" autocomplete="username">
+      <label>Senha</label><input type="password" id="ag_senha" autocomplete="current-password">
+      <div id="ag_erro" style="color:var(--red);font-size:12.5px;margin-top:8px;display:none"></div>
+      <button class="btn" style="margin-top:14px" onclick="fazerLogin()" id="ag_btn">Entrar</button>
+    </div>
+    <p style="text-align:center;color:#8FB8C4;font-size:11.5px;margin-top:14px">Os dados sincronizam entre seus aparelhos automaticamente.</p>
+  </div>
+</div>
 
 <div class="topbar">
 <header>
@@ -375,6 +393,83 @@ a{color:var(--teal)}
 <div class="toast" id="toast"></div>
 
 <script>
+/* ---------- Supabase: config, login e sincronização ---------- */
+const SUPA_URL='https://exinsaegwfynkgvjjaqj.supabase.co';
+const SUPA_KEY='sb_publishable_KNzWfqlWHOvNIHT0-2Ng4g_Xh3Nkyxm';
+const supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+let SESSAO=null, SYNC_TIMER=null, SYNC_OK=true;
+
+async function iniciarAuth(){
+  document.getElementById('ag_senha').addEventListener('keydown',e=>{if(e.key==='Enter')fazerLogin()});
+  const {data}=await supa.auth.getSession();
+  if(data&&data.session){ await entrarNoApp(data.session); }
+  else{ document.getElementById('authGate').style.display='flex'; }
+}
+async function fazerLogin(){
+  const email=document.getElementById('ag_email').value.trim();
+  const senha=document.getElementById('ag_senha').value;
+  const erro=document.getElementById('ag_erro'), btn=document.getElementById('ag_btn');
+  erro.style.display='none';
+  if(!email||!senha){ erro.textContent='Preencha e-mail e senha.'; erro.style.display='block'; return; }
+  btn.textContent='Entrando...'; btn.disabled=true;
+  const {data,error}=await supa.auth.signInWithPassword({email,password:senha});
+  btn.textContent='Entrar'; btn.disabled=false;
+  if(error){ erro.textContent='E-mail ou senha incorretos.'; erro.style.display='block'; return; }
+  await entrarNoApp(data.session);
+}
+async function sair(){
+  await supa.auth.signOut();
+  location.reload();
+}
+async function entrarNoApp(session){
+  SESSAO=session;
+  document.getElementById('authGate').style.display='none';
+  carregar();
+  await sincronizarNaEntrada();
+  render();
+}
+
+/* funde os dados da nuvem com os locais pelo conteúdo (mesma lógica do "Importar só o que for novo") */
+function mesclarSeguro(vindo){
+  if(!vindo)return;
+  const existeL=new Set(DB.lanc.map(l=>chaveDup(l,'lanc')));
+  const existeC=new Set(DB.cot.map(c=>chaveDup(c,'cot')));
+  const idsF=new Set(DB.fotos.map(f=>f.id)), idsP=new Set(DB.passos.map(p=>p.id));
+  const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
+  const novosL=(vindo.lanc||[]).filter(l=>!existeL.has(chaveDup(l,'lanc')));
+  const novosC=(vindo.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot')));
+  const novasF=(vindo.fotos||[]).filter(f=>!idsF.has(f.id));
+  const novosP=(vindo.passos||[]).filter(p=>!idsP.has(p.id));
+  const novasCx=(vindo.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
+  DB.lanc=DB.lanc.concat(novosL); DB.cot=DB.cot.concat(novosC);
+  DB.fotos=DB.fotos.concat(novasF); DB.passos=DB.passos.concat(novosP);
+  DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias();
+  if(!DB.cfg||!DB.cfg.inicio) DB.cfg=vindo.cfg||DB.cfg;
+  return novosL.length+novosC.length+novasF.length+novosP.length+novasCx.length;
+}
+async function sincronizarNaEntrada(){
+  try{
+    const {data,error}=await supa.from('obra_dados').select('dados').eq('user_id',SESSAO.user.id).maybeSingle();
+    if(error){ SYNC_OK=false; return; }
+    if(data&&data.dados){ mesclarSeguro(data.dados); salvar(); }
+    await enviarNuvem();
+    SYNC_OK=true;
+  }catch(e){ SYNC_OK=false; }
+}
+async function enviarNuvem(){
+  if(!SESSAO)return;
+  try{
+    const {error}=await supa.from('obra_dados').upsert(
+      {user_id:SESSAO.user.id, dados:DB, updated_at:new Date().toISOString()},
+      {onConflict:'user_id'});
+    SYNC_OK=!error;
+  }catch(e){ SYNC_OK=false; }
+}
+function sincronizarDepoisDeSalvar(){
+  clearTimeout(SYNC_TIMER);
+  SYNC_TIMER=setTimeout(enviarNuvem,1200);
+}
+
 /* ---------- categorias ---------- */
 const CATS=[
  {id:'terreno',g:'adm',n:'Terreno'},
@@ -579,6 +674,7 @@ function verAnexoDet(i){
 function salvar(){
   try{localStorage.setItem('obraC08',JSON.stringify(DB))}
   catch(e){toast('Memória do aparelho cheia. Exporte o backup e apague fotos antigas.')}
+  if(SESSAO) sincronizarDepoisDeSalvar();
 }
 /* ---------- confirmação (não usa confirm() nativo — falha em apps instalados na tela inicial) ---------- */
 let ACAO_PENDENTE=null;
@@ -1844,6 +1940,8 @@ document.getElementById('menuBtn').onclick=()=>abrir(`<h2>Obra Bananeiras C08</h
     <div class="stat"><span>Lançamentos</span><b class="mono">${DB.lanc.length}</b></div>
     <div class="stat"><span>Cotações abertas</span><b class="mono">${DB.cot.filter(c=>c.status==='aberta').length}</b></div>
     <div class="stat"><span>Fotos no álbum</span><b class="mono">${DB.fotos.length}</b></div>
+    ${SESSAO?`<div class="stat"><span>Sincronização</span><b style="color:${SYNC_OK?'var(--green)':'var(--red)'}">${SYNC_OK?'em dia ✓':'falhou, tentando de novo'}</b></div>
+    <div class="stat"><span>Conta</span><b style="font-size:12.5px">${SESSAO.user.email}</b></div>`:''}
   </div>
   <button class="btn dark" onclick="exportJSON()">Exportar backup</button>
   <div class="row2" style="margin-top:9px">
@@ -1853,10 +1951,11 @@ document.getElementById('menuBtn').onclick=()=>abrir(`<h2>Obra Bananeiras C08</h
   <button class="btn ghost mini" style="margin-top:9px" onclick="abrirCfg()">Prazo e área construída</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="abrirDuplicados()">Verificar duplicados</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="verCategorias()">Categorias personalizadas</button>
-  <p class="hint">Os dados ficam guardados só neste aparelho. Se limpar os dados do navegador, tudo se perde — exporte de vez em quando e guarde o arquivo no Drive.</p>
+  ${SESSAO?`<button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="sair()">Sair da conta</button>`:''}
+  <p class="hint">Os dados sincronizam com a nuvem automaticamente. Continuam funcionando offline e são salvos também neste aparelho.</p>
   <button class="btn ghost mini" style="margin-top:6px" onclick="fechar()">Fechar</button>`);
 
-carregar(); render();
+iniciarAuth();
 </script>
 </body>
 </html>
