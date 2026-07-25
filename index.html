@@ -448,18 +448,21 @@ async function entrarNoApp(session){
 /* funde os dados da nuvem com os locais pelo conteúdo (mesma lógica do "Importar só o que for novo") */
 function mesclarSeguro(vindo){
   if(!vindo)return;
+  mesclarExclusoes(vindo.exc);
+  const setExc=new Set((DB.exc||[]).map(e=>e.k));
   const existeL=new Set(DB.lanc.map(l=>chaveDup(l,'lanc')));
   const existeC=new Set(DB.cot.map(c=>chaveDup(c,'cot')));
   const idsF=new Set(DB.fotos.map(f=>f.id)), idsP=new Set(DB.passos.map(p=>p.id));
   const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
-  const novosL=(vindo.lanc||[]).filter(l=>!existeL.has(chaveDup(l,'lanc')));
-  const novosC=(vindo.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot')));
+  const novosL=(vindo.lanc||[]).filter(l=>!existeL.has(chaveDup(l,'lanc'))&&!setExc.has('lanc|'+chaveDup(l,'lanc')));
+  const novosC=(vindo.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot'))&&!setExc.has('cot|'+chaveDup(c,'cot')));
   const novasF=(vindo.fotos||[]).filter(f=>!idsF.has(f.id));
   const novosP=(vindo.passos||[]).filter(p=>!idsP.has(p.id));
   const novasCx=(vindo.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
   DB.lanc=DB.lanc.concat(novosL); DB.cot=DB.cot.concat(novosC);
   DB.fotos=DB.fotos.concat(novasF); DB.passos=DB.passos.concat(novosP);
   DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias();
+  aplicarExclusoes();
   if(!DB.cfg||!DB.cfg.inicio) DB.cfg=vindo.cfg||DB.cfg;
   return novosL.length+novosC.length+novasF.length+novosP.length+novasCx.length;
 }
@@ -600,6 +603,7 @@ function carregar(){
   }
   DB.fotos=DB.fotos||[];
   DB.catExtra=DB.catExtra||[];
+  DB.exc=DB.exc||[];
   rebuildCategorias();
   (DB.lanc||[]).forEach(l=>{
     if(!l.anexos) l.anexos = l.link?[{id:uid(),tipo:'link',nome:'Link do Drive',dado:l.link}]:[];
@@ -1236,6 +1240,26 @@ function chaveDup(o,tipo){
   if(tipo==='lanc') return o.data+'|'+String(o.desc||'').trim().toLowerCase()+'|'+(+o.total).toFixed(2);
   return String(o.item||'').trim().toLowerCase()+'|'+String(o.forn||'').trim().toLowerCase()+'|'+(+o.total).toFixed(2);
 }
+/* ---------- exclusões (lápides) — garantem que um item apagado num aparelho não "volte" ao sincronizar com outro ---------- */
+function marcarExcluido(o,tipo){
+  DB.exc=DB.exc||[];
+  const k=tipo+'|'+chaveDup(o,tipo);
+  DB.exc=DB.exc.filter(e=>e.k!==k);
+  DB.exc.push({k,at:Date.now()});
+}
+function mesclarExclusoes(vindo){
+  DB.exc=DB.exc||[];
+  const m={}; DB.exc.forEach(e=>m[e.k]=e);
+  (vindo||[]).forEach(e=>{ if(!m[e.k]||(+e.at||0)>(+m[e.k].at||0)) m[e.k]=e; });
+  DB.exc=Object.values(m);
+}
+function aplicarExclusoes(){
+  DB.exc=DB.exc||[];
+  if(!DB.exc.length)return;
+  const set=new Set(DB.exc.map(e=>e.k));
+  DB.lanc=DB.lanc.filter(l=>!set.has('lanc|'+chaveDup(l,'lanc')));
+  DB.cot=DB.cot.filter(c=>!set.has('cot|'+chaveDup(c,'cot')));
+}
 function acharDuplicados(tipo){
   const arr=tipo==='lanc'?DB.lanc:DB.cot, groups={};
   arr.forEach(o=>{const k=chaveDup(o,tipo);(groups[k]=groups[k]||[]).push(o)});
@@ -1485,6 +1509,7 @@ function excluirGasto(id){
   const abertos=l.serie?DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)):[];
   if(l.serie&&abertos.length>1){
     ACAO_PENDENTE=()=>{
+      DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)).forEach(x=>marcarExcluido(x,'lanc'));
       DB.lanc=DB.lanc.filter(x=>!(x.serie===l.serie&&!isPago(x)));
       salvar();fechar();render();toast('Lançamentos em aberto da série excluídos');
     };
@@ -1501,6 +1526,7 @@ function excluirSoEste(id){
   const l=DB.lanc.find(x=>x.id===id);
   confirmar('Excluir lançamento',`"${l.desc}" — ${brl(l.total)}. Não é possível desfazer.`,
     'Excluir',()=>{
+      marcarExcluido(l,'lanc');
       DB.lanc=DB.lanc.filter(x=>x.id!==id);salvar();fechar();render();toast('Lançamento excluído');
     },true);
 }
@@ -1852,7 +1878,8 @@ function verBackupNovoTexto(){
     lanc:DB.lanc.filter(alterado),
     cot:DB.cot.filter(alterado),
     fotos:DB.fotos.filter(x=>!x.id.startsWith('sd-')),
-    catExtra:DB.catExtra||[]
+    catExtra:DB.catExtra||[],
+    exc:DB.exc||[]
   };
   const qtd=novo.lanc.length+novo.cot.length+novo.fotos.length;
   const txt=JSON.stringify(novo);
@@ -1898,10 +1925,11 @@ document.getElementById('impInput').onchange=e=>{
   const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{
     let d; try{d=JSON.parse(r.result); if(!d.lanc)throw 0}catch(x){toast('Arquivo inválido.');return}
+    const setExc=new Set((DB.exc||[]).map(e=>e.k));
     const existeL=new Set(DB.lanc.map(l=>chaveDup(l,'lanc')));
     const existeC=new Set(DB.cot.map(c=>chaveDup(c,'cot')));
-    const nSeguroL=(d.lanc||[]).filter(l=>!existeL.has(chaveDup(l,'lanc'))).length;
-    const nSeguroC=(d.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot'))).length;
+    const nSeguroL=(d.lanc||[]).filter(l=>!existeL.has(chaveDup(l,'lanc'))&&!setExc.has('lanc|'+chaveDup(l,'lanc'))).length;
+    const nSeguroC=(d.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot'))&&!setExc.has('cot|'+chaveDup(c,'cot'))).length;
     abrir(`<h2>Importar dados</h2>
     <p class="sub">Arquivo de ${d.meta&&d.meta.em?new Date(d.meta.em).toLocaleString('pt-BR'):'origem desconhecida'}</p>
     <button class="btn" onclick="importar('seguro')">Importar só o que for novo (${nSeguroL+nSeguroC})</button>
@@ -1921,7 +1949,7 @@ function importar(modo){
   const d=panel._imp;
   if(modo==='trocar'){
     ACAO_PENDENTE=()=>{
-      DB=d; DB.fotos=DB.fotos||[]; DB.cfg=DB.cfg||{inicio:'',meses:8,area:0}; DB.catExtra=DB.catExtra||[];
+      DB=d; DB.fotos=DB.fotos||[]; DB.cfg=DB.cfg||{inicio:'',meses:8,area:0}; DB.catExtra=DB.catExtra||[]; DB.exc=DB.exc||[];
       rebuildCategorias(); salvar();fechar();render();toast('Base substituída');
     };
     abrir(`<h2>Substituir tudo?</h2>
@@ -1931,26 +1959,31 @@ function importar(modo){
     return;
   }
   if(modo==='seguro'){
+    mesclarExclusoes(d.exc);
+    const setExc=new Set((DB.exc||[]).map(e=>e.k));
     const existeL=new Set(DB.lanc.map(l=>chaveDup(l,'lanc')));
     const existeC=new Set(DB.cot.map(c=>chaveDup(c,'cot')));
     const idsF=new Set(DB.fotos.map(f=>f.id)), idsP=new Set(DB.passos.map(p=>p.id));
     const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
-    const novosL=(d.lanc||[]).filter(l=>!existeL.has(chaveDup(l,'lanc')));
-    const novosC=(d.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot')));
+    const novosL=(d.lanc||[]).filter(l=>!existeL.has(chaveDup(l,'lanc'))&&!setExc.has('lanc|'+chaveDup(l,'lanc')));
+    const novosC=(d.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot'))&&!setExc.has('cot|'+chaveDup(c,'cot')));
     const novasF=(d.fotos||[]).filter(f=>!idsF.has(f.id));
     const novosP=(d.passos||[]).filter(p=>!idsP.has(p.id));
     const novasCx=(d.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
     DB.lanc=DB.lanc.concat(novosL); DB.cot=DB.cot.concat(novosC);
     DB.fotos=DB.fotos.concat(novasF); DB.passos=DB.passos.concat(novosP);
     DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias();
+    aplicarExclusoes();
     salvar();fechar();render();
     toast((novosL.length+novosC.length+novasF.length+novosP.length+novasCx.length)+' item(ns) novo(s) importado(s)');
     return;
   }
+  mesclarExclusoes(d.exc);
   DB.lanc=fundir(DB.lanc,d.lanc).lista;
   DB.cot=fundir(DB.cot,d.cot).lista;
   DB.fotos=fundir(DB.fotos,d.fotos).lista;
   DB.passos=fundir(DB.passos,d.passos).lista;
+  aplicarExclusoes();
   const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
   const novasCx=(d.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
   DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias();
