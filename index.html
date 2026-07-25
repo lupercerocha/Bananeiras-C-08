@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A1F2E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Obra Bananeiras C08</title>
+<style>
+:root{
+  --navy:#0A1F2E; --navy-2:#123449; --teal:#16A394; --teal-2:#0E7F74;
+  --amber:#E0A23C; --red:#C4534D; --green:#3F9E68;
+  --bg:#EEF2F3; --surface:#FFFFFF; --surface-2:#F6F8F9;
+  --ink:#0A1F2E; --ink-2:#4A6373; --line:#DCE4E8;
+  --shadow:0 1px 2px rgba(10,31,46,.06),0 8px 24px rgba(10,31,46,.06);
+  --r:14px; --safe:env(safe-area-inset-bottom,0px);
+}
+html[data-theme="dark"]{
+  --bg:#08131C; --surface:#0F2433; --surface-2:#143042;
+  --ink:#E4EEF2; --ink-2:#8FA9B8; --line:#1D3D51;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);
+ font-family:"DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+ font-size:15px;line-height:1.45;padding-bottom:20px}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.02em}
+button,input,select,textarea{font-family:inherit;font-size:15px;color:inherit}
+
+/* topo fixo: cabeçalho + navegação juntos */
+.topbar{position:sticky;top:0;z-index:40}
+header{background:var(--navy);color:#fff;
+ padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 12px;
+ display:flex;align-items:center;gap:12px}
+html[data-theme="dark"] header{background:#061019}
+header .brand{flex:1;min-width:0}
+header .brand b{display:block;font-size:16px;letter-spacing:-.02em}
+header .brand span{display:block;font-size:11px;color:#8FB8C4;letter-spacing:.08em;text-transform:uppercase}
+.iconbtn{background:rgba(255,255,255,.1);border:0;color:#fff;width:36px;height:36px;
+ border-radius:10px;display:grid;place-items:center;font-size:16px;cursor:pointer}
+.iconbtn:active{transform:scale(.94)}
+
+main{padding:16px 14px 20px;max-width:760px;margin:0 auto}
+.view{display:none} .view.on{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+ padding:14px;box-shadow:var(--shadow);margin-bottom:12px}
+.card h3{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2);margin-bottom:10px}
+
+/* hero total */
+.hero{background:linear-gradient(150deg,var(--navy) 0%,var(--navy-2) 100%);color:#fff;border:0}
+.hero .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8FB8C4}
+.hero .big{font-size:34px;font-weight:700;letter-spacing:-.03em;margin:2px 0 12px}
+.hero .split{display:flex;gap:10px}
+.hero .split div{flex:1;background:rgba(255,255,255,.08);border-radius:10px;padding:9px 10px}
+.hero .split b{display:block;font-size:16px;margin-top:2px}
+.hero .split small{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8FB8C4}
+.hero .apagar{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.14);
+ display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:#E0A23C}
+.hero .apagar b{font-size:15px;font-weight:700}
+
+.stat{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px dashed var(--line)}
+.stat:last-child{border:0}
+.stat b{font-weight:700}
+.bar{height:6px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--teal);border-radius:4px}
+
+.tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+ padding:3px 7px;border-radius:6px;background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)}
+.tag.adm{background:rgba(224,162,60,.14);color:#9A6D14;border-color:rgba(224,162,60,.35)}
+.tag.con{background:rgba(22,163,148,.14);color:var(--teal-2);border-color:rgba(22,163,148,.35)}
+.tag.pend{background:rgba(196,83,77,.14);color:var(--red);border-color:rgba(196,83,77,.35)}
+.tag.ok{background:rgba(63,158,104,.14);color:var(--green);border-color:rgba(63,158,104,.35)}
+html[data-theme="dark"] .tag.adm{color:#E0A23C}
+
+/* lista */
+.item{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.item:last-child{border:0}
+.item .dt{width:44px;flex:none;text-align:center}
+.item .dt b{display:block;font-size:17px;line-height:1;font-weight:700}
+.item .dt span{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+.item .mid{flex:1;min-width:0}
+.item .mid b{display:block;font-size:14.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .mid small{color:var(--ink-2);font-size:12px}
+.item .val{text-align:right;font-weight:700;font-size:14.5px;flex:none}
+
+/* botoes */
+.btn{display:block;width:100%;padding:13px;border:0;border-radius:12px;background:var(--teal);color:#fff;
+ font-weight:700;font-size:15px;cursor:pointer;letter-spacing:-.01em}
+.btn:active{transform:scale(.985)}
+.btn.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line)}
+.btn.dark{background:var(--navy)} html[data-theme="dark"] .btn.dark{background:var(--surface-2)}
+.btn.danger{background:var(--red)}
+.row2{display:flex;gap:9px} .row2>*{flex:1}
+.mini{padding:9px;font-size:13px;border-radius:10px}
+
+/* form */
+label{display:block;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+ color:var(--ink-2);margin:12px 0 5px}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+ background:var(--surface-2);color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:transparent}
+textarea{min-height:64px;resize:vertical}
+
+/* modal */
+.sheet{position:fixed;inset:0;z-index:60;display:none}
+.sheet.on{display:block}
+.sheet .bg{position:absolute;inset:0;background:rgba(6,16,25,.5);backdrop-filter:blur(2px)}
+.sheet .panel{position:absolute;left:0;right:0;bottom:0;max-height:92vh;overflow:auto;
+ background:var(--surface);border-radius:20px 20px 0 0;padding:8px 16px calc(24px + var(--safe));
+ animation:up .22s cubic-bezier(.2,.8,.3,1)}
+@keyframes up{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
+.grab{width:38px;height:4px;border-radius:3px;background:var(--line);margin:6px auto 12px}
+.sheet h2{font-size:19px;margin-bottom:2px}
+.sheet .sub{font-size:12.5px;color:var(--ink-2);margin-bottom:8px}
+
+/* nav */
+nav{display:flex;overflow-x:auto;scrollbar-width:none;
+ background:var(--surface);border-bottom:1px solid var(--line)}
+nav::-webkit-scrollbar{display:none}
+nav button{flex:1 0 auto;min-width:64px;background:0;border:0;padding:8px 4px 7px;cursor:pointer;color:var(--ink-2);
+ display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;letter-spacing:.02em}
+nav button svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--teal)}
+
+/* passos */
+.step{display:flex;gap:11px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.step:last-child{border:0}
+.step .chk{width:24px;height:24px;flex:none;border-radius:8px;border:2px solid var(--line);
+ display:grid;place-items:center;cursor:pointer;font-size:13px;color:#fff}
+.step.done .chk{background:var(--teal);border-color:var(--teal)}
+.step.done .txt{text-decoration:line-through;color:var(--ink-2)}
+.step .txt{flex:1;font-size:14.5px}
+.step .n{font-size:11px;color:var(--ink-2);font-weight:700;width:18px;flex:none}
+
+/* fotos */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.grid figure{margin:0;position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--surface-2);cursor:pointer}
+.grid img{width:100%;height:100%;object-fit:cover;display:block}
+.grid figcaption{position:absolute;left:0;right:0;bottom:0;padding:12px 5px 4px;font-size:9px;color:#fff;
+ background:linear-gradient(transparent,rgba(0,0,0,.72));letter-spacing:.02em}
+.monthlbl{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin:14px 0 8px}
+
+.empty{text-align:center;padding:26px 12px;color:var(--ink-2)}
+.empty b{display:block;color:var(--ink);margin-bottom:4px;font-size:15px}
+.empty p{margin:0;font-size:13px}
+.hint{font-size:12px;color:var(--ink-2);margin-top:8px;line-height:1.5}
+.divider{height:1px;background:var(--line);margin:14px 0}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.kpi{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:10px 11px}
+.kpi small{display:block;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+.kpi b{display:block;font-size:19px;font-weight:700;letter-spacing:-.02em;margin-top:3px}
+.kpi u{display:block;font-size:11px;color:var(--ink-2);text-decoration:none;margin-top:2px;line-height:1.3}
+.kpi.wide{grid-column:1/-1}
+.kpi.alert{background:rgba(196,83,77,.09);border-color:rgba(196,83,77,.3)}
+.kpi.good{background:rgba(63,158,104,.09);border-color:rgba(63,158,104,.3)}
+.rank{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.rank:last-child{border:0}
+.rank .p{width:17px;flex:none;font-size:11px;font-weight:700;color:var(--ink-2)}
+.rank .nm{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank .vl{font-weight:700;font-size:13.5px;flex:none}
+.rank .bg{height:4px;border-radius:3px;background:var(--teal);opacity:.25;margin-top:3px}
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.grp{border:1px solid var(--line);border-radius:12px;padding:10px 11px;margin-bottom:10px;background:var(--surface-2)}
+.grp>h4{margin:0 0 2px;font-size:14.5px;font-weight:700;letter-spacing:-.01em}
+.grp .qt{font-size:11.5px;color:var(--ink-2);margin-bottom:6px}
+.prop{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer}
+.prop .nm{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prop .vl{font-weight:700;font-size:13.5px;flex:none}
+.prop.win .nm{font-weight:700}
+.win-tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+ padding:2px 6px;border-radius:5px;background:var(--teal);color:#fff;margin-left:6px}
+.anx{display:flex;align-items:center;gap:9px;padding:8px 9px;background:var(--surface-2);
+ border:1px solid var(--line);border-radius:10px;margin-bottom:7px;cursor:pointer}
+.anx .ic{width:30px;height:30px;flex:none;border-radius:7px;overflow:hidden;background:var(--surface);
+ display:grid;place-items:center;font-size:14px}
+.anx .ic img{width:100%;height:100%;object-fit:cover}
+.anx .nm{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anx .rm{width:26px;height:26px;flex:none;border-radius:8px;border:0;background:transparent;color:var(--red);font-size:15px;cursor:pointer}
+.combo{position:relative}
+.combo-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:35;background:var(--surface);
+ border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);max-height:216px;overflow-y:auto;display:none}
+.combo-list div{padding:10px 12px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--line)}
+.combo-list div:last-child{border-bottom:0}
+.combo-list div:active{background:var(--surface-2)}
+.combo-empty{padding:9px 12px;font-size:12.5px;color:var(--ink-2)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + var(--safe));z-index:80;
+ background:var(--navy);color:#fff;padding:11px 18px;border-radius:11px;font-size:13.5px;font-weight:600;
+ box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.25s}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(-4px)}
+a{color:var(--teal)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+<header>
+  <div class="brand">
+    <b>Bananeiras C08</b>
+    <span>Monte das Cerejeiras · 8 meses</span>
+  </div>
+  <button class="iconbtn" id="themeBtn" title="Tema">◐</button>
+  <button class="iconbtn" id="menuBtn" title="Mais">⋯</button>
+</header>
+<nav>
+  <button class="on" data-v="painel"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Painel</button>
+  <button data-v="gastos"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>Gastos</button>
+  <button data-v="cot"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Cotações</button>
+  <button data-v="itens"><svg viewBox="0 0 24 24"><path d="M20.5 7.3 12 12l-8.5-4.7M12 12v9.3M20.5 7.3 12 3 3.5 7.3l8.5 4.7 8.5-4.7z"/></svg>Itens</button>
+  <button data-v="fotos"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8.5 7l1.5-2.5h4L15.5 7"/></svg>Fotos</button>
+  <button data-v="rel"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Indicadores</button>
+</nav>
+</div>
+
+<main>
+
+<!-- ============ PAINEL ============ -->
+<section class="view on" id="v-painel">
+  <div class="card hero">
+    <div class="lbl">Total investido até hoje</div>
+    <div class="big mono" id="hTotal">R$ 0,00</div>
+    <div class="split">
+      <div><small>Administrativas</small><b class="mono" id="hAdm">—</b></div>
+      <div><small>Construção</small><b class="mono" id="hCon">—</b></div>
+    </div>
+    <div class="apagar" id="hAberto" style="display:none"><span>A pagar em aberto</span><b class="mono" id="hAbertoV"></b></div>
+  </div>
+
+  <div class="card" id="cardPagar" style="display:none">
+    <h3>Contas a pagar</h3>
+    <div id="pagarList"></div>
+  </div>
+
+  <div class="card" id="cardSaldo" style="display:none">
+    <h3>A receber de fornecedores</h3>
+    <div id="saldoList"></div>
+    <p class="hint">Material já pago que ainda está com o fornecedor. Dê baixa conforme chegar.</p>
+  </div>
+
+  <div class="card">
+    <h3>Fase atual · Canteiro e preparação</h3>
+    <div id="passosList"></div>
+    <div class="hint" id="passosResumo"></div>
+  </div>
+
+  <div class="card">
+    <h3>Gasto por categoria</h3>
+    <div id="catList"></div>
+  </div>
+
+  <div class="card">
+    <h3>Documentos da obra</h3>
+    <a class="btn dark" style="text-decoration:none;text-align:center" target="_blank"
+       href="https://drive.google.com/drive/u/0/folders/1Bxqn2iva1PC1N_1bO4au8pgsAxNfXjc4">Abrir pasta no Drive</a>
+    <p class="hint">Arquitetura · Engenharia · Documentos · Despesas · Cotações · Fotos</p>
+  </div>
+</section>
+
+<!-- ============ GASTOS ============ -->
+<section class="view" id="v-gastos">
+  <div class="card">
+    <input id="fBusca" placeholder="Buscar por descrição, fornecedor, categoria, nota, valor...">
+    <div class="row2" style="margin-top:9px">
+      <select id="fCat"><option value="">Todas as categorias</option></select>
+      <select id="fGrupo">
+        <option value="">Adm + Construção</option>
+        <option value="adm">Só administrativas</option>
+        <option value="con">Só construção</option>
+      </select>
+    </div>
+    <select id="fSit" style="margin-top:9px">
+      <option value="">Pagos e a pagar</option>
+      <option value="pago">Só pagos</option>
+      <option value="aberto">Só a pagar</option>
+    </select>
+    <div class="stat" style="margin-top:10px"><span>Total filtrado</span><b class="mono" id="gTotal">R$ 0,00</b></div>
+  </div>
+  <div class="card" id="gastosCard"><div id="gastosList"></div></div>
+  <button class="btn" onclick="abrirGasto()">+ Lançar gasto</button>
+</section>
+
+<!-- ============ COTAÇÕES ============ -->
+<section class="view" id="v-cot">
+  <div class="card">
+    <h3>Previsão de gastos</h3>
+    <div id="cotPrev"></div>
+  </div>
+  <div class="card">
+    <input id="fBuscaCot" placeholder="Buscar por item, fornecedor...">
+  </div>
+  <div class="card">
+    <h3>Cotações abertas</h3>
+    <div id="cotList"></div>
+    <p class="hint">Cotação não é gasto. Quando fechar a compra, use <b>Virou compra</b> — o valor passa para os lançamentos.</p>
+    <div id="cotFechadas" style="margin-top:9px"></div>
+  </div>
+  <button class="btn" onclick="abrirCot()">+ Nova cotação</button>
+</section>
+
+<!-- ============ ITENS DA OBRA ============ -->
+<section class="view" id="v-itens">
+  <div class="card">
+    <input id="fBuscaItens" placeholder="Buscar item ou fornecedor...">
+    <select id="fEtapaItens" style="margin-top:9px">
+      <option value="">Todas as etapas</option>
+    </select>
+  </div>
+  <div id="itensObra"></div>
+</section>
+
+<!-- ============ FOTOS ============ -->
+<section class="view" id="v-fotos">
+  <div class="card">
+    <h3>Álbum da obra</h3>
+    <input type="file" id="fotoInput" accept="image/*" capture="environment" hidden>
+    <button class="btn" onclick="document.getElementById('fotoInput').click()">📷 Registrar foto</button>
+    <p class="hint">A foto é reduzida e guardada no aparelho com data, hora e etapa. Para o arquivo original em alta, envie também para a pasta Fotos do Drive.</p>
+  </div>
+  <div id="fotosWrap"></div>
+</section>
+
+<!-- ============ RELATÓRIOS ============ -->
+<section class="view" id="v-rel">
+  <div class="card">
+    <h3>Prazo da obra</h3>
+    <div id="iPrazo"></div>
+  </div>
+  <div class="card">
+    <h3>Ritmo de desembolso</h3>
+    <div id="iRitmo"></div>
+  </div>
+  <div class="card">
+    <h3>Desembolso por mês</h3>
+    <div id="iChart"></div>
+  </div>
+  <div class="card">
+    <h3>Compromissos e pendências</h3>
+    <div id="iComp"></div>
+  </div>
+  <div class="card">
+    <h3>Onde o dinheiro se concentra</h3>
+    <div id="iRankCat"></div>
+    <div class="divider"></div>
+    <div id="iRankForn"></div>
+    <p class="hint">Rankings por valor — as únicas listas fora da ordem alfabética, porque aqui a ordem <i>é</i> a informação.</p>
+  </div>
+  <div class="card">
+    <h3>Gasto por categoria</h3>
+    <div id="iPorCategoria"></div>
+  </div>
+  <div class="card">
+    <h3>Qualidade do registro</h3>
+    <div id="iReg"></div>
+  </div>
+  <div class="card">
+    <h3>Total por fornecedor</h3>
+    <div id="relForn"></div>
+  </div>
+  <div class="card">
+    <h3>Total por mês</h3>
+    <div id="relMes"></div>
+  </div>
+  <input type="file" id="impInput" accept=".json" hidden>
+</section>
+
+</main>
+
+<input type="file" id="anexoInput" accept="image/*,.pdf" multiple hidden>
+<datalist id="dlProdutos"></datalist>
+<datalist id="dlCategorias"></datalist>
+<div class="sheet" id="sheet"><div class="bg" onclick="fechar()"></div><div class="panel" id="panel"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- categorias ---------- */
+const CATS=[
+ {id:'terreno',g:'adm',n:'Terreno'},
+ {id:'cartorio',g:'adm',n:'Cartório e escritura'},
+ {id:'projetos',g:'adm',n:'Projetos e ART/RRT'},
+ {id:'licencas',g:'adm',n:'Licenças e taxas'},
+ {id:'condominio',g:'adm',n:'Condomínio'},
+ {id:'outros_adm',g:'adm',n:'Outros administrativos'},
+ {id:'c00',g:'con',n:'00 Canteiro e preparação'},
+ {id:'c01',g:'con',n:'01 Fundação'},
+ {id:'c02',g:'con',n:'02 Estrutura'},
+ {id:'c03',g:'con',n:'03 Alvenaria'},
+ {id:'c04',g:'con',n:'04 Cobertura'},
+ {id:'c05',g:'con',n:'05 Instalações'},
+ {id:'c06',g:'con',n:'06 Acabamento'},
+ {id:'c07',g:'con',n:'07 Mão de obra'}
+];
+const cat=id=>CATS_AZ.find(c=>c.id===id)||CATS.find(c=>c.id===id)||{n:'—',g:'con'};
+const alfa=(a,b)=>String(a).localeCompare(String(b),'pt-BR',{sensitivity:'base'});
+const alfa2=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+let CATS_AZ=CATS.slice().sort((a,b)=>alfa(a.n,b.n));
+function rebuildCategorias(){
+  CATS_AZ=CATS.concat(DB.catExtra||[]).slice().sort((a,b)=>alfa(a.n,b.n));
+}
+function catIdPorNome(nome){
+  const alvo=alfa2(nome);
+  const achou=CATS_AZ.find(c=>alfa2(c.n)===alvo);
+  return achou?achou.id:null;
+}
+function garantirCategoria(nomeOuId,grupoPadrao){
+  if(!nomeOuId)return 'c00';
+  if(CATS_AZ.some(c=>c.id===nomeOuId))return nomeOuId; // já é um id válido
+  const nome=String(nomeOuId).trim();
+  if(!nome)return 'c00';
+  let id=catIdPorNome(nome);
+  if(id)return id;
+  id='cx-'+alfa2(nome).replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)+'-'+uid().slice(0,4);
+  DB.catExtra=DB.catExtra||[]; DB.catExtra.push({id,n:nome,g:grupoPadrao||'con'});
+  rebuildCategorias(); salvar();
+  return id;
+}
+
+/* ---------- máscara de moeda: digita só números, a vírgula aparece sozinha ---------- */
+const num2moeda=n=>(+n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const moeda2num=s=>{ if(typeof s==='number')return s; return +String(s||'').replace(/\./g,'').replace(',','.')||0; };
+function onMoedaInput(el){
+  let digits=el.value.replace(/\D/g,'').replace(/^0+(?=\d)/,'');
+  if(!digits)digits='0';
+  el.value=num2moeda((+digits)/100);
+  el.setSelectionRange(el.value.length,el.value.length);
+}
+function moedaAttrs(valor){
+  return `type="text" inputmode="decimal" value="${valor?num2moeda(valor):''}"`;
+}
+
+/* ---------- dados iniciais (sua planilha) ---------- */
+const SEED={
+ lanc:[
+  {d:'2026-03-09',t:'Pagamento da entrada do terreno',c:'terreno',f:'Vendedor do lote',q:1,u:5000,v:5000},
+  {d:'2026-03-13',t:'Emissão 2ª via certidão de nascimento',c:'cartorio',f:'Cartório',q:1,u:71.19,v:71.19},
+  {d:'2026-03-18',t:'Certidões do cartório',c:'cartorio',f:'Cartório',q:1,u:119.75,v:119.75},
+  {d:'2026-03-18',t:'Emolumentos do cartório',c:'cartorio',f:'Cartório',q:1,u:2065.62,v:2065.62},
+  {d:'2026-03-20',t:'Projeto arquitetônico',c:'projetos',f:'Rayla',q:1,u:3475.95,v:3475.95},
+  {d:'2026-04-06',t:'Condomínio Monte das Cerejeiras',c:'condominio',f:'Condomínio',q:1,u:378.20,v:378.20},
+  {d:'2026-04-15',t:'Terreno — parcela',c:'terreno',f:'Vendedor do lote',q:1,u:55000,v:55000},
+  {d:'2026-04-15',t:'Terreno — parcela',c:'terreno',f:'Vendedor do lote',q:1,u:66500,v:66500},
+  {d:'2026-04-15',t:'Terreno — parcela',c:'terreno',f:'Vendedor do lote',q:1,u:3500,v:3500},
+  {d:'2026-04-17',t:'Escritura no cartório',c:'cartorio',f:'Cartório',q:1,u:1113.35,v:1113.35},
+  {d:'2026-04-19',t:'Projeto arquitetônico',c:'projetos',f:'Rayla',q:1,u:868.20,v:868.20},
+  {d:'2026-05-01',t:'Projeto arquitetônico',c:'projetos',f:'Rayla',q:1,u:868.20,v:868.20},
+  {d:'2026-05-06',t:'Condomínio Monte das Cerejeiras',c:'condominio',f:'Condomínio',q:1,u:378.20,v:378.20},
+  {d:'2026-06-02',t:'Projeto arquitetônico',c:'projetos',f:'Rayla',q:1,u:1736.50,v:1736.50},
+  {d:'2026-06-02',t:'RRT do projeto',c:'projetos',f:'Rayla',q:1,u:130.64,v:130.64},
+  {d:'2026-06-03',t:'Projeto de engenharia',c:'projetos',f:'Jefferson Honório',q:1,u:1900,v:1900},
+  {d:'2026-07-08',t:'Alvará Prefeitura de Bananeiras',c:'licencas',f:'Prefeitura',q:1,u:328.92,v:328.92},
+  {d:'2026-07-17',t:'Projeto de engenharia',c:'projetos',f:'Jefferson Honório',q:1,u:800,v:800},
+  {d:'2026-07-17',t:'ART do projeto',c:'projetos',f:'Jefferson Honório',q:1,u:143,v:143}
+ ],
+ cot:[
+  {t:'3.000 tijolos',f:'',val:'',ob:'',its:[['','Tijolo cerâmico',3,790,'']]},
+  {t:'Areia',f:'',val:'',ob:'Carrada de 10m³',its:[['','Carrada de areia 10m³',1,600,'']]},
+  {t:'Cimento 50kg',f:'',val:'',ob:'Preço exige pagamento adiantado do total, com entrega parcelada',
+   its:[['','Saco de cimento 50kg',100,41,'']]},
+  {t:'Blocos e canaletas de concreto',f:'Lumar Bananeiras',val:'2026-07-25',
+   ob:'Paletes não devolvidos: R$ 20,00 cada',
+   its:[['','Bloco 14x19x39cm',2000,3.70,''],['','Canaleta 14x19x39cm',260,4.50,'']]},
+  {t:'Cobertura do banheiro e depósito',f:'',val:'',ob:'Falta cotar',its:[['','Telha Brasilit',1,0,'']]},
+  {t:'Louças e metais do banheiro',f:'',val:'',ob:'Falta cotar',
+   its:[['','Bacia sanitária',1,0,''],['','Chuveiro',1,0,'']]},
+  {t:'Portas e ferragens',f:'',val:'',ob:'Falta cotar',
+   its:[['','Porta do banheiro',1,0,''],['','Porta do depósito',1,0,''],
+        ['','Dobradiça',4,0,''],['','Ferrolho',2,0,'']]}
+ ],
+ passos:['Limpeza do terreno','Padrão de energia (Energisa)','Impressão dos projetos',
+         'Banheiro provisório','Mini depósito de material','Fechamento da frente do terreno']
+};
+
+/* ---------- estado ---------- */
+let DB;
+function carregar(){
+  try{DB=JSON.parse(localStorage.getItem('obraC08')||'null')}catch(e){DB=null}
+  if(!DB){
+    DB={lanc:[],cot:[],fotos:[],passos:[],cfg:{inicio:'',meses:8,area:0}};
+    SEED.lanc.forEach((x,i)=>DB.lanc.push({id:'sd-l'+i,at:0,data:x.d,desc:x.t,cat:x.c,forn:x.f,qtd:x.q,unit:x.u,
+      total:x.v,pag:'Pago',nf:'',link:'',obs:'',ctrl:false,qtdRec:0,baixas:[]}));
+    SEED.cot.forEach((x,i)=>DB.cot.push({id:'sd-c'+i,at:0,data:hoje(),item:x.t,forn:x.f,
+      itens:x.its.map(v=>({c:v[0],d:v[1],q:v[2],u:v[3],f:v[4]})),
+      total:x.its.reduce((s,v)=>s+v[2]*v[3],0),
+      validade:x.val,obs:x.ob,status:'aberta'}));
+    SEED.passos.forEach((t,i)=>DB.passos.push({id:'sd-p'+i,at:0,n:i+1,txt:t,ok:false}));
+    salvar();
+  }
+  DB.fotos=DB.fotos||[];
+  DB.catExtra=DB.catExtra||[];
+  rebuildCategorias();
+  (DB.lanc||[]).forEach(l=>{
+    if(!l.anexos) l.anexos = l.link?[{id:uid(),tipo:'link',nome:'Link do Drive',dado:l.link}]:[];
+  });
+  (DB.cot||[]).forEach(c=>{ if(!c.anexos) c.anexos=[]; });
+  /* cotações antigas viram documento de item único */
+  (DB.cot||[]).forEach(c=>{
+    if(!c.itens){
+      c.itens=[{c:'',d:c.item||'',q:+c.qtd||1,u:+c.unit||0,f:''}];
+      c.total=(+c.qtd||1)*(+c.unit||0)||+c.total||0;
+      delete c.qtd; delete c.unit; delete c.un;
+    }
+  });
+}
+const somaItens=its=>(its||[]).reduce((s,i)=>s+(+i.q||0)*(+i.u||0),0);
+
+/* ---------- anexos (compra e cotação) ---------- */
+let ANX_ALVO=null; // array em edição (panel._anx)
+function pintaAnexos(elId){
+  const box=document.getElementById(elId);
+  if(!box)return;
+  box.innerHTML=(ANX_ALVO||[]).map((a,i)=>`
+    <div class="anx" onclick="verAnexo(${i})">
+      <div class="ic">${a.tipo==='imagem'?`<img src="${a.dado}">`:'🔗'}</div>
+      <div class="nm">${a.nome||(a.tipo==='imagem'?'Foto do documento':'Link')}</div>
+      <button class="rm" onclick="event.stopPropagation();rmAnexo(${i},'${elId}')">×</button>
+    </div>`).join('')
+    +`<div class="row2" style="margin-top:2px">
+      <input id="anx_link" placeholder="Colar link (Drive, foto...)" style="flex:2">
+      <button class="btn mini ghost" style="flex:0 0 auto;padding:11px 14px" onclick="addAnexoLink('${elId}')">+ Link</button>
+    </div>
+    <button class="btn mini ghost" style="margin-top:7px;width:100%" onclick="abrirAnexoFoto('${elId}')">📎 Anexar foto do documento</button>`;
+}
+function addAnexoLink(elId){
+  const v=document.getElementById('anx_link').value.trim();
+  if(!v){toast('Cole um link.');return}
+  ANX_ALVO.push({id:uid(),tipo:'link',nome:v.length>42?v.slice(0,40)+'…':v,dado:v});
+  pintaAnexos(elId);
+}
+function abrirAnexoFoto(elId){ ANX_ELID=elId; document.getElementById('anexoInput').click(); }
+let ANX_ELID=null;
+document.getElementById('anexoInput').onchange=e=>{
+  const files=[...e.target.files]; if(!files.length)return;
+  let restantes=files.length;
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=()=>{
+      const im=new Image();
+      im.onload=()=>{
+        const M=1000, s=Math.min(1,M/Math.max(im.width,im.height));
+        const cv=document.createElement('canvas');
+        cv.width=im.width*s|0; cv.height=im.height*s|0;
+        cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+        ANX_ALVO.push({id:uid(),tipo:'imagem',nome:f.name||'Foto do documento',dado:cv.toDataURL('image/jpeg',.6)});
+        if(--restantes===0) pintaAnexos(ANX_ELID);
+      };
+      im.src=r.result;
+    };
+    r.readAsDataURL(f);
+  });
+  e.target.value='';
+};
+function rmAnexo(i,elId){ ANX_ALVO.splice(i,1); pintaAnexos(elId); }
+function verAnexo(i){
+  const a=ANX_ALVO[i];
+  if(a.tipo==='link'){ window.open(a.dado,'_blank'); return; }
+  abrir(`<h2>${a.nome}</h2>
+    <img src="${a.dado}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
+    <button class="btn ghost mini" onclick="fecharAnexoView()">Fechar</button>`);
+  panel._voltaAnx=true;
+}
+function fecharAnexoView(){ fechar(); }
+let ANX_VER=[];
+function verAnexoLista(list){
+  ANX_VER=list||[];
+  abrir(`<h2>Anexos</h2><div class="card" style="box-shadow:none;margin-top:10px">
+    ${ANX_VER.length?ANX_VER.map((a,i)=>`<div class="anx" onclick="verAnexoDet(${i})">
+      <div class="ic">${a.tipo==='imagem'?`<img src="${a.dado}">`:'🔗'}</div>
+      <div class="nm">${a.nome||(a.tipo==='imagem'?'Foto do documento':'Link')}</div></div>`).join(''):'<div class="empty">Nenhum anexo</div>'}
+  </div><button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function verAnexoDet(i){
+  const a=ANX_VER[i];
+  if(a.tipo==='link'){ window.open(a.dado,'_blank'); return; }
+  abrir(`<h2>${a.nome}</h2><img src="${a.dado}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
+  <button class="btn ghost mini" onclick="fechar()">Fechar</button>`);
+}
+function salvar(){
+  try{localStorage.setItem('obraC08',JSON.stringify(DB))}
+  catch(e){toast('Memória do aparelho cheia. Exporte o backup e apague fotos antigas.')}
+}
+/* ---------- confirmação (não usa confirm() nativo — falha em apps instalados na tela inicial) ---------- */
+let ACAO_PENDENTE=null;
+function confirmar(titulo,sub,textoBtn,fn,perigosa){
+  ACAO_PENDENTE=fn;
+  abrir(`<h2>${titulo}</h2><p class="sub">${sub}</p><div style="height:4px"></div>
+  <button class="btn ${perigosa?'danger':''}" onclick="executarPendente()">${textoBtn}</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function executarPendente(){ const fn=ACAO_PENDENTE; ACAO_PENDENTE=null; if(fn) fn(); }
+
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const hoje=()=>new Date().toISOString().slice(0,10);
+const isPago=l=>l.pag!=='A pagar';
+const pagoParcial=l=>(l.pagamentos||[]).reduce((s,p)=>s+ +p.valor,0);
+const saldoAPagar=l=>isPago(l)?0:Math.max(0,+l.total-pagoParcial(l));
+function partes(l){
+  return (l.rateio&&l.rateio.length)?l.rateio.map(r=>({cat:r.cat,valor:+r.valor||0})):[{cat:l.cat,valor:+l.total||0}];
+}
+function addMeses(iso,n){
+  const [y,m,d]=iso.split('-').map(Number);
+  const ult=new Date(y,m-1+n+1,0).getDate();
+  const dt=new Date(y,m-1+n,Math.min(d,ult));
+  return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+}
+const brl=n=>'R$ '+(+n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+function dia(d){const p=d.split('-');return {d:p[2],m:MES[+p[1]-1]}}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');
+  clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('on'),2600)}
+
+/* ---------- navegação ---------- */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+  document.getElementById('v-'+b.dataset.v).classList.add('on');
+  window.scrollTo(0,0); render();
+});
+
+/* ---------- tema ---------- */
+const tema=t=>{document.documentElement.dataset.theme=t;localStorage.setItem('obraTema',t);
+  document.querySelector('meta[name=theme-color]').content = t==='dark'?'#061019':'#0A1F2E'};
+tema(localStorage.getItem('obraTema')||'light');
+document.getElementById('themeBtn').onclick=()=>
+  tema(document.documentElement.dataset.theme==='dark'?'light':'dark');
+
+/* ---------- sheet ---------- */
+const sheet=document.getElementById('sheet'), panel=document.getElementById('panel');
+function abrir(html){panel.innerHTML='<div class="grab"></div>'+html;sheet.classList.add('on')}
+function fechar(){sheet.classList.remove('on')}
+
+/* ---------- render ---------- */
+let NUM_LANC={};
+function rebuildNumeros(){
+  const ordenados=DB.lanc.slice().sort((a,b)=>a.data.localeCompare(b.data)||(+a.at||0)-(+b.at||0));
+  NUM_LANC={};
+  ordenados.forEach((l,i)=>NUM_LANC[l.id]=i+1);
+}
+function render(){
+  refreshDatalists();
+  rebuildNumeros();
+  const pagos=DB.lanc.filter(isPago);
+  let adm=0,con=0;
+  pagos.forEach(l=>partes(l).forEach(p=>{ if(cat(p.cat).g==='adm') adm+=p.valor; else con+=p.valor; }));
+  document.getElementById('hTotal').textContent=brl(adm+con);
+  document.getElementById('hAdm').textContent=brl(adm);
+  document.getElementById('hCon').textContent=brl(con);
+
+  /* contas a pagar */
+  const abertos=DB.lanc.filter(l=>!isPago(l)).sort((a,b)=>a.data.localeCompare(b.data));
+  const somaAb=abertos.reduce((s,l)=>s+saldoAPagar(l),0);
+  document.getElementById('hAberto').style.display=abertos.length?'flex':'none';
+  document.getElementById('hAbertoV').textContent=brl(somaAb);
+  document.getElementById('cardPagar').style.display=abertos.length?'block':'none';
+  const hj=hoje();
+  document.getElementById('pagarList').innerHTML=abertos.slice(0,12).map(l=>{
+    const p=dia(l.data), atraso=l.data<hj, pp=pagoParcial(l);
+    return `<div class="item" onclick="verGasto('${l.id}')">
+      <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span></div>
+      <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
+        <small>${cat(l.cat).n}${l.forn?' · '+l.forn:''}${pp>0?' · pago '+brl(pp):''}</small></div>
+      <div class="val"><span class="mono">${brl(saldoAPagar(l))}</span>
+        ${atraso?'<div><span class="tag pend">vencida</span></div>':''}</div></div>`;
+  }).join('')+(abertos.length>12?`<p class="hint">e mais ${abertos.length-12} lançamento(s) em aberto.</p>`:'');
+
+  /* saldo a receber */
+  const pend=DB.lanc.filter(l=>l.ctrl && (+l.qtd - +l.qtdRec)>0.001);
+  const cs=document.getElementById('cardSaldo');
+  cs.style.display=pend.length?'block':'none';
+  document.getElementById('saldoList').innerHTML=pend.map(l=>{
+    const falta=+l.qtd - +l.qtdRec, pc=Math.round(+l.qtdRec/+l.qtd*100);
+    return `<div class="item" onclick="verGasto('${l.id}')">
+      <div class="mid"><b>${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
+        <small>${l.forn||'—'} · recebido ${(+l.qtdRec).toLocaleString('pt-BR')} de ${(+l.qtd).toLocaleString('pt-BR')}</small>
+        <div class="bar"><i style="width:${pc}%"></i></div></div>
+      <div class="val"><span class="tag pend">faltam ${falta.toLocaleString('pt-BR')}</span></div></div>`;
+  }).join('');
+
+  /* passos */
+  document.getElementById('passosList').innerHTML=DB.passos.map(p=>
+    `<div class="step ${p.ok?'done':''}"><span class="n">${p.n}</span>
+      <div class="chk" onclick="togglePasso('${p.id}')">${p.ok?'✓':''}</div>
+      <div class="txt">${p.txt}</div></div>`).join('');
+  const f=DB.passos.filter(p=>p.ok).length;
+  document.getElementById('passosResumo').textContent=`${f} de ${DB.passos.length} concluídos`;
+
+  /* categorias */
+  const tot=adm+con||1;
+  const porCat=CATS_AZ.map(c=>({c,v:0}));
+  const idxCat={}; porCat.forEach((x,i)=>idxCat[x.c.id]=i);
+  pagos.forEach(l=>partes(l).forEach(p=>{ if(idxCat[p.cat]!==undefined) porCat[idxCat[p.cat]].v+=p.valor; }));
+  const porCatF=porCat.filter(x=>x.v>0);
+  document.getElementById('catList').innerHTML=porCatF.map(x=>
+    `<div class="stat"><span><span class="tag ${x.c.g}">${x.c.g==='adm'?'adm':'obra'}</span> ${x.c.n}</span>
+     <b class="mono">${brl(x.v)} <small style="color:var(--ink-2);font-weight:400">${(x.v/tot*100).toFixed(1)}%</small></b></div>`).join('')
+    ||'<div class="empty"><b>Nada lançado ainda</b></div>';
+
+  renderGastos(); renderCot(); renderItens(); renderFotos(); renderRel();
+}
+
+/* gastos */
+function renderGastos(){
+  const sel=document.getElementById('fCat');
+  if(sel.options.length<2) CATS_AZ.forEach(c=>sel.add(new Option(c.n,c.id)));
+  const fc=sel.value, fg=document.getElementById('fGrupo').value, fs=document.getElementById('fSit').value;
+  const busca=alfa2(document.getElementById('fBusca').value);
+  let L=DB.lanc.filter(l=>(!fc||l.cat===fc)&&(!fg||cat(l.cat).g===fg)
+        &&(!fs||(fs==='pago'?isPago(l):!isPago(l))));
+  if(busca){
+    L=L.filter(l=>{
+      const alvo=[l.desc,l.forn,l.nf,l.obs,cat(l.cat).n,l.pag,brl(l.total),l.total,
+        l.data.split('-').reverse().join('/'),MES[+l.data.slice(5,7)-1],l.data.slice(0,4),
+        (l.rateio||[]).map(r=>cat(r.cat).n).join(' ')].join(' ');
+      return alfa2(alvo).includes(busca);
+    });
+  }
+  L=L.sort((a,b)=>b.data.localeCompare(a.data));
+  document.getElementById('gTotal').textContent=brl(L.reduce((s,l)=>s+ +l.total,0));
+  document.getElementById('gastosList').innerHTML=L.map(l=>{
+    const p=dia(l.data), falta=l.ctrl?(+l.qtd - +l.qtdRec):0, ab=!isPago(l), pp=pagoParcial(l);
+    return `<div class="item" onclick="verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
+      <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span></div>
+      <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
+        <small>${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}</small></div>
+      <div class="val"><span class="mono">${brl(l.total)}</span>
+        ${ab?`<div><span class="tag pend">${pp>0?'parcial':'a pagar'}</span></div>`:''}</div></div>`;
+  }).join('')||'<div class="empty"><b>Nenhum gasto neste filtro</b><p>Ajuste os filtros acima.</p></div>';
+}
+document.getElementById('fCat').onchange=renderGastos;
+document.getElementById('fGrupo').onchange=renderGastos;
+document.getElementById('fSit').onchange=renderGastos;
+document.getElementById('fBusca').oninput=renderGastos;
+document.getElementById('fBuscaCot').oninput=renderCot;
+
+/* cotações */
+function renderCot(){
+  const buscaEl=document.getElementById('fBuscaCot');
+  const busca=buscaEl?alfa2(buscaEl.value):'';
+  let C=DB.cot.filter(c=>c.status==='aberta');
+  if(busca) C=C.filter(c=>alfa2([c.item,c.forn,c.obs,(c.itens||[]).map(i=>i.d).join(' ')].join(' ')).includes(busca));
+  const chave=t=>String(t||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const G={};
+  C.forEach(c=>{const k=chave(c.item);(G[k]=G[k]||{nome:c.item,props:[]}).props.push(c)});
+  const grupos=Object.values(G).sort((a,b)=>alfa(a.nome,b.nome));
+  const prev=grupos.reduce((s,g)=>{
+    const com=g.props.filter(p=>+p.total>0).sort((a,b)=>a.total-b.total);
+    return s+(com.length?+com[0].total:0)},0);
+  const semPreco=C.filter(p=>!(+p.total>0)).length;
+  document.getElementById('cotPrev').innerHTML=
+    `<div class="stat" style="border:0;padding-top:0"><span>Previsão pelos menores preços</span>
+      <b class="mono" style="font-size:17px">${brl(prev)}</b></div>
+     ${semPreco?`<p class="hint" style="margin-top:0">${semPreco} cotação(ões) ainda sem preço — a previsão está incompleta.</p>`:''}`;
+
+  document.getElementById('cotList').innerHTML=grupos.map(g=>{
+    const com=g.props.filter(p=>+p.total>0).sort((a,b)=>a.total-b.total);
+    const sem=g.props.filter(p=>!(+p.total>0));
+    const venc=com[0], pior=com[com.length-1];
+
+    if(g.props.length===1){
+      const c=g.props[0];
+      let vTag='';
+      if(c.validade){const dd=Math.ceil((new Date(c.validade)-new Date())/864e5);
+        vTag=dd<0?'<span class="tag pend">vencida</span>':`<span class="tag ${dd<=2?'pend':''}">vence em ${dd}d</span>`}
+      return `<div class="item" onclick="verCot('${c.id}')">
+        <div class="mid"><b>${c.item}</b><small>${c.forn||'sem fornecedor'} ${vTag}</small></div>
+        <div class="val mono">${+c.total>0?brl(c.total):'<span class="tag">a cotar</span>'}</div></div>`;
+    }
+
+    const eco=com.length>1?pior.total-venc.total:0;
+    return `<div class="grp">
+      <h4>${g.nome}</h4>
+      <div class="qt">${g.props.length} propostas${com.length?' · melhor preço em destaque':''}</div>
+      ${com.map((p,i)=>`<div class="prop ${i===0?'win':''}" onclick="verCot('${p.id}')">
+        <span class="nm">${p.forn||'sem fornecedor'}${i===0?'<span class="win-tag">menor</span>':''}</span>
+        <span class="vl mono">${brl(p.total)}</span></div>`).join('')}
+      ${sem.map(p=>`<div class="prop" onclick="verCot('${p.id}')">
+        <span class="nm">${p.forn||'sem fornecedor'}</span>
+        <span class="vl"><span class="tag">a cotar</span></span></div>`).join('')}
+      ${eco>0?`<p class="hint" style="margin-top:8px">Escolhendo ${venc.forn||'a menor'}, você economiza ${brl(eco)} em relação à mais cara — ${(eco/pior.total*100).toFixed(0)}%.</p>`:''}
+    </div>`;
+  }).join('')||'<div class="empty"><b>Sem cotações abertas</b><p>Registre um orçamento antes de comprar.</p></div>';
+
+  const fechadas=DB.cot.filter(c=>c.status!=='aberta').sort((a,b)=>(+b.at||0)-(+a.at||0));
+  const temOrfa=fechadas.some(c=>c.status==='fechada'&&!(c.lancIds&&c.lancIds.some(id=>DB.lanc.some(l=>l.id===id))));
+  document.getElementById('cotFechadas').innerHTML=fechadas.length
+    ?`<button class="btn ${temOrfa?'danger':'ghost'} mini" style="width:100%" onclick="verFechadas()">${temOrfa?'⚠ ':''}Ver fechadas e arquivadas (${fechadas.length})</button>`
+    :'';
+}
+function verFechadas(){
+  const fechadas=DB.cot.filter(c=>c.status!=='aberta').sort((a,b)=>(+b.at||0)-(+a.at||0));
+  const orfaC=c=>c.status==='fechada'&&!(c.lancIds&&c.lancIds.some(id=>DB.lanc.some(l=>l.id===id)));
+  const orfas=fechadas.filter(orfaC);
+  abrir(`<h2>Fechadas e arquivadas</h2>
+  <p class="sub">Cotações que já viraram compra ou saíram da disputa — não somem, só saem da lista principal.</p>
+  ${orfas.length?`<div class="card" style="box-shadow:none;background:rgba(196,83,77,.08);border-color:rgba(196,83,77,.3)">
+    <h3 style="color:var(--red)">⚠ Sem lançamento correspondente</h3>
+    <p class="hint" style="margin-top:0">${orfas.length} cotação(ões) foram fechadas mas não têm gasto lançado — provavelmente a tela de confirmação foi fechada antes de terminar. Toque para reabrir.</p>
+    ${orfas.map(c=>`<div class="item" onclick="verCot('${c.id}')">
+      <div class="mid"><b>${c.item}</b><small>${c.forn||'sem fornecedor'}</small></div>
+      <div class="val mono">${+c.total>0?brl(c.total):'—'}</div></div>`).join('')}
+  </div>`:''}
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    ${fechadas.filter(c=>!orfaC(c)).map(c=>`<div class="item" onclick="verCot('${c.id}')">
+      <div class="mid"><b>${c.item}</b>
+        <small>${c.forn||'sem fornecedor'} · <span class="tag ${c.status==='fechada'?'ok':''}">${c.status==='fechada'?'virou compra':'arquivada'}</span></small></div>
+      <div class="val mono">${+c.total>0?brl(c.total):'—'}</div></div>`).join('')||'<div class="empty">Nenhuma</div>'}
+  </div>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+
+/* fotos */
+function renderFotos(){
+  const w=document.getElementById('fotosWrap');
+  if(!DB.fotos.length){w.innerHTML='<div class="card empty"><b>Álbum vazio</b><p>A primeira foto do terreno limpo é um bom começo.</p></div>';return}
+  const g={};
+  DB.fotos.slice().sort((a,b)=>b.dh.localeCompare(a.dh)).forEach(f=>{
+    const k=f.dh.slice(0,7); (g[k]=g[k]||[]).push(f)});
+  w.innerHTML=Object.keys(g).map(k=>{
+    const [y,m]=k.split('-');
+    return `<div class="monthlbl">${MES[+m-1]} ${y} · ${g[k].length} foto${g[k].length>1?'s':''}</div>
+    <div class="grid">`+g[k].map(f=>
+      `<figure onclick="verFoto('${f.id}')"><img src="${f.img}" alt="${f.leg||''}">
+       <figcaption>${f.dh.slice(8,10)}/${f.dh.slice(5,7)} ${f.dh.slice(11,16)}</figcaption></figure>`).join('')+'</div>';
+  }).join('');
+}
+
+/* itens da obra */
+function renderItens(){
+  const selE=document.getElementById('fEtapaItens');
+  if(selE.options.length<2) CATS_AZ.filter(c=>c.g==='con').forEach(c=>selE.add(new Option(c.n,c.id)));
+  const fe=selE.value, busca=alfa2(document.getElementById('fBuscaItens').value);
+
+  /* resumo por material — soma no nível do lançamento, sem duplicar valor de rateio */
+  const mat={};
+  DB.lanc.filter(isPago).forEach(l=>{
+    const ehCon=(l.rateio&&l.rateio.length)||cat(l.cat).g==='con';
+    if(!ehCon)return;
+    if(busca&&!alfa2([l.desc,l.forn].join(' ')).includes(busca))return;
+    if(fe){
+      const bate=(l.rateio&&l.rateio.length)?l.rateio.some(r=>r.cat===fe):l.cat===fe;
+      if(!bate)return;
+    }
+    const k=alfa2(l.desc);
+    const m=mat[k]=mat[k]||{nome:l.desc,qtd:0,valor:0,compras:0,forns:new Set(),familia:l.familia||''};
+    m.qtd+=+l.qtd||0; m.valor+=+l.total||0; m.compras++; if(l.forn)m.forns.add(l.forn);
+  });
+  const resumo=Object.values(mat).sort((a,b)=>b.valor-a.valor);
+
+  /* resumo por tipo de produto — agrupa descrições diferentes sob o mesmo tipo (ex: várias bitolas de ferro) */
+  const tipos={};
+  DB.lanc.filter(isPago).forEach(l=>{
+    if(!l.familia)return;
+    const ehCon=(l.rateio&&l.rateio.length)||cat(l.cat).g==='con';
+    if(!ehCon)return;
+    if(busca&&!alfa2([l.desc,l.forn,l.familia].join(' ')).includes(busca))return;
+    if(fe){
+      const bate=(l.rateio&&l.rateio.length)?l.rateio.some(r=>r.cat===fe):l.cat===fe;
+      if(!bate)return;
+    }
+    const k=alfa2(l.familia);
+    const t=tipos[k]=tipos[k]||{nome:l.familia.trim(),valor:0,itens:0,descs:new Set()};
+    t.valor+=+l.total||0; t.itens++; t.descs.add(l.desc);
+  });
+  const resumoTipo=Object.values(tipos).sort((a,b)=>b.valor-a.valor);
+
+  document.getElementById('itensObra').innerHTML=
+    (resumoTipo.length?`<div class="card"><h3>Resumo por tipo de produto</h3>
+     ${resumoTipo.map(t=>`<div class="stat" style="align-items:flex-start">
+       <span style="flex:1;padding-right:8px">${t.nome}
+         <div style="font-size:11.5px;color:var(--ink-2)">${t.itens} lançamento${t.itens>1?'s':''}${t.descs.size>1?' · '+t.descs.size+' produtos diferentes':''}</div>
+       </span><b class="mono">${brl(t.valor)}</b></div>`).join('')}
+     <p class="hint">Some produtos com descrições diferentes (bitolas, tamanhos) sob o mesmo tipo — preencha "Tipo de produto" ao lançar para aparecer aqui.</p>
+     </div>`:'')
+    + `<div class="card"><h3>Resumo por material</h3>
+     ${resumo.length?resumo.map(m=>`<div class="stat" style="align-items:flex-start">
+       <span style="flex:1;padding-right:8px">${m.nome}${m.familia?` <span class="tag">${m.familia}</span>`:''}
+         <div style="font-size:11.5px;color:var(--ink-2)">${m.compras} compra${m.compras>1?'s':''}${m.forns.size?' · '+[...m.forns].join(', '):''}</div>
+       </span><b class="mono">${brl(m.valor)}</b></div>`).join('')
+       :'<div class="empty">Nenhum item neste filtro</div>'}
+     ${resumo.length?'<p class="hint">Aqui a soma é por descrição exata — cada bitola de ferro conta separado.</p>':''}
+     </div>`
+    + gruposEtapa(fe,busca);
+}
+function gruposEtapa(fe,busca){
+  const etapas=CATS_AZ.filter(c=>c.g==='con'&&(!fe||c.id===fe));
+  return etapas.map(et=>{
+    const linhas=[];
+    DB.lanc.filter(isPago).forEach(l=>{
+      partes(l).forEach(p=>{
+        if(p.cat!==et.id)return;
+        if(busca&&!alfa2([l.desc,l.forn].join(' ')).includes(busca))return;
+        linhas.push({...l,valorEtapa:p.valor,dividido:l.rateio&&l.rateio.length>1});
+      });
+    });
+    if(!linhas.length)return '';
+    linhas.sort((a,b)=>b.data.localeCompare(a.data));
+    const sub=linhas.reduce((s,x)=>s+x.valorEtapa,0);
+    return `<div class="card"><h3>${et.n} <span style="float:right;font-weight:400;text-transform:none;letter-spacing:0">${brl(sub)}</span></h3>
+      ${linhas.map(l=>`<div class="item" onclick="verGasto('${l.id}')">
+        <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+        <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
+          <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.forn?' · '+l.forn:''}${l.dividido?' · <span style="color:var(--amber)">parte de compra dividida</span>':''}</small></div>
+        <div class="val mono">${brl(l.valorEtapa)}</div></div>`).join('')}
+      </div>`;
+  }).join('') || (etapas.length?'':'<div class="card"><div class="empty">Nenhuma etapa corresponde ao filtro</div></div>');
+}
+document.getElementById('fBuscaItens').oninput=renderItens;
+document.getElementById('fEtapaItens').onchange=renderItens;
+
+function refreshDatalists(){
+  const prods=new Set();
+  DB.lanc.forEach(l=>{ if(l.desc) prods.add(l.desc.trim()); });
+  DB.cot.forEach(c=>(c.itens||[]).forEach(i=>{ if(i.d) prods.add(i.d.trim()); }));
+  const dlP=document.getElementById('dlProdutos');
+  if(dlP) dlP.innerHTML=[...prods].sort((a,b)=>alfa(a,b)).map(p=>`<option value="${p.replace(/"/g,'&quot;')}">`).join('');
+  const dlC=document.getElementById('dlCategorias');
+  if(dlC) dlC.innerHTML=CATS_AZ.map(c=>`<option value="${c.n.replace(/"/g,'&quot;')}">`).join('');
+}
+/* ---------- combobox de tipo de produto (dropdown próprio, sem estilo nativo do navegador) ---------- */
+function familiasExistentes(){
+  const vistos={};
+  DB.lanc.forEach(l=>{
+    const v=(l.familia||'').trim(); if(!v)return;
+    const k=alfa2(v); if(!vistos[k]) vistos[k]=v;
+  });
+  return Object.values(vistos).sort((a,b)=>alfa(a,b));
+}
+function comboFamiliaFiltrar(input){
+  const wrap=input.closest('.combo'); if(!wrap)return;
+  const list=wrap.querySelector('.combo-list');
+  const q=alfa2(input.value), fonte=familiasExistentes();
+  const filtradas=q?fonte.filter(o=>alfa2(o).includes(q)):fonte;
+  if(!filtradas.length){
+    list.innerHTML=q?`<div class="combo-empty">Nenhum tipo encontrado — "${input.value.replace(/</g,'&lt;')}" será criado ao salvar</div>`
+      :'<div class="combo-empty">Nenhum tipo cadastrado ainda — comece a digitar</div>';
+  }else{
+    list.innerHTML=filtradas.slice(0,10).map(o=>
+      `<div onmousedown="comboEscolherFamilia(this,'${o.replace(/'/g,"\\'")}')">${o}</div>`).join('');
+  }
+  list.style.display='block';
+}
+function comboEscolherFamilia(el,valor){
+  const wrap=el.closest('.combo'), input=wrap.querySelector('input');
+  input.value=valor;
+  wrap.querySelector('.combo-list').style.display='none';
+  const idx=input.dataset.itemIndex;
+  if(idx!==undefined && idx!=='') chgItem(+idx,'familia',valor);
+}
+function comboFechar(input){
+  const wrap=input.closest('.combo'); if(!wrap)return;
+  setTimeout(()=>{ wrap.querySelector('.combo-list').style.display='none'; },150);
+}
+
+/* indicadores */
+function cfg(){DB.cfg=DB.cfg||{inicio:'',meses:8,area:0};return DB.cfg}
+const kpi=(l,v,u,cls)=>`<div class="kpi ${cls||''}"><small>${l}</small><b class="mono">${v}</b>${u?`<u>${u}</u>`:''}</div>`;
+const diasEntre=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
+const curto=n=>{n=+n||0;
+  if(n>=1e6) return (n/1e6).toFixed(1).replace('.',',')+'M';
+  if(n>=1e3) return (n/1e3).toFixed(n>=1e4?0:1).replace('.',',')+'k';
+  return n.toFixed(0);};
+
+function verMes(m){
+  const L=DB.lanc.filter(l=>isPago(l)&&l.data.slice(0,7)===m).sort((a,b)=>a.data.localeCompare(b.data));
+  const tot=L.reduce((s,l)=>s+ +l.total,0);
+  abrir(`<h2>${MES[+m.slice(5)-1]} de ${m.slice(0,4)}</h2>
+  <p class="sub">${L.length} lançamento${L.length!==1?'s':''} · ${brl(tot)}</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    ${L.map(l=>`<div class="item" onclick="verGasto('${l.id}')">
+      <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+      <div class="mid"><b>${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}<small>${cat(l.cat).n}${l.forn?' · '+l.forn:''}</small></div>
+      <div class="val mono">${brl(l.total)}</div></div>`).join('')}
+    <div class="stat" style="border-top:1px solid var(--line);border-bottom:0;margin-top:4px;padding-top:9px">
+      <span style="font-weight:700">Total do mês</span><b class="mono" style="font-size:17px">${brl(tot)}</b></div>
+  </div>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+
+function renderRel(){
+  const c=cfg(), pagos=DB.lanc.filter(isPago), hj=hoje();
+  const con=pagos.filter(l=>cat(l.cat).g==='con'), adm=pagos.filter(l=>cat(l.cat).g==='adm');
+  let totCon=0,totAdm=0;
+  pagos.forEach(l=>partes(l).forEach(p=>{ if(cat(p.cat).g==='con') totCon+=p.valor; else totAdm+=p.valor; }));
+  const inicio=c.inicio || (con.length?con.map(l=>l.data).sort()[0]:'');
+
+  /* --- prazo --- */
+  if(!inicio){
+    document.getElementById('iPrazo').innerHTML=
+      `<div class="empty"><b>A obra ainda não começou</b><p>O prazo passa a contar no primeiro gasto de construção, ou defina a data de início.</p></div>
+       <button class="btn ghost mini" onclick="abrirCfg()">Definir início da obra</button>`;
+  }else{
+    const fim=addMeses(inicio,c.meses), dec=Math.max(0,diasEntre(inicio,hj)), tot=diasEntre(inicio,fim);
+    const pc=Math.min(100,Math.round(dec/tot*100)), rest=tot-dec;
+    document.getElementById('iPrazo').innerHTML=`
+      <div class="kpis">
+        ${kpi('Dia da obra',dec+' de '+tot,'início em '+inicio.split('-').reverse().join('/'))}
+        ${kpi('Prazo decorrido',pc+'%','término previsto em '+fim.split('-').reverse().join('/'),pc>100?'alert':'')}
+      </div>
+      <div class="bar" style="margin-top:10px"><i style="width:${pc}%;background:${pc>90?'var(--red)':'var(--teal)'}"></i></div>
+      <p class="hint">${rest>0?`Faltam ${rest} dias para o fim do prazo de ${c.meses} meses.`:`O prazo de ${c.meses} meses venceu há ${-rest} dias.`}</p>
+      <button class="btn ghost mini" onclick="abrirCfg()">Ajustar prazo e área</button>`;
+  }
+
+  /* --- ritmo --- */
+  const mesesAtivos=inicio?Math.max(1,(diasEntre(inicio,hj)/30.44)):0;
+  const ritmo=mesesAtivos?totCon/mesesAtivos:0;
+  const proj=inicio?totCon+ritmo*Math.max(0,c.meses-mesesAtivos):0;
+  document.getElementById('iRitmo').innerHTML=`
+    <div class="kpis">
+      ${kpi('Construção até agora',brl(totCon),'sem terreno e administrativo')}
+      ${kpi('Média por mês',ritmo?brl(ritmo):'—','ritmo dos gastos de obra')}
+      ${kpi('Projeção no fim do prazo',proj?brl(proj):'—','se o ritmo atual continuar até o mês '+c.meses,'wide')}
+      ${c.area>0?kpi('Custo por m²',brl(totCon/c.area),c.area+' m² de área construída','wide'):
+        kpi('Custo por m²','—','informe a área construída em Ajustar prazo e área','wide')}
+    </div>
+    <p class="hint">A projeção não é orçamento — é só o seu próprio ritmo esticado até o fim do prazo. Serve para antecipar surpresa, não para prever o custo final.</p>`;
+
+  /* --- gráfico mensal --- */
+  const byM={}; pagos.forEach(l=>byM[l.data.slice(0,7)]=(byM[l.data.slice(0,7)]||0)+ +l.total);
+  const ms=Object.keys(byM).sort();
+  if(!ms.length){document.getElementById('iChart').innerHTML='<div class="empty">Sem lançamentos</div>'}
+  else{
+    const W=340,H=120,max=Math.max(...ms.map(m=>byM[m])),bw=W/ms.length;
+    const totGeral=ms.reduce((s,m)=>s+byM[m],0);
+    let acc=0; const pts=ms.map((m,i)=>{acc+=byM[m];return [i*bw+bw/2,H-(acc/totGeral)*H]});
+    document.getElementById('iChart').innerHTML=`
+    <svg class="chart" viewBox="0 -22 ${W} ${H+44}">
+      ${ms.map((m,i)=>{
+        const h=byM[m]/max*H, x=i*bw, nome=MES[+m.slice(5)-1]+'/'+m.slice(2,4);
+        return `<g onclick="verMes('${m}')" style="cursor:pointer">
+          <title>${nome} — ${brl(byM[m])} (toque para ver os lançamentos)</title>
+          <rect x="${x}" y="-22" width="${bw}" height="${H+22}" fill="transparent"/>
+          <rect x="${x+bw*.18}" y="${H-h}" width="${bw*.64}" height="${h}" rx="3" fill="var(--teal)" opacity=".85"/>
+          <text x="${x+bw/2}" y="${H-h-6}" font-size="9" font-weight="700" fill="var(--ink)" text-anchor="middle">${curto(byM[m])}</text>
+        </g>`}).join('')}
+      <polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--amber)"
+        stroke-width="2" stroke-linejoin="round" pointer-events="none"/>
+      ${ms.map((m,i)=>`<text x="${i*bw+bw/2}" y="${H+15}" font-size="9" fill="var(--ink-2)" text-anchor="middle" pointer-events="none">${MES[+m.slice(5)-1]}</text>`).join('')}
+    </svg>
+    <p class="hint">Barras: quanto saiu em cada mês. Linha âmbar: o acumulado subindo. Toque numa barra para ver os lançamentos daquele mês.</p>`;
+  }
+
+  /* --- compromissos --- */
+  const ab=DB.lanc.filter(l=>!isPago(l)), venc=ab.filter(l=>l.data<hj);
+  const somaAb=ab.reduce((s,l)=>s+saldoAPagar(l),0), somaV=venc.reduce((s,l)=>s+saldoAPagar(l),0);
+  const parado=DB.lanc.filter(l=>l.ctrl&&+l.qtd>0)
+    .reduce((s,l)=>s+ +l.total*((+l.qtd-+l.qtdRec)/+l.qtd),0);
+  const cotAb=DB.cot.filter(x=>x.status==='aberta'), semPreco=cotAb.filter(x=>!(+x.total>0)).length;
+  document.getElementById('iComp').innerHTML=`
+    <div class="kpis">
+      ${kpi('A pagar em aberto',brl(somaAb),ab.length+' lançamento(s)')}
+      ${kpi('Vencido',brl(somaV),venc.length+' em atraso',somaV>0?'alert':'good')}
+      ${kpi('Parado com fornecedor',brl(parado),'material pago e não entregue',parado>0?'alert':'')}
+      ${kpi('Itens sem preço',semPreco,'de '+cotAb.length+' cotações abertas',semPreco>0?'alert':'good')}
+    </div>
+    <p class="hint">"Parado com fornecedor" é dinheiro seu que já saiu e ainda não virou material no canteiro.</p>`;
+
+  /* --- concentração --- */
+  const tot=totCon+totAdm||1;
+  const rankHTML=(arr,t)=>`<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2);margin-bottom:8px">${t}</h3>`+
+    (arr.length?arr.slice(0,5).map(([k,v],i)=>
+      `<div class="rank"><span class="p">${i+1}º</span>
+        <span class="nm">${k}<div class="bg" style="width:${v/arr[0][1]*100}%"></div></span>
+        <span class="vl mono">${brl(v)}</span></div>`).join(''):'<div class="empty">Sem dados</div>');
+  const catT={},fornT={};
+  pagos.forEach(l=>{partes(l).forEach(p=>{catT[cat(p.cat).n]=(catT[cat(p.cat).n]||0)+p.valor});
+                    fornT[l.forn||'—']=(fornT[l.forn||'—']||0)+ +l.total});
+  const catR=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
+  const fornR=Object.entries(fornT).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('iRankCat').innerHTML=rankHTML(catR,'Top 5 categorias')+
+    (catR.length?`<p class="hint">A maior categoria concentra ${(catR[0][1]/tot*100).toFixed(0)}% de tudo.</p>`:'');
+  document.getElementById('iRankForn').innerHTML=rankHTML(fornR,'Top 5 fornecedores');
+
+  /* --- gasto por categoria, lista completa --- */
+  const catTAdm={},catTCon={};
+  pagos.forEach(l=>partes(l).forEach(p=>{
+    const alvo=cat(p.cat).g==='adm'?catTAdm:catTCon;
+    alvo[p.cat]=(alvo[p.cat]||0)+p.valor;
+  }));
+  const linhaCat=(id,v,max)=>`<div class="stat" style="display:block;border-bottom:1px dashed var(--line);padding-bottom:9px;margin-bottom:2px">
+     <div style="display:flex;justify-content:space-between"><span>${cat(id).n}</span><b class="mono">${brl(v)}</b></div>
+     <div class="bar" style="margin-top:5px"><i style="width:${max?v/max*100:0}%"></i></div>
+   </div>`;
+  const maxCon=Math.max(0,...Object.values(catTCon)), maxAdm=Math.max(0,...Object.values(catTAdm));
+  const conArr=Object.entries(catTCon).sort((a,b)=>b[1]-a[1]);
+  const admArr=Object.entries(catTAdm).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('iPorCategoria').innerHTML=
+    `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2);margin-bottom:8px">Construção</h3>`+
+    (conArr.length?conArr.map(([id,v])=>linhaCat(id,v,maxCon)).join(''):'<div class="empty">Sem dados</div>')+
+    (admArr.length?`<div class="divider"></div><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2);margin-bottom:8px">Administrativas</h3>`+
+      admArr.map(([id,v])=>linhaCat(id,v,maxAdm)).join(''):'');
+
+  /* --- qualidade do registro --- */
+  const n=pagos.length||1;
+  const comNF=pagos.filter(l=>l.nf).length, comLink=pagos.filter(l=>l.anexos&&l.anexos.length).length;
+  const ult=DB.lanc.map(l=>l.data).sort().pop();
+  const ultF=DB.fotos.length?DB.fotos.map(f=>f.dh.slice(0,10)).sort().pop():'';
+  const fotosMes=DB.fotos.filter(f=>f.dh.slice(0,7)===hj.slice(0,7)).length;
+  document.getElementById('iReg').innerHTML=`
+    <div class="kpis">
+      ${kpi('Com nota anexada',Math.round(comNF/n*100)+'%',comNF+' de '+n+' lançamentos',comNF/n<.5?'alert':'good')}
+      ${kpi('Com anexo',Math.round(comLink/n*100)+'%',comLink+' de '+n)}
+      ${kpi('Último lançamento',ult?diasEntre(ult,hj)+' dias':'—',ult?'em '+ult.split('-').reverse().join('/'):'nenhum')}
+      ${kpi('Fotos neste mês',fotosMes,ultF?'última em '+ultF.split('-').reverse().join('/'):'álbum vazio',fotosMes?'':'alert')}
+    </div>
+    <p class="hint">Nota guardada hoje reduz o imposto sobre o ganho de capital quando o imóvel for vendido. É o indicador que mais rende no longo prazo.</p>`;
+
+  /* --- listas alfabéticas --- */
+  const byF={},byMes={};
+  pagos.forEach(l=>{byF[l.forn||'—']=(byF[l.forn||'—']||0)+ +l.total;
+    byMes[l.data.slice(0,7)]=(byMes[l.data.slice(0,7)]||0)+ +l.total});
+  const line=(k,v)=>`<div class="stat"><span>${k}</span><b class="mono">${brl(v)}</b></div>`;
+  document.getElementById('relForn').innerHTML=
+    Object.entries(byF).sort((a,b)=>alfa(a[0],b[0])).map(([k,v])=>line(k,v)).join('')||'<div class="empty">Sem dados</div>';
+  document.getElementById('relMes').innerHTML=
+    Object.entries(byMes).sort().reverse().map(([k,v])=>line(MES[+k.slice(5)-1]+'/'+k.slice(0,4),v)).join('')||'<div class="empty">Sem dados</div>';
+}
+
+function chaveDup(o,tipo){
+  if(tipo==='lanc') return o.data+'|'+String(o.desc||'').trim().toLowerCase()+'|'+(+o.total).toFixed(2);
+  return String(o.item||'').trim().toLowerCase()+'|'+String(o.forn||'').trim().toLowerCase()+'|'+(+o.total).toFixed(2);
+}
+function acharDuplicados(tipo){
+  const arr=tipo==='lanc'?DB.lanc:DB.cot, groups={};
+  arr.forEach(o=>{const k=chaveDup(o,tipo);(groups[k]=groups[k]||[]).push(o)});
+  return Object.values(groups).filter(g=>g.length>1);
+}
+function abrirDuplicados(){
+  const dL=acharDuplicados('lanc'), dC=acharDuplicados('cot');
+  const nL=dL.reduce((s,g)=>s+g.length-1,0), nC=dC.reduce((s,g)=>s+g.length-1,0);
+  if(!nL&&!nC){
+    abrir(`<h2>Sem duplicados</h2><p class="sub">Não encontrei lançamentos ou cotações repetidos.</p>
+    <button class="btn ghost mini" onclick="fechar()">Fechar</button>`);return;
+  }
+  abrir(`<h2>Duplicados encontrados</h2>
+  <p class="sub">Comparando por data, descrição e valor — mesma combinação nas duas contando como cópia.</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    ${dL.map(g=>`<div class="stat"><span>${g[0].desc}<br><small style="color:var(--ink-2)">${g[0].data.split('-').reverse().join('/')}</small></span><b class="mono">${g.length}×</b></div>`).join('')}
+    ${dC.map(g=>`<div class="stat"><span>${g[0].item}<br><small style="color:var(--ink-2)">cotação</small></span><b class="mono">${g.length}×</b></div>`).join('')}
+  </div>
+  <button class="btn" onclick="removerDuplicados()">Remover ${nL+nC} cópia(s)</button>
+  <p class="hint">Mantém, de cada grupo, o lançamento com mais informação preenchida (anexo, nota, rateio).</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function removerDuplicados(){
+  let removidos=0;
+  const score=x=>(x.anexos?x.anexos.length:0)*10+(x.nf?5:0)+(x.rateio&&x.rateio.length?5:0)+(x.itens?x.itens.length:0);
+  acharDuplicados('lanc').forEach(g=>{
+    const manter=g.slice().sort((a,b)=>score(b)-score(a)||(+b.at||0)-(+a.at||0))[0];
+    g.forEach(x=>{if(x.id!==manter.id){DB.lanc=DB.lanc.filter(l=>l.id!==x.id);removidos++}});
+  });
+  acharDuplicados('cot').forEach(g=>{
+    const manter=g.slice().sort((a,b)=>score(b)-score(a)||(+b.at||0)-(+a.at||0))[0];
+    g.forEach(x=>{if(x.id!==manter.id){DB.cot=DB.cot.filter(c=>c.id!==x.id);removidos++}});
+  });
+  salvar();fechar();render();toast(removidos+' duplicado(s) removido(s)');
+}
+function abrirCfg(){
+  const c=cfg();
+  abrir(`<h2>Prazo e área</h2><p class="sub">Base dos indicadores de tempo e de custo por m².</p>
+  <label>Início da obra</label><input type="date" id="k_ini" value="${c.inicio}">
+  <p class="hint">Deixe em branco para usar a data do primeiro gasto de construção.</p>
+  <label>Prazo em meses</label><input type="number" min="1" max="60" id="k_mes" value="${c.meses}">
+  <label>Área construída (m²)</label><input type="number" step="any" id="k_area" value="${c.area||''}" placeholder="peça ao engenheiro">
+  <div style="height:14px"></div>
+  <button class="btn" onclick="salvarCfg()">Salvar</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function salvarCfg(){
+  DB.cfg={inicio:val('k_ini'),meses:+val('k_mes')||8,area:+val('k_area')||0,at:Date.now()};
+  salvar();fechar();render();toast('Indicadores atualizados');
+}
+
+/* ---------- passos ---------- */
+function togglePasso(id){const p=DB.passos.find(x=>x.id===id);p.ok=!p.ok;p.at=Date.now();salvar();render()}
+
+/* ---------- gasto: form ---------- */
+function abrirGasto(l){
+  l=l||{id:'',data:hoje(),desc:'',cat:'c00',forn:'',qtd:1,unit:'',total:'',pag:'Pago',nf:'',link:'',obs:'',ctrl:false,qtdRec:0,baixas:[]};
+  abrir(`<h2>${l.id?'Editar gasto':'Lançar gasto'}</h2>
+  <p class="sub">O valor entra por inteiro na data do pagamento.</p>
+  <label>Data</label><input type="date" id="x_data" value="${l.data}">
+  <div id="descUnica"><label>Descrição</label><input id="x_desc" list="dlProdutos" value="${l.desc}" placeholder="Ex: 100 sacos de cimento 50kg">
+    <label>Tipo de produto (opcional)</label>
+    <div class="combo"><input id="x_fam" autocomplete="off"
+      oninput="comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
+      value="${(l.familia||'').replace(/"/g,'&quot;')}" placeholder="Ex: Ferro, Cimento, Bloco...">
+      <div class="combo-list"></div></div>
+    <p class="hint">Agrupa produtos parecidos mesmo com descrições diferentes — todas as bitolas de ferro em "Ferro", por exemplo.</p>
+  </div>
+  <div id="categoriaUnica"><label>Categoria</label>
+    <input id="x_cat" list="dlCategorias" value="${(cat(l.cat||'c00').n||'').replace(/"/g,'&quot;')}"
+      placeholder="Escolha ou digite uma nova" ${l.rateio&&l.rateio.length?'style="display:none"':''}>
+    <p class="hint" style="margin-top:5px">Escolha na lista ou digite o nome de uma categoria nova.</p>
+  </div>
+  <div id="blocoRateio">
+  <label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0;margin-top:${l.rateio&&l.rateio.length?'0':'6px'}">
+    <input type="checkbox" id="x_rat" ${l.rateio&&l.rateio.length?'checked':''} style="width:20px;height:20px;flex:none">
+    Este material vai para mais de uma etapa</label>
+  <p class="hint">Marque para cimento, ferro e outros que servem à obra toda. Escolha as etapas e o valor é dividido igualmente entre elas.</p>
+  <div id="rateioBox" style="display:${l.rateio&&l.rateio.length?'block':'none'}"></div>
+  </div>
+  <label>Fornecedor</label><input id="x_forn" value="${l.forn}" placeholder="Ex: Lumar Bananeiras">
+  ${l.id?'':`<label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0">
+    <input type="checkbox" id="x_multi" style="width:20px;height:20px;flex:none">
+    Mais de um item nesta compra</label>
+  <p class="hint">Marque para lançar vários produtos de uma vez, como um pedido com nota única.</p>`}
+  <div id="itemUnico">
+    <div class="row2">
+      <div><label>Quantidade</label><input type="number" step="any" id="x_qtd" value="${l.qtd}"></div>
+      <div><label>Valor unitário</label><input ${moedaAttrs(l.unit)} id="x_unit"></div>
+    </div>
+    <label>Valor total</label><input ${moedaAttrs(l.total)} id="x_total">
+  </div>
+  <div id="itensMultiplos" style="display:none">
+    <label style="margin:12px 0 5px">Itens</label>
+    <div id="itensGasto"></div>
+    <button class="btn ghost mini" style="margin-top:8px" onclick="addItem()">+ Adicionar item</button>
+    <div class="stat" style="margin-top:12px;border-top:1px solid var(--line);border-bottom:0;padding-top:11px">
+      <span style="font-weight:700">Total da compra</span><b class="mono" id="x_tot_itens" style="font-size:18px"></b></div>
+  </div>
+  <label>Pagamento</label><select id="x_pag">
+    ${['A pagar','Pago','Pago adiantado','Parcelado'].map(o=>`<option ${o===l.pag?'selected':''}>${o}</option>`).join('')}</select>
+  <label>Nota fiscal / recibo (número)</label><input id="x_nf" value="${l.nf}" placeholder="Número">
+  <label>Anexos</label>
+  <div id="anexosGasto"></div>
+  <div class="divider"></div>
+  <label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0">
+    <input type="checkbox" id="x_ctrl" ${l.ctrl?'checked':''} style="width:20px;height:20px;flex:none">
+    Vou receber o material aos poucos</label>
+  <p class="hint">Marque quando pagar tudo agora e o fornecedor entregar em partes, como no cimento.</p>
+  <div id="ctrlBox" style="display:${l.ctrl?'block':'none'}">
+    <label>Quantidade já recebida</label><input type="number" step="any" id="x_rec" value="${l.qtdRec}">
+  </div>
+  ${l.id?'':`<div class="divider"></div>
+  <label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0">
+    <input type="checkbox" id="x_rep" style="width:20px;height:20px;flex:none">
+    Repetir todo mês</label>
+  <div id="repBox" style="display:none">
+    <label>Quantas vezes no total</label><input type="number" min="2" max="60" id="x_repN" value="8">
+    <p class="hint">A primeira usa a data acima. As seguintes entram como <b>a pagar</b>, no mesmo dia dos meses seguintes.</p>
+  </div>`}
+  <label>Observações</label><textarea id="x_obs">${l.obs}</textarea>
+  <div style="height:14px"></div>
+  <button class="btn" onclick="salvarGasto('${l.id}')">Salvar</button>
+  ${l.id?`<button class="btn ghost mini" style="margin-top:9px" onclick="excluirGasto('${l.id}')">Excluir lançamento</button>`:''}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+
+  const q=document.getElementById('x_qtd'),u=document.getElementById('x_unit'),t=document.getElementById('x_total');
+  const calc=()=>{onMoedaInput(u);
+    if(q.value&&u.value)t.value=num2moeda((+q.value||0) * moeda2num(u.value));
+    if(document.getElementById('x_rat').checked) atualizarResumoRateio();};
+  q.oninput=calc;u.oninput=calc;
+  t.oninput=()=>{onMoedaInput(t); if(document.getElementById('x_rat').checked) atualizarResumoRateio()};
+  document.getElementById('x_ctrl').onchange=e=>
+    document.getElementById('ctrlBox').style.display=e.target.checked?'block':'none';
+  const rep=document.getElementById('x_rep');
+  if(rep) rep.onchange=e=>document.getElementById('repBox').style.display=e.target.checked?'block':'none';
+  ANX_ALVO=JSON.parse(JSON.stringify(l.anexos||[]));
+  pintaAnexos('anexosGasto');
+
+  const catSel=document.getElementById('x_cat'), ratChk=document.getElementById('x_rat');
+  panel._ratCats=(l.rateio&&l.rateio.length)?l.rateio.map(r=>r.cat):[cat(l.cat||'c00').g==='con'?(l.cat||'c00'):'c00'];
+  ratChk.onchange=e=>{
+    catSel.style.display=e.target.checked?'none':'';
+    document.getElementById('rateioBox').style.display=e.target.checked?'block':'none';
+    if(e.target.checked) pintaRateio();
+  };
+  if(ratChk.checked) pintaRateio();
+
+  const multiChk=document.getElementById('x_multi');
+  panel._its=[{c:'',d:'',q:1,u:0,f:'',cat:cat(l.cat||'c00').n}];
+  if(multiChk){
+    multiChk.onchange=e=>{
+      const on=e.target.checked;
+      document.getElementById('descUnica').style.display=on?'none':'block';
+      document.getElementById('categoriaUnica').style.display=on?'none':'block';
+      document.getElementById('itemUnico').style.display=on?'none':'block';
+      document.getElementById('itensMultiplos').style.display=on?'block':'none';
+      document.getElementById('blocoRateio').style.display=on?'none':'block';
+      if(on){ ITENS_DIV='itensGasto'; ITENS_TOT='x_tot_itens'; ITENS_CAT=true; pintaItens(); }
+    };
+  }
+}
+function totalGastoAtual(){ return moeda2num(val('x_total')); }
+function pintaRateio(){
+  const box=document.getElementById('rateioBox'), etapasCon=CATS_AZ.filter(x=>x.g==='con');
+  box.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:2px 0;margin:4px 0 2px">
+    ${etapasCon.map(x=>`<label style="display:inline-flex;align-items:center;gap:5px;margin:3px 10px 3px 0;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0">
+      <input type="checkbox" style="width:17px;height:17px" value="${x.id}" ${panel._ratCats.includes(x.id)?'checked':''}
+        onchange="toggleRatCat('${x.id}',this.checked)"> ${x.n}
+    </label>`).join('')}
+    </div>
+    <div class="row2" style="margin-top:2px">
+      <button class="btn ghost mini" style="padding:7px" onclick="marcarTodasRat()">Marcar todas</button>
+      <button class="btn ghost mini" style="padding:7px" onclick="limparRat()">Limpar</button>
+    </div>
+    <div id="rateioResumo"></div>`;
+  atualizarResumoRateio();
+}
+function toggleRatCat(id,checked){
+  if(checked){ if(!panel._ratCats.includes(id)) panel._ratCats.push(id); }
+  else panel._ratCats=panel._ratCats.filter(c=>c!==id);
+  pintaRateio();
+}
+function marcarTodasRat(){ panel._ratCats=CATS_AZ.filter(x=>x.g==='con').map(x=>x.id); pintaRateio(); }
+function limparRat(){ panel._ratCats=[]; pintaRateio(); }
+function atualizarResumoRateio(){
+  const el=document.getElementById('rateioResumo'); if(!el)return;
+  const tot=totalGastoAtual(), n=panel._ratCats.length;
+  if(n===0){ el.innerHTML='<p class="hint" style="color:var(--red);margin-top:6px">Escolha ao menos uma etapa.</p>'; return; }
+  el.innerHTML=n===1?'':`<p class="hint" style="margin-top:6px">Dividido igualmente entre ${n} etapas: ${brl(tot/n)} cada.</p>`;
+}
+function salvarGasto(id){
+  const multiChk=document.getElementById('x_multi');
+  const usaMulti=multiChk&&multiChk.checked;
+
+  if(usaMulti){
+    const its=(panel._its||[]).filter(i=>String(i.d||'').trim()&&+i.u>0);
+    if(!its.length){toast('Preencha ao menos um item com descrição e valor.');return}
+    const data=val('x_data'), forn0=val('x_forn').trim(), pag=val('x_pag'), obs=val('x_obs').trim();
+    const anexos=ANX_ALVO||[], at=Date.now();
+    its.forEach(it=>{
+      DB.lanc.push({id:uid(),at,data,desc:it.d.trim(),familia:(it.familia||'').trim(),cat:garantirCategoria(it.cat,'con'),forn:(it.f&&it.f.trim())||forn0,
+        qtd:+it.q||1,unit:+it.u||0,total:(+it.q||0)*(+it.u||0),rateio:[],
+        pag,nf:'',anexos,obs,ctrl:false,qtdRec:0,baixas:[]});
+    });
+    salvar();fechar();render();toast(its.length+' item(ns) lançado(s)');return;
+  }
+
+  const usaRat=document.getElementById('x_rat').checked;
+  const totalVal=moeda2num(val('x_total'));
+  let rat=[], catPrincipal=garantirCategoria(val('x_cat'),'con');
+  if(usaRat){
+    const cats=panel._ratCats||[];
+    if(!cats.length){toast('Escolha ao menos uma etapa para dividir.');return}
+    catPrincipal=cats[0];
+    if(cats.length>1){
+      const n=cats.length, cada=Math.floor((totalVal/n)*100)/100;
+      rat=cats.map((c,idx)=>({cat:c,valor:idx<n-1?cada:+(totalVal-cada*(n-1)).toFixed(2)}));
+    }
+  }
+  const g={id:id||uid(),at:Date.now(),
+    data:val('x_data'),desc:val('x_desc').trim(),familia:val('x_fam').trim(),cat:catPrincipal,forn:val('x_forn').trim(),
+    qtd:+val('x_qtd')||1,unit:moeda2num(val('x_unit')),total:totalVal,rateio:rat,
+    pag:val('x_pag'),nf:val('x_nf').trim(),anexos:ANX_ALVO||[],obs:val('x_obs').trim(),
+    ctrl:document.getElementById('x_ctrl').checked,
+    qtdRec:document.getElementById('x_ctrl').checked?(+val('x_rec')||0):0,
+    baixas:(DB.lanc.find(l=>l.id===id)||{}).baixas||[]};
+  if(!g.desc){toast('Escreva uma descrição.');return}
+  if(!g.total){toast('Informe o valor total.');return}
+  if(id){DB.lanc[DB.lanc.findIndex(l=>l.id===id)]=g;salvar();fechar();render();toast('Gasto atualizado');return}
+
+  const rep=document.getElementById('x_rep');
+  if(rep&&rep.checked){
+    const n=Math.min(60,Math.max(2,+val('x_repN')||2)), grupo=uid();
+    g.serie=grupo; DB.lanc.push(g);
+    for(let i=1;i<n;i++){
+      DB.lanc.push({...g,id:uid(),data:addMeses(g.data,i),pag:'A pagar',
+        ctrl:false,qtdRec:0,baixas:[],nf:'',anexos:[],serie:grupo});
+    }
+    salvar();fechar();render();toast(n+' lançamentos criados');return;
+  }
+  DB.lanc.push(g);salvar();fechar();render();toast('Gasto lançado');
+}
+const val=i=>document.getElementById(i).value;
+function excluirGasto(id){
+  const l=DB.lanc.find(x=>x.id===id);
+  const abertos=l.serie?DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)):[];
+  if(l.serie&&abertos.length>1){
+    ACAO_PENDENTE=()=>{
+      DB.lanc=DB.lanc.filter(x=>!(x.serie===l.serie&&!isPago(x)));
+      salvar();fechar();render();toast('Lançamentos em aberto da série excluídos');
+    };
+    abrir(`<h2>Faz parte de uma série mensal</h2>
+    <p class="sub">"${l.desc}" se repete todo mês. O que você quer excluir?</p>
+    <button class="btn danger" onclick="executarPendente()">Excluir os ${abertos.length} em aberto da série</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="excluirSoEste('${id}')">Excluir só este lançamento</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+    return;
+  }
+  excluirSoEste(id);
+}
+function excluirSoEste(id){
+  const l=DB.lanc.find(x=>x.id===id);
+  confirmar('Excluir lançamento',`"${l.desc}" — ${brl(l.total)}. Não é possível desfazer.`,
+    'Excluir',()=>{
+      DB.lanc=DB.lanc.filter(x=>x.id!==id);salvar();fechar();render();toast('Lançamento excluído');
+    },true);
+}
+
+function verGasto(id){
+  const l=DB.lanc.find(x=>x.id===id);const falta=l.ctrl?(+l.qtd - +l.qtdRec):0;
+  const pp=pagoParcial(l), saldo=saldoAPagar(l);
+  abrir(`<h2>#${NUM_LANC[l.id]||''} ${l.desc}</h2>
+  <p class="sub">${l.data.split('-').reverse().join('/')} · ${(l.rateio&&l.rateio.length)?'Dividido entre etapas':cat(l.cat).n}</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <div class="stat"><span>Valor total</span><b class="mono">${brl(l.total)}</b></div>
+    <div class="stat"><span>Quantidade</span><b class="mono">${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}</b></div>
+    ${l.familia?`<div class="stat"><span>Tipo de produto</span><b>${l.familia}</b></div>`:''}
+    <div class="stat"><span>Fornecedor</span><b>${l.forn||'—'}</b></div>
+    <div class="stat"><span>Pagamento</span><b>${l.pag}</b></div>
+    ${l.nf?`<div class="stat"><span>Nota fiscal</span><b>${l.nf}</b></div>`:''}
+    ${l.ctrl?`<div class="stat"><span>Recebido</span><b class="mono">${(+l.qtdRec).toLocaleString('pt-BR')} de ${(+l.qtd).toLocaleString('pt-BR')}</b></div>`:''}
+    ${pp>0?`<div class="stat"><span>Já pago</span><b class="mono">${brl(pp)} de ${brl(l.total)}</b></div>`:''}
+  </div>
+  ${(l.rateio&&l.rateio.length)?`<div class="card" style="box-shadow:none;margin-top:-4px">
+    <h3>Dividido entre etapas</h3>
+    ${l.rateio.map(r=>`<div class="stat"><span>${cat(r.cat).n}</span><b class="mono">${brl(r.valor)}</b></div>`).join('')}
+  </div>`:''}
+  ${l.obs?`<p class="hint">${l.obs}</p>`:''}
+  ${(l.anexos&&l.anexos.length)?`<button class="btn dark mini" style="width:100%" onclick='verAnexoLista(${JSON.stringify(l.anexos)})'>📎 Ver anexos (${l.anexos.length})</button>`:''}
+  ${falta>0?`<div class="divider"></div>
+    <label>Registrar entrega — faltam ${falta.toLocaleString('pt-BR')}</label>
+    <div class="row2"><input type="number" step="any" id="b_qtd" placeholder="Quantidade recebida">
+    <button class="btn mini" onclick="darBaixa('${l.id}')">Dar baixa</button></div>
+    <p class="hint">A baixa é só física. O dinheiro já foi lançado e não muda.</p>`:''}
+  ${l.baixas&&l.baixas.length?'<div class="divider"></div><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)">Entregas</h3>'+
+    l.baixas.map(b=>`<div class="stat"><span>${b.d.split('-').reverse().join('/')}</span><b class="mono">+${(+b.q).toLocaleString('pt-BR')}</b></div>`).join(''):''}
+  ${!isPago(l)?`<div class="divider"></div>
+    <label>Registrar pagamento — saldo ${brl(saldo)}</label>
+    <div class="row2"><input ${moedaAttrs('')} id="p_valor" oninput="onMoedaInput(this)" placeholder="Valor pago">
+    <button class="btn mini" onclick="darPagamento('${l.id}')">Registrar</button></div>
+    <p class="hint">Use para pagar o pedreiro aos poucos. Quando o saldo zerar, vira "Pago" sozinho.</p>`:''}
+  ${l.pagamentos&&l.pagamentos.length?'<div class="divider"></div><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)">Pagamentos</h3>'+
+    l.pagamentos.map(p=>`<div class="stat"><span>${p.d.split('-').reverse().join('/')}</span><b class="mono">${brl(p.valor)}</b></div>`).join(''):''}
+  <div style="height:14px"></div>
+  ${isPago(l)?'':`<button class="btn" onclick="marcarPago('${l.id}')">Marcar tudo como pago</button><div style="height:9px"></div>`}
+  <div class="row2">
+    <button class="btn ghost mini" onclick="abrirGasto(DB.lanc.find(x=>x.id==='${l.id}'))">Editar</button>
+    <button class="btn ghost mini" onclick="duplicar('${l.id}')">Duplicar</button>
+  </div>
+  <button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="excluirGasto('${l.id}')">Excluir lançamento</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function darPagamento(id){
+  const l=DB.lanc.find(x=>x.id===id);
+  const v=moeda2num(document.getElementById('p_valor').value);
+  if(!v||v<=0){toast('Informe o valor pago.');return}
+  const saldo=saldoAPagar(l);
+  if(v>saldo+0.01){toast('Maior que o saldo devido.');return}
+  l.pagamentos=l.pagamentos||[]; l.pagamentos.push({d:hoje(),valor:v}); l.at=Date.now();
+  if(saldoAPagar(l)<=0.01){ l.pag='Pago'; if(l.data>hoje())l.data=hoje(); }
+  salvar();fechar();render();
+  toast(isPago(l)?'Pago por completo':'Pagamento registrado');
+}
+function marcarPago(id){
+  const l=DB.lanc.find(x=>x.id===id);
+  l.pag='Pago'; if(l.data>hoje()) l.data=hoje(); l.at=Date.now();
+  salvar();fechar();render();toast('Marcado como pago');
+}
+function duplicar(id){
+  const l=DB.lanc.find(x=>x.id===id);
+  abrirGasto({...l,id:'',data:addMeses(l.data,1),pag:'A pagar',nf:'',anexos:[],
+    ctrl:false,qtdRec:0,baixas:[],serie:undefined});
+  toast('Cópia com data do mês seguinte');
+}
+function darBaixa(id){
+  const l=DB.lanc.find(x=>x.id===id), q=+document.getElementById('b_qtd').value;
+  if(!q||q<=0){toast('Informe a quantidade recebida.');return}
+  const falta=+l.qtd - +l.qtdRec;
+  if(q>falta+.001){toast('Maior que o saldo pendente.');return}
+  l.qtdRec=+l.qtdRec+q; l.baixas=l.baixas||[]; l.baixas.push({d:hoje(),q}); l.at=Date.now();
+  salvar();fechar();render();
+  toast(+l.qtd-+l.qtdRec<.001?'Pedido recebido por completo':'Entrega registrada');
+}
+
+/* ---------- cotação ---------- */
+function abrirCot(c){
+  c=c||{id:'',item:'',forn:'',validade:'',obs:'',itens:[{c:'',d:'',q:1,u:0,f:''}]};
+  panel._its=JSON.parse(JSON.stringify(c.itens&&c.itens.length?c.itens:[{c:'',d:'',q:1,u:0,f:''}]));
+  abrir(`<h2>${c.id?'Editar cotação':'Nova cotação'}</h2>
+  <p class="sub">Preço de mercado. Ainda não é gasto.</p>
+  <label>Do que se trata</label><input id="c_item" value="${c.item||''}" placeholder="Ex: Blocos e canaletas de concreto">
+  <p class="hint">Use o mesmo texto ao cotar com outros fornecedores — é o que agrupa as propostas para comparar.</p>
+  <label>Fornecedor</label><input id="c_forn" value="${c.forn||''}">
+  <label>Validade da proposta</label><input type="date" id="c_val" value="${c.validade||''}">
+  <label>Anexos</label>
+  <div id="anexosCot"></div>
+  <div class="divider"></div>
+  <label style="margin:0">Itens</label>
+  <div id="itens"></div>
+  <button class="btn ghost mini" style="margin-top:8px" onclick="addItem()">+ Adicionar item</button>
+  <div class="stat" style="margin-top:12px;border-top:1px solid var(--line);border-bottom:0;padding-top:11px">
+    <span style="font-weight:700">Total da cotação</span><b class="mono" id="c_tot" style="font-size:18px"></b></div>
+  <label>Observações</label><textarea id="c_obs" placeholder="Condições, prazo de entrega, devolução de palete...">${c.obs||''}</textarea>
+  <div style="height:14px"></div>
+  <button class="btn" onclick="salvarCot('${c.id}')">Salvar cotação</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  ITENS_DIV='itens'; ITENS_TOT='c_tot'; ITENS_CAT=false;
+  pintaItens();
+  ANX_ALVO=JSON.parse(JSON.stringify(c.anexos||[]));
+  pintaAnexos('anexosCot');
+}
+let ITENS_DIV='itens', ITENS_TOT='c_tot', ITENS_CAT=false;
+function pintaItens(){
+  document.getElementById(ITENS_DIV).innerHTML=panel._its.map((it,i)=>`
+   <div class="grp" style="background:var(--surface-2);margin-bottom:8px">
+     <div class="row2">
+       <div><label style="margin-top:0">Qtde</label>
+         <input type="number" step="any" value="${it.q}" oninput="chgItem(${i},'q',this.value)"></div>
+       <div><label style="margin-top:0">Vlr unitário</label>
+         <input ${moedaAttrs(it.u)} oninput="onMoedaInput(this);chgItem(${i},'u',moeda2num(this.value))"></div>
+     </div>
+     <label>Descrição</label>
+     <input value="${(it.d||'').replace(/"/g,'&quot;')}" list="dlProdutos" placeholder="Ex: Bloco 14x19x39cm" oninput="chgItem(${i},'d',this.value)">
+     <label>Tipo de produto (opcional)</label>
+     <div class="combo"><input data-item-index="${i}" autocomplete="off"
+       oninput="chgItem(${i},'familia',this.value);comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
+       value="${(it.familia||'').replace(/"/g,'&quot;')}" placeholder="Ex: Ferro, Cimento...">
+       <div class="combo-list"></div></div>
+     ${ITENS_CAT?`<label>Etapa deste item</label>
+     <input list="dlCategorias" value="${(it.cat||cat('c00').n).replace(/"/g,'&quot;')}"
+       placeholder="Escolha ou digite uma nova" oninput="chgItem(${i},'cat',this.value)">`:''}
+     <div class="row2">
+       <div><label>Cód. (opcional)</label>
+         <input value="${(it.c||'').replace(/"/g,'&quot;')}" oninput="chgItem(${i},'c',this.value)"></div>
+       <div><label>Fornecedor (opcional)</label>
+         <input value="${(it.f||'').replace(/"/g,'&quot;')}" oninput="chgItem(${i},'f',this.value)"></div>
+     </div>
+     <div class="stat" style="border:0;padding-bottom:0">
+       <span style="font-size:12px">Total do item</span>
+       <span><b class="mono" id="it_${i}">${brl((+it.q||0)*(+it.u||0))}</b>
+       ${panel._its.length>1?`<button class="iconbtn" style="background:var(--surface);color:var(--red);width:28px;height:28px;margin-left:8px;vertical-align:middle" onclick="delItem(${i})">×</button>`:''}</span>
+     </div>
+   </div>`).join('');
+  totItens();
+}
+function chgItem(i,campo,v){
+  panel._its[i][campo]=(campo==='q'||campo==='u')?(+v||0):v;
+  if(campo==='q'||campo==='u'){
+    document.getElementById('it_'+i).textContent=brl((+panel._its[i].q||0)*(+panel._its[i].u||0));
+    totItens();
+  }
+}
+function totItens(){const el=document.getElementById(ITENS_TOT);if(el)el.textContent=brl(somaItens(panel._its))}
+function addItem(){
+  const catPadrao=document.getElementById('x_cat')?(val('x_cat')||cat('c00').n):cat('c00').n;
+  panel._its.push({c:'',d:'',q:1,u:0,f:'',cat:catPadrao});
+  pintaItens();
+}
+function delItem(i){panel._its.splice(i,1);pintaItens()}
+
+
+function salvarCot(id){
+  const its=panel._its.filter(i=>String(i.d||'').trim()||+i.u>0);
+  const c={id:id||uid(),at:Date.now(),data:hoje(),item:val('c_item').trim(),forn:val('c_forn').trim(),
+    itens:its.length?its:[{c:'',d:val('c_item').trim(),q:1,u:0,f:''}],
+    total:somaItens(its),validade:val('c_val'),anexos:ANX_ALVO||[],obs:val('c_obs').trim(),status:'aberta'};
+  if(!c.item){toast('Descreva do que se trata a cotação.');return}
+  if(id){const i=DB.cot.findIndex(x=>x.id===id);c.status=DB.cot[i].status;DB.cot[i]=c}else DB.cot.push(c);
+  salvar();fechar();render();toast('Cotação salva');
+}
+function verCot(id){
+  const c=DB.cot.find(x=>x.id===id), its=c.itens||[], fechada=c.status!=='aberta';
+  abrir(`<h2>${c.item}</h2><p class="sub">${c.forn||'Fornecedor não definido'}${c.validade?' · válida até '+c.validade.split('-').reverse().join('/'):''}</p>
+  ${fechada?`<p class="sub" style="margin-top:-4px"><span class="tag ${c.status==='fechada'?'ok':''}">${c.status==='fechada'?'Já virou compra':'Arquivada'}</span></p>`:''}
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    ${its.map(i=>`<div class="stat" style="align-items:flex-start">
+      <span style="flex:1;padding-right:8px">${i.d||'—'}${i.familia?` <span class="tag">${i.familia}</span>`:''}
+        <div style="font-size:11.5px;color:var(--ink-2)">${(+i.q||0).toLocaleString('pt-BR')} × ${brl(i.u)}${i.c?' · cód. '+i.c:''}${i.f?' · '+i.f:''}</div>
+      </span><b class="mono">${brl((+i.q||0)*(+i.u||0))}</b></div>`).join('')}
+    <div class="stat" style="border-top:1px solid var(--line);border-bottom:0;margin-top:4px;padding-top:9px">
+      <span style="font-weight:700">Total</span><b class="mono" style="font-size:17px">${brl(c.total)}</b></div>
+  </div>
+  ${c.obs?`<p class="hint">${c.obs}</p>`:''}
+  ${(c.anexos&&c.anexos.length)?`<button class="btn dark mini" style="width:100%" onclick='verAnexoLista(${JSON.stringify(c.anexos)})'>📎 Ver anexos (${c.anexos.length})</button>`:''}
+  <div style="height:10px"></div>
+  ${fechada?`<button class="btn ghost mini" style="width:100%" onclick="reabrirCot('${c.id}')">Reabrir cotação</button>`:`
+  <button class="btn" onclick="virouCompra('${c.id}')">Virou compra</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="outraProposta('${c.id}')">Cotar com outro fornecedor</button>
+  <div class="row2" style="margin-top:9px">
+    <button class="btn ghost mini" onclick="abrirCot(DB.cot.find(x=>x.id==='${c.id}'))">Editar</button>
+    <button class="btn ghost mini" onclick="arquivarCot('${c.id}')">Arquivar</button>
+  </div>`}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function reabrirCot(id){
+  const c=DB.cot.find(x=>x.id===id); c.status='aberta'; c.at=Date.now();
+  salvar();fechar();render();toast('Cotação reaberta');
+}
+function outraProposta(id){
+  const c=DB.cot.find(x=>x.id===id);
+  abrirCot({id:'',item:c.item,forn:'',validade:'',obs:'',
+    itens:(c.itens||[]).map(i=>({c:i.c,d:i.d,q:i.q,u:0,f:'',familia:i.familia||''}))});
+  toast('Mesmos itens, novo fornecedor');
+}
+function arquivarCot(id){const _a=DB.cot.find(x=>x.id===id);_a.status='arquivada';_a.at=Date.now();salvar();fechar();render();toast('Cotação arquivada')}
+function virouCompra(id){
+  const c=DB.cot.find(x=>x.id===id);
+  abrirConfirmarCompra(c);
+}
+function abrirConfirmarCompra(c){
+  const its=(c.itens&&c.itens.length)?c.itens:[{c:'',d:c.item,q:1,u:c.total,f:''}];
+  panel._itC=JSON.parse(JSON.stringify(its)).map(i=>({...i,cats:[i.cat||'c00']}));
+  panel._cotOrig=c;
+  abrir(`<h2>Lançar compra</h2>
+  <p class="sub">${c.forn||'Sem fornecedor'} · marque em quais etapas cada item entra</p>
+  <div id="itensCompra"></div>
+  <label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0;margin-top:10px">
+    <input type="checkbox" id="ic_pago" checked style="width:20px;height:20px;flex:none">
+    Já pago</label>
+  <div style="height:14px"></div>
+  <button class="btn" onclick="confirmarCompra()">Lançar ${panel._itC.length} item(ns)</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  pintaItensCompra();
+}
+function pintaItensCompra(){
+  const etapasCon=CATS_AZ.filter(x=>x.g==='con');
+  document.getElementById('itensCompra').innerHTML=panel._itC.map((it,i)=>{
+    const n=it.cats.length, valorItem=(+it.q||0)*(+it.u||0);
+    return `<div class="grp" style="background:var(--surface-2);margin-bottom:8px">
+     <h4>${it.d||'—'}${it.familia?` <span class="tag">${it.familia}</span>`:''}</h4>
+     <div class="qt">${(+it.q||0).toLocaleString('pt-BR')} × ${brl(it.u)} = <b class="mono">${brl(valorItem)}</b>${it.c?' · cód. '+it.c:''}</div>
+     <label style="margin-top:8px">Etapas desta compra</label>
+     <div style="display:flex;flex-wrap:wrap;gap:2px 0;margin:4px 0 2px">
+       ${etapasCon.map(x=>`<label style="display:inline-flex;align-items:center;gap:5px;margin:3px 10px 3px 0;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0">
+         <input type="checkbox" style="width:17px;height:17px" value="${x.id}" ${it.cats.includes(x.id)?'checked':''}
+           onchange="toggleEtapaItem(${i},'${x.id}',this.checked)"> ${x.n}
+       </label>`).join('')}
+     </div>
+     <div class="row2" style="margin-top:2px">
+       <button class="btn ghost mini" style="padding:7px" onclick="marcarTodasEtapas(${i})">Marcar todas</button>
+       <button class="btn ghost mini" style="padding:7px" onclick="limparEtapas(${i})">Limpar</button>
+     </div>
+     ${n===0?'<p class="hint" style="color:var(--red)">Escolha ao menos uma etapa.</p>':
+       n>1?`<p class="hint">Dividido igualmente entre ${n} etapas: ${brl(valorItem/n)} cada.</p>`:''}
+   </div>`;
+  }).join('');
+}
+function toggleEtapaItem(i,catId,checked){
+  const it=panel._itC[i];
+  if(checked){ if(!it.cats.includes(catId)) it.cats.push(catId); }
+  else { it.cats=it.cats.filter(c=>c!==catId); }
+  pintaItensCompra();
+}
+function marcarTodasEtapas(i){
+  panel._itC[i].cats=CATS_AZ.filter(x=>x.g==='con').map(x=>x.id);
+  pintaItensCompra();
+}
+function limparEtapas(i){ panel._itC[i].cats=[]; pintaItensCompra(); }
+function confirmarCompra(){
+  if(panel._itC.some(it=>it.cats.length===0)){toast('Falta escolher a etapa de algum item.');return}
+  const c=panel._cotOrig, pago=document.getElementById('ic_pago').checked;
+
+  c.status='fechada'; c.at=Date.now();
+  const k=t=>String(t||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const perdedoras=DB.cot.filter(x=>x.status==='aberta'&&k(x.item)===k(c.item));
+  perdedoras.forEach(x=>{x.status='arquivada';x.at=Date.now()});
+
+  const idsGerados=[];
+  panel._itC.forEach(it=>{
+    const total=(+it.q||0)*(+it.u||0), n=it.cats.length;
+    let rateio=[];
+    if(n>1){
+      const cada=Math.floor((total/n)*100)/100;
+      rateio=it.cats.map((cat,idx)=>({cat,valor:idx<n-1?cada:+(total-cada*(n-1)).toFixed(2)}));
+    }
+    const novoId=uid(); idsGerados.push(novoId);
+    DB.lanc.push({id:novoId,at:Date.now(),data:hoje(),desc:it.d||c.item,familia:(it.familia||'').trim(),cat:it.cats[0],
+      forn:it.f||c.forn,qtd:+it.q||1,unit:+it.u||0,total,rateio,
+      pag:pago?'Pago':'A pagar',nf:'',anexos:c.anexos||[],obs:c.obs||'',
+      ctrl:false,qtdRec:0,baixas:[]});
+  });
+  c.lancIds=idsGerados;
+  salvar();fechar();render();
+  toast(panel._itC.length+' item(ns) lançado(s)'+(perdedoras.length?' · '+perdedoras.length+' proposta arquivada':''));
+}
+
+/* ---------- fotos ---------- */
+document.getElementById('fotoInput').onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{const im=new Image();
+    im.onload=()=>{
+      const M=900, s=Math.min(1,M/Math.max(im.width,im.height));
+      const cv=document.createElement('canvas');
+      cv.width=im.width*s|0; cv.height=im.height*s|0;
+      cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+      formFoto(cv.toDataURL('image/jpeg',.62));
+    }; im.src=r.result};
+  r.readAsDataURL(f); e.target.value='';
+};
+function formFoto(img){
+  const agora=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16);
+  abrir(`<h2>Registrar foto</h2><p class="sub">Data e hora vêm do momento do registro.</p>
+  <img src="${img}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
+  <label>Data e hora</label><input type="datetime-local" id="f_dh" value="${agora}">
+  <label>Etapa</label><select id="f_cat">${CATS_AZ.filter(c=>c.g==='con').map(c=>
+    `<option value="${c.id}">${c.n}</option>`).join('')}</select>
+  <label>Legenda</label><input id="f_leg" placeholder="Ex: terreno limpo, vista da frente">
+  <div style="height:14px"></div>
+  <button class="btn" onclick="salvarFoto('${'IMG'}')">Salvar no álbum</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Descartar</button>`);
+  panel._img=img;
+}
+function salvarFoto(){
+  DB.fotos.push({id:uid(),at:Date.now(),dh:val('f_dh'),cat:val('f_cat'),leg:val('f_leg').trim(),img:panel._img});
+  salvar();fechar();render();toast('Foto salva no álbum');
+}
+function verFoto(id){
+  const f=DB.fotos.find(x=>x.id===id);
+  abrir(`<h2>${f.leg||'Sem legenda'}</h2>
+  <p class="sub">${f.dh.slice(8,10)}/${f.dh.slice(5,7)}/${f.dh.slice(0,4)} às ${f.dh.slice(11,16)} · ${cat(f.cat).n}</p>
+  <img src="${f.img}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
+  <button class="btn ghost mini" onclick="excluirFoto('${f.id}')">Excluir foto</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function excluirFoto(id){
+  confirmar('Excluir foto','Não é possível desfazer.','Excluir',()=>{
+    DB.fotos=DB.fotos.filter(f=>f.id!==id);salvar();fechar();render();toast('Foto excluída');
+  },true);
+}
+
+/* ---------- backup ---------- */
+function baixar(nome,txt,tipo){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:tipo}));a.download=nome;a.click();
+}
+function exportJSON(){
+  DB.meta={ver:2,em:new Date().toISOString()};
+  const txt=JSON.stringify(DB), nome='obra-c08-'+hoje()+'.json';
+  if(navigator.share && navigator.canShare){
+    const f=new File([txt],nome,{type:'application/json'});
+    if(navigator.canShare({files:[f]})){
+      navigator.share({files:[f],title:'Backup da obra C08'})
+        .then(()=>toast('Backup enviado')).catch(()=>{baixar(nome,txt,'application/json');toast('Backup salvo')});
+      return;
+    }
+  }
+  baixar(nome,txt,'application/json');toast('Backup gerado');
+}
+
+/* junta duas bases pelo id, mantendo sempre a versão alterada por último */
+function fundir(local,vindo){
+  const m={},r={novos:0,atual:0};
+  (local||[]).forEach(x=>m[x.id]=x);
+  (vindo||[]).forEach(x=>{
+    const e=m[x.id];
+    if(!e){m[x.id]=x;r.novos++}
+    else if((+x.at||0)>(+e.at||0)){m[x.id]=x;r.atual++}
+  });
+  return {lista:Object.values(m),...r};
+}
+function exportCSV(){
+  rebuildNumeros();
+  const h='Num;Data;Descricao;TipoProduto;Categoria;Grupo;Fornecedor;Qtd;Unitario;Total;ValorEtapa;Pagamento;Situacao;NF;Recebido;Saldo\n';
+  const linhas=[];
+  DB.lanc.slice().sort((a,b)=>a.data.localeCompare(b.data)).forEach(x=>{
+    partes(x).forEach(p=>{
+      linhas.push([NUM_LANC[x.id]||'',x.data,x.desc,x.familia||'',cat(p.cat).n,cat(p.cat).g==='adm'?'Administrativa':'Construcao',x.forn,
+        x.qtd,(+x.unit).toFixed(2),(+x.total).toFixed(2),p.valor.toFixed(2),x.pag,isPago(x)?'Pago':'A pagar',x.nf,
+        x.ctrl?x.qtdRec:'',x.ctrl?(+x.qtd-+x.qtdRec):''].join(';'));
+    });
+  });
+  baixar('gastos-c08-'+hoje()+'.csv','\ufeff'+h+linhas.join('\n'),'text/csv');toast('CSV gerado');
+}
+document.getElementById('impInput').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{
+    let d; try{d=JSON.parse(r.result); if(!d.lanc)throw 0}catch(x){toast('Arquivo inválido.');return}
+    const existeL=new Set(DB.lanc.map(l=>chaveDup(l,'lanc')));
+    const existeC=new Set(DB.cot.map(c=>chaveDup(c,'cot')));
+    const nSeguroL=(d.lanc||[]).filter(l=>!existeL.has(chaveDup(l,'lanc'))).length;
+    const nSeguroC=(d.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot'))).length;
+    abrir(`<h2>Importar dados</h2>
+    <p class="sub">Arquivo de ${d.meta&&d.meta.em?new Date(d.meta.em).toLocaleString('pt-BR'):'origem desconhecida'}</p>
+    <button class="btn" onclick="importar('seguro')">Importar só o que for novo (${nSeguroL+nSeguroC})</button>
+    <p class="hint">Compara por data, descrição e valor. Nunca duplica e nunca altera o que já está aqui — o mais seguro.</p>
+    <div class="divider"></div>
+    <button class="btn ghost mini" onclick="importar('juntar')">Juntar e atualizar alterados</button>
+    <p class="hint">Também traz o que já existe mas foi editado depois. Use se editou o mesmo lançamento nos dois aparelhos.</p>
+    <div class="divider"></div>
+    <button class="btn ghost mini" onclick="importar('trocar')">Substituir tudo por este arquivo</button>
+    <p class="hint">Apaga o que está neste aparelho. Use só para configurar um aparelho novo.</p>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+    panel._imp=d;
+  };
+  r.readAsText(f);e.target.value='';
+};
+function importar(modo){
+  const d=panel._imp;
+  if(modo==='trocar'){
+    ACAO_PENDENTE=()=>{
+      DB=d; DB.fotos=DB.fotos||[]; DB.cfg=DB.cfg||{inicio:'',meses:8,area:0}; DB.catExtra=DB.catExtra||[];
+      rebuildCategorias(); salvar();fechar();render();toast('Base substituída');
+    };
+    abrir(`<h2>Substituir tudo?</h2>
+    <p class="sub">Os dados deste aparelho serão apagados e trocados pelos do arquivo. Não é possível desfazer.</p>
+    <button class="btn danger" onclick="executarPendente()">Substituir</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+    return;
+  }
+  if(modo==='seguro'){
+    const existeL=new Set(DB.lanc.map(l=>chaveDup(l,'lanc')));
+    const existeC=new Set(DB.cot.map(c=>chaveDup(c,'cot')));
+    const idsF=new Set(DB.fotos.map(f=>f.id)), idsP=new Set(DB.passos.map(p=>p.id));
+    const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
+    const novosL=(d.lanc||[]).filter(l=>!existeL.has(chaveDup(l,'lanc')));
+    const novosC=(d.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot')));
+    const novasF=(d.fotos||[]).filter(f=>!idsF.has(f.id));
+    const novosP=(d.passos||[]).filter(p=>!idsP.has(p.id));
+    const novasCx=(d.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
+    DB.lanc=DB.lanc.concat(novosL); DB.cot=DB.cot.concat(novosC);
+    DB.fotos=DB.fotos.concat(novasF); DB.passos=DB.passos.concat(novosP);
+    DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias();
+    salvar();fechar();render();
+    toast((novosL.length+novosC.length+novasF.length+novosP.length+novasCx.length)+' item(ns) novo(s) importado(s)');
+    return;
+  }
+  DB.lanc=fundir(DB.lanc,d.lanc).lista;
+  DB.cot=fundir(DB.cot,d.cot).lista;
+  DB.fotos=fundir(DB.fotos,d.fotos).lista;
+  DB.passos=fundir(DB.passos,d.passos).lista;
+  const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
+  const novasCx=(d.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
+  DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias();
+  if(d.cfg&&(+d.cfg.at||0)>(+((DB.cfg||{}).at)||0)) DB.cfg=d.cfg;
+  salvar();fechar();render();toast('Bases juntadas');
+}
+function verCategorias(){
+  const custom=(DB.catExtra||[]).slice().sort((a,b)=>alfa(a.n,b.n));
+  abrir(`<h2>Categorias personalizadas</h2>
+  <p class="sub">Criadas automaticamente ao digitar um nome novo em vez de escolher da lista.</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    ${custom.length?custom.map(c=>`<div class="stat"><span>${c.n} <span class="tag ${c.g}">${c.g==='adm'?'adm':'obra'}</span></span>
+      <button class="iconbtn" style="background:var(--surface-2);color:var(--red);width:28px;height:28px" onclick="excluirCategoria('${c.id}')">×</button></div>`).join('')
+      :'<div class="empty">Nenhuma criada ainda</div>'}
+  </div>
+  <p class="hint">Excluir aqui não apaga lançamentos já feitos nela — eles continuam existindo, só some da lista para escolher em novos.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function excluirCategoria(id){
+  confirmar('Excluir categoria','Lançamentos já feitos nela continuam existindo normalmente.','Excluir',()=>{
+    DB.catExtra=(DB.catExtra||[]).filter(c=>c.id!==id);
+    rebuildCategorias(); salvar(); fechar(); render(); toast('Categoria removida da lista');
+  },true);
+}
+document.getElementById('menuBtn').onclick=()=>abrir(`<h2>Obra Bananeiras C08</h2>
+  <p class="sub">Monte das Cerejeiras · residência unifamiliar · prazo de 8 meses</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <div class="stat"><span>Lançamentos</span><b class="mono">${DB.lanc.length}</b></div>
+    <div class="stat"><span>Cotações abertas</span><b class="mono">${DB.cot.filter(c=>c.status==='aberta').length}</b></div>
+    <div class="stat"><span>Fotos no álbum</span><b class="mono">${DB.fotos.length}</b></div>
+  </div>
+  <button class="btn dark" onclick="exportJSON()">Exportar backup</button>
+  <div class="row2" style="margin-top:9px">
+    <button class="btn ghost mini" onclick="exportCSV()">Gastos em CSV</button>
+    <button class="btn ghost mini" onclick="document.getElementById('impInput').click()">Importar / juntar</button>
+  </div>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirCfg()">Prazo e área construída</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirDuplicados()">Verificar duplicados</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verCategorias()">Categorias personalizadas</button>
+  <p class="hint">Os dados ficam guardados só neste aparelho. Se limpar os dados do navegador, tudo se perde — exporte de vez em quando e guarde o arquivo no Drive.</p>
+  <button class="btn ghost mini" style="margin-top:6px" onclick="fechar()">Fechar</button>`);
+
+carregar(); render();
+</script>
+</body>
+</html>
