@@ -549,25 +549,50 @@ async function entrarNoApp(session){
 }
 
 /* funde os dados da nuvem com os locais pelo conteúdo (mesma lógica do "Importar só o que for novo") */
+/* funde uma lista: mesmo id -> fica a versão editada mais recentemente; id novo -> entra (sem duplicar conteúdo igual) */
+function mesclarLista(local,vindo,tipo,setExc){
+  const porId={}; local.forEach(o=>{porId[o.id]=o});
+  const porChave={}; if(tipo) local.forEach(o=>{porChave[chaveDup(o,tipo)]=o});
+  let add=0, upd=0;
+  (vindo||[]).forEach(o=>{
+    if(!o||!o.id)return;
+    const meu=porId[o.id];
+    if(meu){
+      if((+o.at||0)>(+meu.at||0)){
+        const i=local.indexOf(meu);
+        if(i>=0){ local[i]=o; porId[o.id]=o; upd++; }
+      }
+      return;
+    }
+    if(tipo){
+      const k=chaveDup(o,tipo);
+      if(setExc&&setExc.has(tipo+'|'+k))return;
+      if(porChave[k])return;
+      porChave[k]=o;
+    }
+    local.push(o); porId[o.id]=o; add++;
+  });
+  return add+upd;
+}
 function mesclarSeguro(vindo){
   if(!vindo)return;
   mesclarExclusoes(vindo.exc);
   const setExc=new Set((DB.exc||[]).map(e=>e.k));
-  const existeL=new Set(DB.lanc.map(l=>chaveDup(l,'lanc')));
-  const existeC=new Set(DB.cot.map(c=>chaveDup(c,'cot')));
-  const idsF=new Set(DB.fotos.map(f=>f.id)), idsP=new Set(DB.passos.map(p=>p.id));
+  let n=0;
+  n+=mesclarLista(DB.lanc,vindo.lanc,'lanc',setExc);
+  n+=mesclarLista(DB.cot,vindo.cot,'cot',setExc);
+  n+=mesclarLista(DB.fotos,vindo.fotos,null,null);
+  n+=mesclarLista(DB.passos,vindo.passos,null,null);
+  DB.equipe=DB.equipe||[];
+  n+=mesclarLista(DB.equipe,vindo.equipe,null,null);
   const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
-  const novosL=(vindo.lanc||[]).filter(l=>!existeL.has(chaveDup(l,'lanc'))&&!setExc.has('lanc|'+chaveDup(l,'lanc')));
-  const novosC=(vindo.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot'))&&!setExc.has('cot|'+chaveDup(c,'cot')));
-  const novasF=(vindo.fotos||[]).filter(f=>!idsF.has(f.id));
-  const novosP=(vindo.passos||[]).filter(p=>!idsP.has(p.id));
   const novasCx=(vindo.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
-  DB.lanc=DB.lanc.concat(novosL); DB.cot=DB.cot.concat(novosC);
-  DB.fotos=DB.fotos.concat(novasF); DB.passos=DB.passos.concat(novosP);
-  DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias();
+  DB.catExtra=(DB.catExtra||[]).concat(novasCx); n+=novasCx.length;
+  rebuildCategorias();
   aplicarExclusoes();
-  if(!DB.cfg||!DB.cfg.inicio) DB.cfg=vindo.cfg||DB.cfg;
-  return novosL.length+novosC.length+novasF.length+novosP.length+novasCx.length;
+  if(vindo.cfg&&(+vindo.cfg.at||0)>(+((DB.cfg||{}).at)||0)) DB.cfg=vindo.cfg;
+  else if(!DB.cfg||!DB.cfg.inicio) DB.cfg=vindo.cfg||DB.cfg;
+  return n;
 }
 async function sincronizarNaEntrada(){
   try{
@@ -578,6 +603,23 @@ async function sincronizarNaEntrada(){
     SYNC_OK=true;
   }catch(e){ SYNC_OK=false; }
 }
+/* busca alterações feitas em outro aparelho: ao voltar para o app e a cada 60s */
+let ULTIMO_SYNC=0;
+async function ressincronizar(forcar){
+  if(!SESSAO)return;
+  const agora=Date.now();
+  if(!forcar&&agora-ULTIMO_SYNC<20000)return;
+  ULTIMO_SYNC=agora;
+  const antes=JSON.stringify([DB.lanc.length,DB.cot.length,DB.passos.length,
+    DB.lanc.reduce((s,l)=>s+(+l.at||0),0)]);
+  await sincronizarNaEntrada();
+  const depois=JSON.stringify([DB.lanc.length,DB.cot.length,DB.passos.length,
+    DB.lanc.reduce((s,l)=>s+(+l.at||0),0)]);
+  if(antes!==depois){ render(); toast('Atualizado com o outro aparelho'); }
+}
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) ressincronizar(); });
+window.addEventListener('focus',()=>ressincronizar());
+setInterval(()=>{ if(!document.hidden) ressincronizar(); },60000);
 async function enviarNuvem(){
   if(!SESSAO)return;
   try{
