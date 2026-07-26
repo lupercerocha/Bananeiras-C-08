@@ -139,6 +139,28 @@ textarea{min-height:64px;resize:vertical}
  animation:up .22s cubic-bezier(.2,.8,.3,1)}
 @keyframes up{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
 .grab{width:38px;height:4px;border-radius:3px;background:var(--line);margin:6px auto 12px}
+.sheet .panel{touch-action:pan-y}
+
+/* cards-resumo (estilo painel) */
+.kpicards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+@media (min-width:620px){.kpicards{grid-template-columns:repeat(4,1fr)}}
+.kpic{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--teal);
+ border-radius:12px;padding:10px 12px;box-shadow:var(--shadow)}
+.kpic small{display:block;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+.kpic b{display:block;font-size:18px;font-weight:700;letter-spacing:-.02em;margin-top:3px}
+.kpic u{display:block;font-size:11px;color:var(--ink-2);text-decoration:none;margin-top:2px}
+
+/* acordeão */
+.acc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+ box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+.acc .acch{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;user-select:none}
+.acc .acch h3{margin:0;flex:1}
+.acc .acch .cnt{font-size:12px;color:var(--ink-2);white-space:nowrap}
+.acc .acch .arw{font-size:12px;color:var(--ink-2);transition:transform .18s}
+.acc.on .acch .arw{transform:rotate(180deg)}
+.acc .accb{display:none;padding:0 14px 14px}
+.acc.on .accb{display:block}
+.acc .acch:active{background:var(--surface-2)}
 .sheet h2{font-size:19px;margin-bottom:2px}
 .sheet .sub{font-size:12.5px;color:var(--ink-2);margin-bottom:8px}
 
@@ -828,8 +850,50 @@ document.getElementById('themeBtn').onclick=()=>
 
 /* ---------- sheet ---------- */
 const sheet=document.getElementById('sheet'), panel=document.getElementById('panel');
-function abrir(html){panel.innerHTML='<div class="grab"></div>'+html;sheet.classList.add('on')}
-function fechar(){sheet.classList.remove('on')}
+function abrir(html){
+  panel.innerHTML='<div class="grab"></div>'+html;
+  panel.style.transition=''; panel.style.transform='';
+  panel.scrollTop=0;
+  sheet.classList.add('on');
+}
+function fechar(){
+  sheet.classList.remove('on');
+  panel.style.transition=''; panel.style.transform='';
+}
+/* arrastar o modal para baixo fecha (celular) */
+(function(){
+  let y0=null, dy=0, ativo=false;
+  panel.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1){ativo=false;return}
+    y0=e.touches[0].clientY; dy=0;
+    ativo=panel.scrollTop<=0;
+  },{passive:true});
+  panel.addEventListener('touchmove',e=>{
+    if(!ativo||y0===null)return;
+    dy=e.touches[0].clientY-y0;
+    if(dy>0){
+      if(e.cancelable)e.preventDefault();
+      panel.style.transition='none';
+      panel.style.transform='translateY('+dy+'px)';
+    }else if(panel.scrollTop<=0){
+      ativo=false; panel.style.transform='';
+    }
+  },{passive:false});
+  const soltar=()=>{
+    if(!ativo){y0=null;return}
+    panel.style.transition='transform .18s ease';
+    if(dy>100){
+      panel.style.transform='translateY(100%)';
+      setTimeout(fechar,170);
+    }else{
+      panel.style.transform='';
+    }
+    y0=null; dy=0; ativo=false;
+  };
+  panel.addEventListener('touchend',soltar);
+  panel.addEventListener('touchcancel',soltar);
+})();
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&sheet.classList.contains('on')) fechar(); });
 
 /* ---------- render ---------- */
 let NUM_LANC={};
@@ -911,14 +975,48 @@ function render(){
   pagos.forEach(l=>partes(l).forEach(p=>{ if(idxCat[p.cat]!==undefined) porCat[idxCat[p.cat]].v+=p.valor; }));
   const porCatF=porCat.filter(x=>x.v>0);
   document.getElementById('catList').innerHTML=porCatF.map(x=>
-    `<div class="stat"><span><span class="tag ${x.c.g}">${x.c.g==='adm'?'adm':'obra'}</span> ${x.c.n}</span>
-     <b class="mono">${brl(x.v)} <small style="color:var(--ink-2);font-weight:400">${(x.v/tot*100).toFixed(1)}%</small></b></div>`).join('')
+    `<div class="stat" onclick="verCategoria('${x.c.id}')" style="cursor:pointer">
+     <span><span class="tag ${x.c.g}">${x.c.g==='adm'?'adm':'obra'}</span> ${x.c.n}</span>
+     <b class="mono">${brl(x.v)} <small style="color:var(--ink-2);font-weight:400">${(x.v/tot*100).toFixed(1)}%</small> <span style="color:var(--ink-2);font-weight:400">›</span></b></div>`).join('')
     ||'<div class="empty"><b>Nada lançado ainda</b></div>';
 
   renderGastos(); renderCot(); renderItens(); renderFotos(); renderRel();
 }
 
 /* gastos */
+function verCategoria(catId){
+  const c=cat(catId);
+  const linhas=[];
+  DB.lanc.filter(isPago).forEach(l=>{
+    partes(l).forEach(p=>{
+      if(p.cat!==catId)return;
+      const totalItem=+l.total||0;
+      const nPartes=(l.rateio&&l.rateio.length)?l.rateio.length:1;
+      linhas.push({l,valor:p.valor,totalItem,nPartes,
+        pct:totalItem>0?(p.valor/totalItem*100):100});
+    });
+  });
+  linhas.sort((a,b)=>b.valor-a.valor);
+  const total=linhas.reduce((s,x)=>s+x.valor,0);
+  const dividos=linhas.filter(x=>x.nPartes>1).length;
+
+  abrir(`<h2>${c.n}</h2>
+  <p class="sub">${linhas.length} lançamento(s)${dividos?` · ${dividos} vindo(s) de compra dividida`:''}</p>
+  <div class="card" style="box-shadow:none;border:0;padding:0;margin:10px 0 0">
+    <div class="stat"><span>Total nesta categoria</span><b class="mono">${brl(total)}</b></div>
+  </div>
+  ${linhas.length?linhas.map(x=>{
+    const l=x.l, div=x.nPartes>1;
+    return `<div class="item" onclick="verGasto('${l.id}')">
+      <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+      <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
+        <small>${l.forn||'sem fornecedor'}${div?` · dividido em ${x.nPartes} etapas · item inteiro ${brl(x.totalItem)}`:''}</small></div>
+      <div class="val"><span class="mono">${brl(x.valor)}</span>
+        ${div?`<div><span class="tag">${x.pct.toFixed(1)}% do item</span></div>`:''}</div></div>`;
+  }).join(''):'<div class="empty">Nada lançado nesta categoria</div>'}
+  ${dividos?'<p class="hint">Nas compras divididas, o valor mostrado é só a parte que pertence a esta categoria. Toque no lançamento para ver a divisão completa.</p>':''}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
 function renderGastos(){
   const sel=document.getElementById('fCat');
   if(sel.options.length<2) CATS_AZ.forEach(c=>sel.add(new Option(c.n,c.id)));
@@ -1070,6 +1168,12 @@ function renderFotos(){
 }
 
 /* itens da obra */
+const ACC={};
+function toggleAcc(chave){
+  ACC[chave]=!ACC[chave];
+  const el=document.querySelector(`.acch[onclick="toggleAcc('${chave}')"]`);
+  if(el&&el.parentElement) el.parentElement.classList.toggle('on',!!ACC[chave]);
+}
 function renderItens(){
   const selE=document.getElementById('fEtapaItens');
   if(selE.options.length<2) CATS_AZ.filter(c=>c.g==='con').forEach(c=>selE.add(new Option(c.n,c.id)));
@@ -1117,24 +1221,56 @@ function renderItens(){
   });
   const resumoTipo=Object.values(tipos).sort((a,b)=>b.valor-a.valor);
 
-  document.getElementById('itensObra').innerHTML=
-    (resumoTipo.length?`<div class="card"><h3>Resumo por tipo de produto</h3>
-     ${resumoTipo.map(t=>`<div class="stat" style="align-items:flex-start">
-       <span style="flex:1;padding-right:8px">${t.nome}
-         <div style="font-size:11.5px;color:var(--ink-2)">${t.itens} lançamento${t.itens>1?'s':''}${t.descs.size>1?' · '+t.descs.size+' produtos diferentes':''}</div>
-       </span><b class="mono">${brl(t.valor)}</b></div>`).join('')}
-     <p class="hint">Some produtos com descrições diferentes (bitolas, tamanhos) sob o mesmo tipo — preencha "Tipo de produto" ao lançar para aparecer aqui.</p>
-     </div>`:'')
-    + `<div class="card"><h3>Resumo por material</h3>
-     ${resumo.length?resumo.map(m=>`<div class="stat" style="align-items:flex-start">
-       <span style="flex:1;padding-right:8px">${m.nome}${m.familia?` <span class="tag">${m.familia}</span>`:''}
-         <div style="font-size:11.5px;color:var(--ink-2)">${m.compras} compra${m.compras>1?'s':''}${m.forns.size?' · '+[...m.forns].join(', '):''}</div>
-       </span><b class="mono">${brl(m.valor)}</b></div>`).join('')
-       :'<div class="empty">Nenhum item neste filtro</div>'}
-     ${resumo.length?'<p class="hint">Aqui a soma é por descrição exata — cada bitola de ferro conta separado.</p>':''}
-     </div>`
-    + gruposEtapa(fe,busca,ft);
+  /* cards-resumo no topo */
+  const totalItens=resumo.reduce((s,m)=>s+m.valor,0);
+  const totalCompras=resumo.reduce((s,m)=>s+m.compras,0);
+  const fornUnicos=new Set(); resumo.forEach(m=>m.forns.forEach(f=>fornUnicos.add(f)));
+  const cards=`<div class="kpicards">
+    <div class="kpic"><small>Total em materiais</small><b class="mono">${brl(totalItens)}</b><u>no filtro atual</u></div>
+    <div class="kpic"><small>Itens diferentes</small><b class="mono">${resumo.length}</b><u>${totalCompras} compra${totalCompras===1?'':'s'}</u></div>
+    <div class="kpic"><small>Tipos de produto</small><b class="mono">${resumoTipo.length}</b><u>${resumoTipo.length?'agrupados por tipo':'preencha o tipo ao lançar'}</u></div>
+    <div class="kpic"><small>Fornecedores</small><b class="mono">${fornUnicos.size}</b><u>${fornUnicos.size?[...fornUnicos].slice(0,2).join(', ')+(fornUnicos.size>2?'...':''):'—'}</u></div>
+  </div>`;
+
+  /* lista de quantidades compradas */
+  const porNome=resumo.slice().sort((a,b)=>alfa(a.nome,b.nome));
+  const listaQtd=porNome.length?porNome.map(m=>{
+    const medio=m.qtd>0?m.valor/m.qtd:0;
+    return `<div class="stat" style="align-items:flex-start">
+      <span style="flex:1;padding-right:8px">${m.nome}${m.familia?` <span class="tag">${m.familia}</span>`:''}
+        <div style="font-size:11.5px;color:var(--ink-2)">${m.compras} compra${m.compras>1?'s':''}${medio>0?' · média '+brl(medio)+' por unidade':''}</div>
+      </span>
+      <div style="text-align:right">
+        <b class="mono" style="font-size:16px">${(+m.qtd).toLocaleString('pt-BR')}</b>
+        <div style="font-size:11.5px;color:var(--ink-2)" class="mono">${brl(m.valor)}</div>
+      </div></div>`;
+  }).join(''):'<div class="empty">Nenhum item neste filtro</div>';
+
+  const bloco=(chave,titulo,contagem,corpo)=>`<div class="acc ${ACC[chave]?'on':''}">
+    <div class="acch" onclick="toggleAcc('${chave}')">
+      <h3>${titulo}</h3><span class="cnt">${contagem}</span><span class="arw">▼</span>
+    </div>
+    <div class="accb">${corpo}</div></div>`;
+
+  document.getElementById('itensObra').innerHTML = cards
+    + bloco('qtd','Quantidades compradas',porNome.length+' item(ns)',
+        listaQtd+'<p class="hint">Quanto de cada material já entrou na obra, com o preço médio pago por unidade.</p>')
+    + (resumoTipo.length?bloco('tipo','Resumo por tipo de produto',resumoTipo.length+' tipo(s)',
+        resumoTipo.map(t=>`<div class="stat" style="align-items:flex-start">
+          <span style="flex:1;padding-right:8px">${t.nome}
+            <div style="font-size:11.5px;color:var(--ink-2)">${t.itens} lançamento${t.itens>1?'s':''}${t.descs.size>1?' · '+t.descs.size+' produtos diferentes':''}</div>
+          </span><b class="mono">${brl(t.valor)}</b></div>`).join('')
+        +'<p class="hint">Some produtos com descrições diferentes (bitolas, tamanhos) sob o mesmo tipo — preencha "Tipo de produto" ao lançar para aparecer aqui.</p>'):'')
+    + bloco('valor','Materiais por valor gasto',brl(totalItens),
+        (resumo.length?resumo.map(m=>`<div class="stat" style="align-items:flex-start">
+          <span style="flex:1;padding-right:8px">${m.nome}${m.familia?` <span class="tag">${m.familia}</span>`:''}
+            <div style="font-size:11.5px;color:var(--ink-2)">${m.compras} compra${m.compras>1?'s':''}${m.forns.size?' · '+[...m.forns].join(', '):''}</div>
+          </span><b class="mono">${brl(m.valor)}</b></div>`).join('')
+          :'<div class="empty">Nenhum item neste filtro</div>')
+        +'<p class="hint">Do maior para o menor gasto. A soma é por descrição exata — cada bitola de ferro conta separado.</p>')
+    + bloco('etapa','Detalhe por etapa','lançamento a lançamento', gruposEtapa(fe,busca,ft));
 }
+
 function gruposEtapa(fe,busca,ft){
   const etapas=CATS_AZ.filter(c=>c.g==='con'&&(!fe||c.id===fe));
   return etapas.map(et=>{
