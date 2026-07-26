@@ -357,7 +357,9 @@ a{color:var(--teal)}
 
 <!-- ============ COTAÇÕES ============ -->
 <section class="view" id="v-cot">
-  <div class="card">
+  <button class="btn" onclick="abrirCot()">+ Nova cotação</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="document.getElementById('pdfCotInput').click()">📄 Importar orçamento em PDF</button>
+  <div class="card" style="margin-top:12px">
     <h3>Previsão de gastos</h3>
     <div id="cotPrev"></div>
   </div>
@@ -378,8 +380,6 @@ a{color:var(--teal)}
     <p class="hint">Cotação não é gasto. Quando fechar a compra, use <b>Virou compra</b> — o valor passa para os lançamentos.</p>
     <div id="cotFechadas" style="margin-top:9px"></div>
   </div>
-  <button class="btn" onclick="abrirCot()">+ Nova cotação</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="document.getElementById('pdfCotInput').click()">📄 Importar orçamento em PDF</button>
 </section>
 
 <!-- ============ ITENS DA OBRA ============ -->
