@@ -163,6 +163,12 @@ nav button.on{color:var(--teal)}
 
 /* fotos */
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.card.avisos{border-left:4px solid var(--amber)}
+.aviso{display:flex;gap:9px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.aviso:last-child{border-bottom:0}
+.aviso i{font-style:normal;flex:0 0 auto}
+.aviso b{display:block;font-weight:600}
+.aviso small{color:var(--ink-2);font-size:12px}
 .grid figure{margin:0;position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--surface-2);cursor:pointer}
 .grid img{width:100%;height:100%;object-fit:cover;display:block}
 .grid figcaption{position:absolute;left:0;right:0;bottom:0;padding:12px 5px 4px;font-size:9px;color:#fff;
@@ -260,6 +266,7 @@ a{color:var(--teal)}
   <button data-v="gastos"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>Gastos</button>
   <button data-v="cot"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Cotações</button>
   <button data-v="itens"><svg viewBox="0 0 24 24"><path d="M20.5 7.3 12 12l-8.5-4.7M12 12v9.3M20.5 7.3 12 3 3.5 7.3l8.5 4.7 8.5-4.7z"/></svg>Itens</button>
+  <button data-v="equipe"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.4 2.9-5.2 6.5-5.2s6.5 1.8 6.5 5.2"/><path d="M16.5 5.2a3.2 3.2 0 0 1 0 6.2M18 14.4c2.2.5 3.5 2 3.5 4.4"/></svg>Equipe</button>
   <button data-v="fotos"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8.5 7l1.5-2.5h4L15.5 7"/></svg>Fotos</button>
   <button data-v="rel"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Indicadores</button>
   <button data-v="io"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>Importações</button>
@@ -270,6 +277,10 @@ a{color:var(--teal)}
 
 <!-- ============ PAINEL ============ -->
 <section class="view on" id="v-painel">
+  <div class="card avisos" id="cardAvisos" style="display:none">
+    <h3>Precisa de atenção</h3>
+    <div id="avisosList"></div>
+  </div>
   <div class="card hero">
     <div class="lbl">Total investido até hoje</div>
     <div class="big mono" id="hTotal">R$ 0,00</div>
@@ -388,6 +399,16 @@ a{color:var(--teal)}
 </section>
 
 <!-- ============ FOTOS ============ -->
+<!-- ============ EQUIPE / MÃO DE OBRA ============ -->
+<section class="view" id="v-equipe">
+  <button class="btn" onclick="abrirTrabalhador()">+ Novo trabalhador</button>
+  <div class="card" style="margin-top:12px">
+    <h3>Resumo da mão de obra</h3>
+    <div id="equipeResumo"></div>
+  </div>
+  <div id="equipeList"></div>
+</section>
+
 <section class="view" id="v-fotos">
   <div class="card">
     <h3>Álbum da obra</h3>
@@ -477,6 +498,7 @@ function modoTeste(){
   SESSAO=null;
   document.getElementById('authGate').style.display='none';
   carregar();
+  gravarSnap();
   render();
 }
 async function fazerLogin(){
@@ -500,6 +522,7 @@ async function entrarNoApp(session){
   document.getElementById('authGate').style.display='none';
   carregar();
   await sincronizarNaEntrada();
+  gravarSnap();
   render();
 }
 
@@ -662,6 +685,7 @@ function carregar(){
   DB.fotos=DB.fotos||[];
   DB.catExtra=DB.catExtra||[];
   DB.exc=DB.exc||[];
+  DB.equipe=DB.equipe||[];
   rebuildCategorias();
   (DB.passos||[]).forEach(p=>{ if(!p.cat) p.cat='c00'; });
   (DB.lanc||[]).forEach(l=>{
@@ -819,6 +843,8 @@ function render(){
   rebuildNumeros();
   renderIO();
   renderAvatar();
+  renderAvisos();
+  renderEquipe();
   const pagos=DB.lanc.filter(isPago);
   let adm=0,con=0;
   pagos.forEach(l=>partes(l).forEach(p=>{ if(cat(p.cat).g==='adm') adm+=p.valor; else con+=p.valor; }));
@@ -2342,6 +2368,207 @@ function verTextoPdf(){
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
 
+/* ---------- avisos do painel ---------- */
+function renderAvisos(){
+  const hj=hoje(), avisos=[];
+  const emDias=d=>Math.ceil((new Date(d)-new Date(hj))/864e5);
+
+  DB.lanc.filter(l=>!isPago(l)&&l.data<hj).sort((a,b)=>a.data.localeCompare(b.data)).slice(0,4).forEach(l=>{
+    avisos.push({ic:'🔴',t:`${l.desc} — ${brl(saldoAPagar(l))}`,
+      s:`conta vencida em ${l.data.split('-').reverse().join('/')}`,go:`verGasto('${l.id}')`});
+  });
+  DB.lanc.filter(l=>!isPago(l)&&l.data>=hj&&emDias(l.data)<=3).sort((a,b)=>a.data.localeCompare(b.data)).slice(0,3).forEach(l=>{
+    const d=emDias(l.data);
+    avisos.push({ic:'🟡',t:`${l.desc} — ${brl(saldoAPagar(l))}`,
+      s:d===0?'vence hoje':`vence em ${d} dia${d>1?'s':''}`,go:`verGasto('${l.id}')`});
+  });
+  DB.cot.filter(c=>c.status==='aberta'&&c.validade).forEach(c=>{
+    const d=emDias(c.validade);
+    if(d<0) avisos.push({ic:'⚪',t:`${c.item}${c.forn?' · '+c.forn:''}`,
+      s:`cotação venceu em ${c.validade.split('-').reverse().join('/')}`,go:`verCot('${c.id}')`});
+    else if(d<=2) avisos.push({ic:'🟡',t:`${c.item}${c.forn?' · '+c.forn:''}`,
+      s:d===0?'cotação vence hoje':`cotação vence em ${d} dia${d>1?'s':''}`,go:`verCot('${c.id}')`});
+  });
+
+  const card=document.getElementById('cardAvisos');
+  if(!avisos.length){card.style.display='none';return}
+  card.style.display='block';
+  document.getElementById('avisosList').innerHTML=avisos.slice(0,10).map(a=>
+    `<div class="aviso" onclick="${a.go}" style="cursor:pointer"><i>${a.ic}</i>
+      <div style="flex:1;min-width:0"><b>${a.t}</b><small>${a.s}</small></div></div>`).join('');
+}
+
+/* ---------- equipe / mão de obra ---------- */
+function equipe(){DB.equipe=DB.equipe||[];return DB.equipe}
+function totalPagoTrab(id){
+  return DB.lanc.filter(l=>l.trabId===id).reduce((s,l)=>s+(isPago(l)?+l.total:pagoParcial(l)),0);
+}
+function diasTrab(id){
+  return DB.lanc.filter(l=>l.trabId===id).reduce((s,l)=>s+(+l.qtd||0),0);
+}
+function renderEquipe(){
+  const eq=equipe();
+  const semanas=DB.lanc.filter(l=>l.trabId);
+  const totalMO=semanas.reduce((s,l)=>s+ +l.total,0);
+  const aberto=semanas.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
+  document.getElementById('equipeResumo').innerHTML=
+    `<div class="stat"><span>Total em mão de obra</span><b class="mono">${brl(totalMO)}</b></div>
+     <div class="stat"><span>Diárias lançadas</span><b class="mono">${semanas.reduce((s,l)=>s+(+l.qtd||0),0).toLocaleString('pt-BR')}</b></div>
+     ${aberto>0?`<div class="stat"><span>A pagar</span><b class="mono" style="color:var(--red)">${brl(aberto)}</b></div>`:''}
+     <p class="hint">Cada semana lançada vira um gasto na etapa Mão de obra, entrando no total da obra e nas contas a pagar.</p>`;
+
+  document.getElementById('equipeList').innerHTML= eq.length? eq.map(t=>{
+    const sem=DB.lanc.filter(l=>l.trabId===t.id).sort((a,b)=>b.data.localeCompare(a.data));
+    const ab=sem.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <h3 style="margin:0">${t.nome}</h3>
+          <div style="font-size:12px;color:var(--ink-2);margin-top:2px">${t.funcao||'—'} · diária ${brl(t.diaria)}</div>
+        </div>
+        <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="abrirTrabalhador('${t.id}')">Editar</button>
+      </div>
+      <div class="stat" style="margin-top:10px"><span>Total pago a ele</span><b class="mono">${brl(totalPagoTrab(t.id))}</b></div>
+      <div class="stat"><span>Diárias trabalhadas</span><b class="mono">${diasTrab(t.id).toLocaleString('pt-BR')}</b></div>
+      ${ab>0?`<div class="stat"><span>Em aberto</span><b class="mono" style="color:var(--red)">${brl(ab)}</b></div>`:''}
+      <button class="btn" style="margin-top:10px" onclick="abrirSemana('${t.id}')">+ Lançar semana</button>
+      ${sem.length?`<div style="margin-top:10px">${sem.slice(0,6).map(l=>
+        `<div class="item" onclick="verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
+          <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+          <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} diária(s) × ${brl(l.unit)}</small></div>
+          <div class="val mono">${brl(l.total)}${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')}
+        ${sem.length>6?`<p class="hint">Mostrando as 6 semanas mais recentes. As demais estão na aba Gastos.</p>`:''}</div>`
+        :'<p class="hint">Nenhuma semana lançada ainda.</p>'}
+    </div>`;
+  }).join('') : '<div class="card"><div class="empty"><b>Nenhum trabalhador cadastrado</b><p>Cadastre o pedreiro, servente ou ajudante e o valor da diária para controlar a mão de obra.</p></div></div>';
+}
+function abrirTrabalhador(id){
+  const t=equipe().find(x=>x.id===id)||{id:'',nome:'',funcao:'',diaria:0};
+  abrir(`<h2>${id?'Editar trabalhador':'Novo trabalhador'}</h2>
+  <label>Nome</label><input id="t_nome" value="${t.nome}" placeholder="Ex: João">
+  <label>Função</label><input id="t_func" value="${t.funcao||''}" placeholder="Pedreiro, servente, ajudante...">
+  <label>Valor da diária</label><input id="t_diaria" inputmode="numeric" value="${t.diaria?num2moeda(t.diaria):''}" placeholder="0,00" oninput="onMoedaInput(this)">
+  <div style="height:14px"></div>
+  <button class="btn" onclick="salvarTrabalhador('${t.id}')">Salvar</button>
+  ${id?`<button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="excluirTrabalhador('${t.id}')">Excluir trabalhador</button>`:''}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function salvarTrabalhador(id){
+  const nome=val('t_nome').trim();
+  if(!nome){toast('Informe o nome.');return}
+  const dados={nome,funcao:val('t_func').trim(),diaria:moeda2num(val('t_diaria')),at:Date.now()};
+  if(id){Object.assign(equipe().find(x=>x.id===id),dados)}
+  else{equipe().push({id:uid(),...dados})}
+  salvar();fechar();render();toast('Trabalhador salvo');
+}
+function excluirTrabalhador(id){
+  const temLanc=DB.lanc.some(l=>l.trabId===id);
+  confirmar('Excluir trabalhador',
+    temLanc?'As semanas já lançadas continuam nos gastos, apenas o cadastro sai daqui.':'Não é possível desfazer.',
+    'Excluir',()=>{
+      DB.equipe=equipe().filter(x=>x.id!==id);salvar();fechar();render();toast('Trabalhador excluído');
+    },true);
+}
+function abrirSemana(trabId){
+  const t=equipe().find(x=>x.id===trabId); if(!t)return;
+  const hj=new Date(), dow=hj.getDay();
+  const seg=new Date(hj); seg.setDate(hj.getDate()-((dow+6)%7));
+  const ini=new Date(seg.getTime()-seg.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  abrir(`<h2>Semana de ${t.nome}</h2>
+  <p class="sub">Diária de ${brl(t.diaria)}. Marque os dias trabalhados.</p>
+  <label>Segunda-feira da semana</label><input type="date" id="s_ini" value="${ini}" onchange="calcSemana()">
+  <label style="margin-top:10px">Dias trabalhados</label>
+  <div id="s_dias" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+    ${['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map((d,i)=>
+      `<label style="flex:1 0 auto;min-width:60px;display:flex;align-items:center;gap:5px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;font-size:13px">
+        <input type="checkbox" class="sdia" value="${i}" ${i<5?'checked':''} style="width:auto" onchange="calcSemana()">${d}</label>`).join('')}
+  </div>
+  <label style="margin-top:10px">Valor total da semana</label>
+  <input id="s_total" inputmode="numeric" value="" oninput="onMoedaInput(this)">
+  <p class="hint" id="s_calc"></p>
+  <label>Situação</label>
+  <select id="s_pag">
+    <option value="Pago">Pago</option>
+    <option value="A pagar">A pagar</option>
+  </select>
+  <label>Observações</label><input id="s_obs" placeholder="Ex: serviço da fundação">
+  <div style="height:14px"></div>
+  <button class="btn" onclick="salvarSemana('${trabId}')">Lançar semana</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  panel._trab=t; calcSemana();
+}
+function calcSemana(){
+  const t=panel._trab; if(!t)return;
+  const n=[...document.querySelectorAll('.sdia')].filter(c=>c.checked).length;
+  const tot=n*(+t.diaria||0);
+  document.getElementById('s_total').value=num2moeda(tot);
+  document.getElementById('s_calc').textContent=`${n} diária(s) × ${brl(t.diaria)} = ${brl(tot)} (dá para ajustar o total à mão)`;
+}
+function salvarSemana(trabId){
+  const t=equipe().find(x=>x.id===trabId); if(!t)return;
+  const marcados=[...document.querySelectorAll('.sdia')].filter(c=>c.checked).map(c=>+c.value);
+  if(!marcados.length){toast('Marque pelo menos um dia.');return}
+  const ini=val('s_ini'); if(!ini){toast('Informe a segunda-feira da semana.');return}
+  const total=moeda2num(val('s_total'));
+  if(!(total>0)){toast('Informe o valor da semana.');return}
+  const dIni=new Date(ini+'T12:00:00');
+  const ultimo=new Date(dIni); ultimo.setDate(dIni.getDate()+Math.max(...marcados));
+  const fim=new Date(ultimo.getTime()-ultimo.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  const rot=d=>d.split('-').reverse().slice(0,2).join('/');
+  const n=marcados.length;
+  DB.lanc.push({id:uid(),at:Date.now(),trabId,
+    data:fim, desc:`${t.nome} · semana ${rot(ini)} a ${rot(fim)}`,
+    familia:'Mão de obra', cat:'c07', forn:t.nome,
+    qtd:n, unit:Math.round(total/n*100)/100, total,
+    pag:val('s_pag'), nf:'', anexos:[], obs:val('s_obs').trim(),
+    ctrl:false, qtdRec:0, baixas:[], pagamentos:[]});
+  salvar();fechar();render();toast('Semana lançada');
+}
+
+/* ---------- pontos de restauração ---------- */
+const SNAP_KEY='obraC08_snaps';
+function lerSnaps(){try{return JSON.parse(localStorage.getItem(SNAP_KEY)||'[]')}catch(e){return []}}
+function gravarSnap(){
+  try{
+    const snaps=lerSnaps(), hj=hoje();
+    if(snaps.some(s=>s.dia===hj))return;
+    snaps.push({dia:hj,em:new Date().toISOString(),
+      resumo:{lanc:DB.lanc.length,cot:DB.cot.length,fotos:DB.fotos.length},
+      dados:JSON.stringify({lanc:DB.lanc,cot:DB.cot,passos:DB.passos,equipe:DB.equipe||[],
+        catExtra:DB.catExtra||[],cfg:DB.cfg,exc:DB.exc||[]})});
+    while(snaps.length>7)snaps.shift();
+    localStorage.setItem(SNAP_KEY,JSON.stringify(snaps));
+  }catch(e){}
+}
+function verRestauracao(){
+  const snaps=lerSnaps().slice().reverse();
+  abrir(`<h2>Pontos de restauração</h2>
+  <p class="sub">Cópias automáticas guardadas neste aparelho, uma por dia (últimos 7 dias). As fotos não entram para não pesar.</p>
+  ${snaps.length?snaps.map(s=>`<div class="item">
+    <div class="mid"><b>${s.dia.split('-').reverse().join('/')}</b>
+      <small>${s.resumo.lanc} lançamentos · ${s.resumo.cot} cotações</small></div>
+    <div class="val"><button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="restaurarSnap('${s.dia}')">Restaurar</button></div>
+  </div>`).join('')
+  :'<p class="sub">Nenhum ponto ainda — o primeiro é criado automaticamente ao abrir o app.</p>'}
+  <p class="hint">Restaurar substitui os dados atuais deste aparelho pelos daquele dia e envia para a nuvem. Faça um backup antes, por segurança.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function restaurarSnap(diaSnap){
+  const s=lerSnaps().find(x=>x.dia===diaSnap); if(!s)return;
+  confirmar('Restaurar '+diaSnap.split('-').reverse().join('/'),
+    `Os dados deste aparelho voltam para como estavam em ${diaSnap.split('-').reverse().join('/')} (${s.resumo.lanc} lançamentos). As fotos atuais são mantidas.`,
+    'Restaurar',()=>{
+      try{
+        const d=JSON.parse(s.dados);
+        DB.lanc=d.lanc||[]; DB.cot=d.cot||[]; DB.passos=d.passos||[];
+        DB.equipe=d.equipe||[]; DB.catExtra=d.catExtra||[]; DB.exc=d.exc||[];
+        if(d.cfg)DB.cfg=d.cfg;
+        rebuildCategorias(); salvar(); fechar(); render();
+        toast('Dados restaurados');
+      }catch(e){toast('Não consegui restaurar esse ponto.')}
+    },true);
+}
+
 function verCategorias(){
   const custom=(DB.catExtra||[]).slice().sort((a,b)=>alfa(a.n,b.n));
   abrir(`<h2>Categorias personalizadas</h2>
@@ -2379,7 +2606,8 @@ function renderIO(){
   </div>
   <p class="hint">Os dados sincronizam com a nuvem automaticamente. Continuam funcionando offline e são salvos também neste aparelho.</p>
   <div class="divider" style="margin:16px 0"></div>
-  <button class="btn ghost mini" onclick="abrirCfg()">Prazo e área construída</button>
+  <button class="btn ghost mini" onclick="verRestauracao()">Pontos de restauração</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirCfg()">Prazo e área construída</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="abrirDuplicados()">Verificar duplicados</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="verCategorias()">Categorias personalizadas</button>`;
 }
@@ -2442,13 +2670,14 @@ function verManual(){
     <p><b>Painel</b> — total investido (dividido em administrativas e construção), fase atual da obra com pendências (toque em "Gerenciar" para criar, mover de etapa ou ver as já concluídas), contas a pagar, saldo de material a receber e gasto por categoria. O ícone de olho no topo esconde ou mostra os valores em tela.</p>
     <p><b>Gastos</b> — todos os lançamentos. Dá para duplicar, repetir todo mês, ratear entre várias etapas de uma vez, controlar entregas parciais e anexar foto ou link do documento.</p>
     <p><b>Cotações</b> — orçamentos para comparar fornecedores antes de comprar (não entra na conta ainda). Quando fechar, use "Virou compra" para virar gasto de verdade. Dá para importar um PDF de orçamento e o app já tenta preencher os itens sozinho, pra você só conferir.</p>
-    <p><b>Itens</b> — resumo por material e por tipo de produto comprado, com filtro por etapa.</p>
+    <p><b>Itens</b> — resumo por material e por tipo de produto comprado, com filtro por etapa e por tipo.</p>
+    <p><b>Equipe</b> — cadastro de pedreiro, servente e ajudantes com o valor da diária. "Lançar semana" marca os dias trabalhados e cria automaticamente o gasto na etapa Mão de obra, entrando nas contas a pagar como qualquer outro.</p>
     <p><b>Fotos</b> — álbum com data e hora. "Tirar foto" abre a câmera, "Da galeria" deixa escolher uma já existente. "Ver em sequência" mostra o álbum como uma linha do tempo, com setas ou arrastando o dedo.</p>
     <p><b>Indicadores</b> — prazo da obra, ritmo de gasto, gráfico mensal, rankings e qualidade do registro.</p>
     <p><b>Importações</b> — backup, planilha em CSV, importar/juntar dados de outro aparelho ou arquivo, prazo e área construída, verificar duplicados e categorias personalizadas.</p>
     <p><b>Conta (canto superior direito)</b> — trocar sua foto de perfil, reler este manual e sair do app.</p>
   </div>
-  <p class="hint">Os dados ficam salvos neste aparelho e sincronizam automaticamente com a nuvem quando você está logado — inclusive as exclusões, então apagar em um aparelho remove no outro também.</p>
+  <p class="hint">Os dados ficam salvos neste aparelho e sincronizam automaticamente com a nuvem quando você está logado — inclusive as exclusões, então apagar em um aparelho remove no outro também. O app guarda uma cópia de si mesmo, então abre no canteiro mesmo sem sinal, e faz um ponto de restauração por dia (em Importações) caso algo dê errado.</p>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
 document.getElementById('olhoBtn').onclick=()=>{
@@ -2456,6 +2685,11 @@ document.getElementById('olhoBtn').onclick=()=>{
   document.getElementById('olhoBtn').textContent=OCULTAR?'🙈':'👁️';
   render();
 };
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
 iniciarAuth();
 </script>
 </body>
