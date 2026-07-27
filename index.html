@@ -1437,17 +1437,17 @@ document.getElementById('notaInput').onchange=async e=>{
         const t=await f.text();
         const d=lerXmlNfe(t);
         if(!d){toast('“'+f.name+'” não parece um XML de NF-e.');continue}
-        d.xml=t.length<200000?t:''; d.arquivo=f.name;
+        d.xml=t.length<200000?t:''; d.arquivo=f.name; d._file=f;
         conferirNota(d);
       }else if(nome.endsWith('.pdf')||f.type==='application/pdf'){
         toast('Lendo '+f.name+'...');
         const linhas=await linhasDoPdf(f);
-        const d=lerTextoDanfe(linhas); d.arquivo=f.name; d.linhas=linhas;
+        const d=lerTextoDanfe(linhas); d.arquivo=f.name; d.linhas=linhas; d._file=f;
         conferirNota(d);
       }else if(/^image\//.test(f.type)){
         const img=await comprimirImagem(f,1100,.6);
         conferirNota({tipo:'foto',chave:'',numero:'',serie:'',data:hoje(),emit:'',cnpj:'',
-          total:0,itens:[],img,arquivo:f.name});
+          total:0,itens:[],img,arquivo:f.name,_file:f});
       }else{
         toast('“'+f.name+'”: envie o XML da NF-e, o PDF do DANFE ou uma foto.');
       }
@@ -1541,7 +1541,9 @@ function salvarNota(id){
     emit,cnpj:base.cnpj||'',numero:val('n_num').trim(),serie:base.serie||'',
     chave:val('n_chave').replace(/\D/g,''),data:val('n_data')||hoje(),
     total,itens:its,link:val('n_link').trim(),obs:val('n_obs').trim(),
-    lancId:val('n_lanc')||'',arquivo:base.arquivo||'',img:base.img||'',xml:base.xml||''};
+    lancId:val('n_lanc')||'',arquivo:base.arquivo||'',img:base.img||'',xml:base.xml||'',
+    lancIds:base.lancIds||[],arqNome:base.arqNome||'',arqTipo:base.arqTipo||'',arqTam:base.arqTam||0,
+    arqPath:base.arqPath||'',arqLocal:base.arqLocal||false};
   const dup=notas().find(x=>x.id!==n.id&&n.chave&&x.chave===n.chave);
   if(dup){toast('Essa nota já está cadastrada.');return}
   if(id){const i=notas().findIndex(x=>x.id===id); notas()[i]=n;}
@@ -1550,7 +1552,14 @@ function salvarNota(id){
     const l=DB.lanc.find(x=>x.id===n.lancId);
     if(l&&!l.nf){ l.nf=n.numero||('chave '+n.chave.slice(-8)); l.at=Date.now(); }
   }
+  const arq=base._file||null;
   NOTA_TMP=null; salvar(); fechar(); render(); toast('Nota salva');
+  if(arq){
+    guardarArquivoNota(n,arq).then(()=>{
+      salvar(); render();
+      if(n.arqErro==='bucket') toast('Arquivo guardado neste aparelho. Para abrir no outro, crie o espaço de arquivos no Supabase.');
+    });
+  }
 }
 function verNota(id){
   const n=notas().find(x=>x.id===id); if(!n)return;
@@ -1574,7 +1583,10 @@ function verNota(id){
   ${l?`<div class="item" onclick="verGasto('${l.id}')"><div class="mid"><b>Gasto vinculado</b><small>${l.desc}</small></div>
     <div class="val mono">${brl(l.total)}</div></div>`:'<p class="hint">Nenhum gasto vinculado a esta nota.</p>'}
   ${n.img?`<img src="${n.img}" style="width:100%;border-radius:12px;margin:10px 0">`:''}
-  ${n.link?`<a class="btn dark mini" style="width:100%;text-align:center;text-decoration:none;display:block;padding:11px" href="${n.link}" target="_blank" rel="noopener">Abrir arquivo no Drive</a>`:''}
+  ${(n.arqLocal||n.arqPath||n.img)?`<button class="btn dark" onclick="verArquivoNota('${n.id}')">📄 Ver arquivo da nota</button>`:''}
+  ${(n.itens||[]).length?`<button class="btn" style="margin-top:9px" onclick="lancarItensDaNota('${n.id}')">Lançar itens como gastos</button>`:''}
+  ${(n.lancIds||[]).filter(x=>DB.lanc.some(l=>l.id===x)).length?`<p class="hint">Esta nota já gerou ${(n.lancIds||[]).filter(x=>DB.lanc.some(l=>l.id===x)).length} lançamento(s) na obra.</p>`:''}
+  ${n.link?`<a class="btn ghost mini" style="width:100%;text-align:center;text-decoration:none;display:block;padding:11px;margin-top:9px" href="${n.link}" target="_blank" rel="noopener">Abrir link do Drive</a>`:''}
   ${n.xml?`<button class="btn ghost mini" style="margin-top:9px" onclick="baixarXml('${n.id}')">Baixar o XML</button>`:''}
   <div class="row2" style="margin-top:9px">
     <button class="btn ghost mini" onclick="abrirNota('${n.id}')">Editar</button>
@@ -1589,9 +1601,101 @@ function baixarXml(id){
 function excluirNota(id){
   const n=notas().find(x=>x.id===id); if(!n)return;
   confirmar('Excluir nota',`Nota ${n.numero||''} de ${n.emit}. O gasto lançado continua existindo.`,'Excluir',()=>{
+    idbDel('nota:'+id);
     DB.notas=notas().filter(x=>x.id!==id); salvar(); fechar(); render(); toast('Nota excluída');
   },true);
 }
+/* ---------- arquivos das notas: cópia local no aparelho + cópia na nuvem ---------- */
+function idbOpen(){
+  return new Promise((ok,err)=>{
+    const r=indexedDB.open('obraC08Arqs',1);
+    r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains('arqs'))r.result.createObjectStore('arqs'); };
+    r.onsuccess=()=>ok(r.result); r.onerror=()=>err(r.error);
+  });
+}
+async function idbPut(k,v){
+  const db=await idbOpen();
+  return new Promise((ok,err)=>{const t=db.transaction('arqs','readwrite');
+    t.objectStore('arqs').put(v,k); t.oncomplete=()=>ok(); t.onerror=()=>err(t.error);});
+}
+async function idbGet(k){
+  const db=await idbOpen();
+  return new Promise((ok,err)=>{const t=db.transaction('arqs','readonly');
+    const q=t.objectStore('arqs').get(k); q.onsuccess=()=>ok(q.result); q.onerror=()=>err(q.error);});
+}
+async function idbDel(k){
+  const db=await idbOpen();
+  return new Promise(ok=>{const t=db.transaction('arqs','readwrite');
+    t.objectStore('arqs').delete(k); t.oncomplete=()=>ok(); t.onerror=()=>ok();});
+}
+/* guarda o arquivo: sempre no aparelho; e na nuvem quando dá, para abrir no outro aparelho */
+async function guardarArquivoNota(nota,file){
+  if(!file)return;
+  nota.arqNome=file.name; nota.arqTipo=file.type||'application/octet-stream'; nota.arqTam=file.size;
+  try{ await idbPut('nota:'+nota.id,file); nota.arqLocal=true; }catch(e){ nota.arqLocal=false; }
+  if(SESSAO){
+    try{
+      const ext=(file.name.split('.').pop()||'bin').toLowerCase();
+      const path=SESSAO.user.id+'/'+nota.id+'.'+ext;
+      const {error}=await supa.storage.from('notas').upload(path,file,{upsert:true,contentType:nota.arqTipo});
+      if(!error){ nota.arqPath=path; }
+      else if(/bucket|not found/i.test(error.message||'')){ nota.arqErro='bucket'; }
+    }catch(e){}
+  }
+}
+async function urlArquivoNota(n){
+  try{
+    const f=await idbGet('nota:'+n.id);
+    if(f)return {url:URL.createObjectURL(f),tipo:f.type||n.arqTipo||'',local:true};
+  }catch(e){}
+  if(n.arqPath&&SESSAO){
+    try{
+      const {data,error}=await supa.storage.from('notas').createSignedUrl(n.arqPath,3600);
+      if(!error&&data&&data.signedUrl)return {url:data.signedUrl,tipo:n.arqTipo||'',local:false};
+    }catch(e){}
+  }
+  if(n.img)return {url:n.img,tipo:'image/jpeg',local:true};
+  return null;
+}
+async function verArquivoNota(id){
+  const n=notas().find(x=>x.id===id); if(!n)return;
+  toast('Abrindo arquivo...');
+  const a=await urlArquivoNota(n);
+  if(!a){
+    abrir(`<h2>Arquivo não encontrado</h2>
+    <p class="sub">Esta nota não tem o arquivo guardado neste aparelho.</p>
+    ${n.arqPath?'<p class="hint">Ela tem cópia na nuvem, mas não consegui baixar agora — verifique a conexão.</p>'
+      :'<p class="hint">Envie a nota de novo por este aparelho, ou use o link do Drive.</p>'}
+    ${n.link?`<a class="btn dark" style="text-decoration:none;display:block;text-align:center;padding:11px" href="${n.link}" target="_blank" rel="noopener">Abrir link do Drive</a>`:''}
+    <button class="btn ghost mini" style="margin-top:9px" onclick="verNota('${n.id}')">Voltar</button>`);
+    return;
+  }
+  const ehPdf=/pdf/i.test(a.tipo)||/\.pdf$/i.test(n.arqNome||'');
+  const ehImg=/^image\//i.test(a.tipo);
+  abrir(`<h2>${n.emit}</h2>
+  <p class="sub">Nota ${n.numero||'s/nº'} · ${n.data.split('-').reverse().join('/')}${n.arqNome?' · '+n.arqNome:''}</p>
+  ${ehPdf?`<iframe src="${a.url}" style="width:100%;height:68vh;border:1px solid var(--line);border-radius:12px;margin-top:10px;background:#fff"></iframe>`
+    :ehImg?`<img src="${a.url}" style="width:100%;border-radius:12px;margin-top:10px">`
+    :`<p class="hint">Não dá para exibir esse tipo de arquivo aqui dentro — abra em outra aba.</p>`}
+  <a class="btn dark" style="margin-top:10px;text-decoration:none;display:block;text-align:center;padding:11px" href="${a.url}" target="_blank" rel="noopener">Abrir em outra aba</a>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verNota('${n.id}')">Voltar para a nota</button>`);
+}
+function lancarItensDaNota(id){
+  const n=notas().find(x=>x.id===id); if(!n)return;
+  if(!(n.itens||[]).length){toast('Essa nota não tem itens para lançar.');return}
+  const jaLancados=(n.lancIds||[]).filter(x=>DB.lanc.some(l=>l.id===x)).length;
+  const seguir=()=>{
+    const its=n.itens.map(i=>({c:i.c||'',d:i.d,q:+i.q||1,u:+i.u||0,f:n.emit,familia:'',cat:'c00'}));
+    abrirConfirmarCompra({id:'',item:n.emit,forn:n.emit,total:n.total,itens:its,
+      anexos:[],obs:'NF '+(n.numero||'')+(n.chave?' · chave '+n.chave.slice(-8):''),
+      desconto:0,_nota:n});
+  };
+  if(jaLancados){
+    confirmar('Lançar de novo?',`Esta nota já gerou ${jaLancados} lançamento(s). Lançar outra vez vai duplicar os gastos.`,
+      'Lançar mesmo assim',seguir,true);
+  }else seguir();
+}
+
 function renderNotas(){
   const el=document.getElementById('notasBody'); if(!el)return;
   const busca=alfa2((document.getElementById('fBuscaNota')||{}).value||'');
@@ -1599,7 +1703,7 @@ function renderNotas(){
   if(busca)L=L.filter(n=>alfa2([n.emit,n.numero,n.obs,n.chave,(n.itens||[]).map(i=>i.d).join(' ')].join(' ')).includes(busca));
   const total=L.reduce((s,n)=>s+ +n.total,0);
   const semVinculo=L.filter(n=>!n.lancId).length;
-  const semArquivo=L.filter(n=>!n.link&&!n.img&&!n.xml).length;
+  const semArquivo=L.filter(n=>!n.link&&!n.img&&!n.xml&&!n.arqPath&&!n.arqLocal).length;
   const gastosSemNota=DB.lanc.filter(l=>isPago(l)&&!notas().some(n=>n.lancId===l.id)).length;
 
   const itensTodos={};
@@ -1626,7 +1730,7 @@ function renderNotas(){
     ${L.length?L.map(n=>`<div class="item" onclick="verNota('${n.id}')">
       <div class="dt"><b class="mono">${dia(n.data).d}</b><span>${dia(n.data).m}</span></div>
       <div class="mid"><b>${n.emit}</b>
-        <small>nº ${n.numero||'s/nº'} · ${(n.itens||[]).length} item(ns)${n.lancId?'':' · <span style="color:var(--amber)">sem gasto vinculado</span>'}${(!n.link&&!n.img&&!n.xml)?' · <span style="color:var(--red)">sem arquivo</span>':''}</small></div>
+        <small>nº ${n.numero||'s/nº'} · ${(n.itens||[]).length} item(ns)${n.lancId?'':' · <span style="color:var(--amber)">sem gasto vinculado</span>'}${(n.arqLocal||n.arqPath||n.img)?' · 📄':''}${(!n.link&&!n.img&&!n.xml&&!n.arqPath&&!n.arqLocal)?' · <span style="color:var(--red)">sem arquivo</span>':''}</small></div>
       <div class="val mono">${brl(n.total)}</div></div>`).join('')
       :'<div class="empty"><b>Nenhuma nota guardada</b><p>Envie o XML da NF-e (extração exata), o PDF do DANFE ou uma foto da nota.</p></div>'}
   </div>
@@ -1640,7 +1744,7 @@ function renderNotas(){
         <div style="text-align:right"><b class="mono">${m.q.toLocaleString('pt-BR')}${m.un?' '+m.un:''}</b>
           <div class="mono" style="font-size:11.5px;color:var(--ink-2)">${brl(m.t)}</div></div></div>`).join('')}
     </div></div>`:''}
-  <p class="hint">Para o habite-se, o que vale é o arquivo original de cada nota. Guarde o PDF/XML no Drive e mantenha o link aqui — o app guarda os dados e o XML, mas não o PDF, para não estourar a memória do aparelho.</p>`;
+  <p class="hint">O arquivo original (PDF, XML ou foto) fica guardado no aparelho que enviou e, quando o espaço de arquivos do Supabase está criado, também na nuvem — aí abre em qualquer aparelho. O campo "link do Drive" continua valendo como cópia de segurança.</p>`;
   const b=document.getElementById('fBuscaNota');
   if(b)b.oninput=()=>renderNotas();
 }
@@ -1650,7 +1754,7 @@ function relatorioNotas(){
   const porForn={};
   L.forEach(n=>{const k=alfa2(n.emit)||'—';(porForn[k]=porForn[k]||{nome:n.emit,t:0,n:0}).t+=+n.total;porForn[k].n++});
   const forns=Object.values(porForn).sort((a,b)=>b.t-a.t);
-  const semArquivo=L.filter(n=>!n.link&&!n.img&&!n.xml);
+  const semArquivo=L.filter(n=>!n.link&&!n.img&&!n.xml&&!n.arqPath&&!n.arqLocal);
   abrir(`<h2>Relatório de notas fiscais</h2>
   <p class="sub">Para o habite-se e a prestação de contas da obra.</p>
   <div class="card" style="box-shadow:none;margin-top:10px">
@@ -2724,12 +2828,14 @@ function limparEtapas(i){ panel._itC[i].cats=[]; pintaItensCompra(); }
 function confirmarCompra(){
   if(panel._itC.some(it=>it.cats.length===0)){toast('Falta escolher a etapa de algum item.');return}
   const c=panel._cotOrig, pago=document.getElementById('ic_pago').checked;
-
-  c.status='fechada'; c.at=Date.now();
-  const k=t=>String(t||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const perdedoras=DB.cot.filter(x=>x.status==='aberta'&&k(x.item)===k(c.item));
-  perdedoras.forEach(x=>{x.status='arquivada';x.at=Date.now()});
-
+  const nota=c._nota||null;
+  let perdedoras=[];
+  if(!nota){
+    c.status='fechada'; c.at=Date.now();
+    const k=t=>String(t||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    perdedoras=DB.cot.filter(x=>x.status==='aberta'&&k(x.item)===k(c.item));
+    perdedoras.forEach(x=>{x.status='arquivada';x.at=Date.now()});
+  }
   const idsGerados=[];
   panel._itC.forEach(it=>{
     const bruto=(+it.q||0)*(+it.u||0);
@@ -2742,12 +2848,17 @@ function confirmarCompra(){
       rateio=it.cats.map((cat,idx)=>({cat,valor:idx<n-1?cada:+(total-cada*(n-1)).toFixed(2)}));
     }
     const novoId=uid(); idsGerados.push(novoId);
-    DB.lanc.push({id:novoId,at:Date.now(),data:hoje(),desc:it.d||c.item,familia:(it.familia||'').trim(),cat:it.cats[0],
+    DB.lanc.push({id:novoId,at:Date.now(),data:nota?nota.data:hoje(),desc:it.d||c.item,familia:(it.familia||'').trim(),cat:it.cats[0],
       forn:it.f||c.forn,qtd:+it.q||1,unit,total,rateio,
-      pag:pago?'Pago':'A pagar',nf:'',anexos:c.anexos||[],obs:c.obs||'',
-      ctrl:false,qtdRec:0,baixas:[]});
+      pag:pago?'Pago':'A pagar',nf:nota?(nota.numero||''):'',anexos:c.anexos||[],obs:c.obs||'',
+      ctrl:false,qtdRec:0,baixas:[],notaId:nota?nota.id:''});
   });
-  c.lancIds=idsGerados;
+  if(nota){
+    nota.lancIds=idsGerados; nota.at=Date.now();
+    if(!nota.lancId)nota.lancId=idsGerados[0]||'';
+  }else{
+    c.lancIds=idsGerados;
+  }
   salvar();fechar();render();
   toast(panel._itC.length+' item(ns) lançado(s)'+(perdedoras.length?' · '+perdedoras.length+' proposta arquivada':''));
 }
@@ -3533,7 +3644,7 @@ function verManual(){
     <p><b>Painel</b> — total investido (dividido em administrativas e construção), fase atual da obra com pendências (toque em "Gerenciar" para criar, mover de etapa ou ver as já concluídas), contas a pagar, saldo de material a receber e gasto por categoria. O ícone de olho no topo esconde ou mostra os valores em tela.</p>
     <p><b>Gastos</b> — todos os lançamentos. Dá para duplicar, repetir todo mês, ratear entre várias etapas de uma vez, controlar entregas parciais e anexar foto ou link do documento.</p>
     <p><b>Cotações</b> — orçamentos para comparar fornecedores antes de comprar (não entra na conta ainda). Quando há mais de uma proposta para a mesma coisa, o app compara pelo preço unitário de cada item, recalculando todas para a mesma quantidade — assim um orçamento com quantidade menor não parece mais barato só por isso. Em "Comparar item a item" dá para ver quem tem o melhor preço de cada produto. Se negociar um desconto no fechamento, lance no campo "Desconto negociado" (ou use "Arredondar total") — ele é dividido entre os itens conforme o valor de cada um. Quando fechar, use "Virou compra" para virar gasto de verdade. Dá para importar um PDF de orçamento e o app já tenta preencher os itens sozinho, pra você só conferir.</p>
-    <p><b>Notas</b> — arquivo das notas fiscais da obra, que a prefeitura pede no habite-se. Envie o XML da NF-e (o app extrai emitente, número, chave e todos os itens automaticamente), o PDF do DANFE (leitura por texto, confira antes de salvar) ou uma foto. Cada nota pode ser vinculada ao gasto correspondente, e "Relatório final de notas" gera as planilhas por nota e por item.</p>
+    <p><b>Notas</b> — arquivo das notas fiscais da obra, que a prefeitura pede no habite-se. Envie o XML da NF-e (o app extrai emitente, número, chave e todos os itens automaticamente), o PDF do DANFE (leitura por texto, confira antes de salvar) ou uma foto. O arquivo fica guardado e abre dentro do próprio sistema em "Ver arquivo da nota". Com "Lançar itens como gastos" os produtos da nota viram lançamentos da obra, escolhendo a etapa de cada um. "Relatório final de notas" gera as planilhas por nota e por item.</p>
     <p><b>Itens</b> — resumo por material e por tipo de produto comprado, com filtro por etapa e por tipo.</p>
     <p><b>Equipe</b> — cadastro de pedreiro, servente e ajudantes com o valor da diária. "Lançar semana" marca os dias trabalhados e cria automaticamente o gasto na etapa Mão de obra, entrando nas contas a pagar como qualquer outro.</p>
     <p><b>Fotos</b> — álbum com data e hora. "Tirar foto" abre a câmera, "Da galeria" deixa escolher uma já existente. "Ver em sequência" mostra o álbum como uma linha do tempo, com setas ou arrastando o dedo.</p>
