@@ -290,6 +290,7 @@ a{color:var(--teal)}
 <nav>
   <button class="on" data-v="painel"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Painel</button>
   <button data-v="gastos"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>Gastos</button>
+  <button data-v="notas"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 12h6M9 16h4"/></svg>Notas</button>
   <button data-v="cot"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Cotações</button>
   <button data-v="itens"><svg viewBox="0 0 24 24"><path d="M20.5 7.3 12 12l-8.5-4.7M12 12v9.3M20.5 7.3 12 3 3.5 7.3l8.5 4.7 8.5-4.7z"/></svg>Itens</button>
   <button data-v="equipe"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.4 2.9-5.2 6.5-5.2s6.5 1.8 6.5 5.2"/><path d="M16.5 5.2a3.2 3.2 0 0 1 0 6.2M18 14.4c2.2.5 3.5 2 3.5 4.4"/></svg>Equipe</button>
@@ -379,6 +380,13 @@ a{color:var(--teal)}
     <div class="stat" style="margin-top:10px"><span>Total filtrado</span><b class="mono" id="gTotal">R$ 0,00</b></div>
   </div>
   <div class="card" id="gastosCard"><div id="gastosList"></div></div>
+</section>
+
+<!-- ============ NOTAS FISCAIS ============ -->
+<section class="view" id="v-notas">
+  <button class="btn" onclick="document.getElementById('notaInput').click()">📎 Enviar nota fiscal</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirNota()">+ Lançar nota manualmente</button>
+  <div id="notasBody"></div>
 </section>
 
 <!-- ============ COTAÇÕES ============ -->
@@ -501,8 +509,10 @@ a{color:var(--teal)}
 <input type="file" id="anexoInput" accept="image/*,.pdf" multiple hidden>
 <input type="file" id="fotoPerfilInput" accept="image/*" hidden>
 <input type="file" id="pdfCotInput" accept="application/pdf,.pdf" hidden>
+<input type="file" id="notaInput" accept=".xml,text/xml,application/xml,application/pdf,.pdf,image/*" multiple hidden>
 <datalist id="dlProdutos"></datalist>
 <datalist id="dlCategorias"></datalist>
+<datalist id="dlForn"></datalist>
 <div class="sheet" id="sheet"><div class="bg" onclick="fechar()"></div><div class="panel" id="panel"></div></div>
 <div class="toast" id="toast"></div>
 
@@ -588,7 +598,9 @@ function mesclarSeguro(vindo){
   n+=mesclarLista(DB.fotos,vindo.fotos,null,null);
   n+=mesclarLista(DB.passos,vindo.passos,null,null);
   DB.equipe=DB.equipe||[];
+  DB.notas=DB.notas||[];
   n+=mesclarLista(DB.equipe,vindo.equipe,null,null);
+  n+=mesclarLista(DB.notas,vindo.notas,null,null);
   const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
   const novasCx=(vindo.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
   DB.catExtra=(DB.catExtra||[]).concat(novasCx); n+=novasCx.length;
@@ -755,6 +767,7 @@ function carregar(){
   DB.catExtra=DB.catExtra||[];
   DB.exc=DB.exc||[];
   DB.equipe=DB.equipe||[];
+  DB.notas=DB.notas||[];
   rebuildCategorias();
   normalizarCategorias();
   (DB.passos||[]).forEach(p=>{ if(!p.cat) p.cat='c00'; });
@@ -978,6 +991,7 @@ function render(){
   refreshDatalists();
   rebuildNumeros();
   renderIO();
+  renderNotas();
   renderAvatar();
   renderAvisos();
   renderEquipe();
@@ -1358,6 +1372,329 @@ function verComparativo(nomeGrupo){
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
 
+/* ================= NOTAS FISCAIS ================= */
+function notas(){DB.notas=DB.notas||[];return DB.notas}
+function txtTag(no,tag){
+  if(!no)return '';
+  const e=no.getElementsByTagName(tag);
+  return e&&e[0]&&e[0].textContent?e[0].textContent.trim():'';
+}
+/* NF-e em XML: extração exata, é o formato oficial */
+function lerXmlNfe(xml){
+  let doc;
+  try{ doc=new DOMParser().parseFromString(xml,'text/xml'); }catch(e){ return null; }
+  const inf=doc.getElementsByTagName('infNFe')[0];
+  if(!inf)return null;
+  const ide=inf.getElementsByTagName('ide')[0];
+  const emitN=inf.getElementsByTagName('emit')[0];
+  const tot=inf.getElementsByTagName('ICMSTot')[0];
+  const dh=txtTag(ide,'dhEmi')||txtTag(ide,'dEmi');
+  const itens=[];
+  const dets=inf.getElementsByTagName('det');
+  for(let i=0;i<dets.length;i++){
+    const prod=dets[i].getElementsByTagName('prod')[0];
+    if(!prod)continue;
+    itens.push({c:txtTag(prod,'cProd'),d:txtTag(prod,'xProd'),ncm:txtTag(prod,'NCM'),
+      un:txtTag(prod,'uCom'),q:+txtTag(prod,'qCom')||0,
+      u:+txtTag(prod,'vUnCom')||0,t:+txtTag(prod,'vProd')||0});
+  }
+  return {tipo:'xml',
+    chave:(inf.getAttribute('Id')||'').replace(/\D/g,''),
+    numero:txtTag(ide,'nNF'),serie:txtTag(ide,'serie'),
+    data:(dh||'').slice(0,10),
+    emit:txtTag(emitN,'xNome'),cnpj:txtTag(emitN,'CNPJ')||txtTag(emitN,'CPF'),
+    total:+txtTag(tot,'vNF')||itens.reduce((s,i)=>s+i.t,0),
+    itens};
+}
+/* DANFE em PDF: leitura por texto, sempre precisa de conferência */
+function lerTextoDanfe(linhas){
+  const tudo=linhas.join(' ');
+  const mChave=tudo.match(/(\d[\d\s.]{50,66}\d)/);
+  const chave=mChave?mChave[1].replace(/\D/g,''):'';
+  const mNum=tudo.match(/n[ºo°.\s]*\s*(\d{1,3}[.\s]?\d{3,9})\b/i);
+  const mData=tudo.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  let total=0;
+  linhas.forEach(t=>{
+    if(/valor\s*total\s*da\s*nota|v\.?\s*total\s*da\s*nota|total\s*da\s*nota/i.test(t)){
+      const ms=acharMoedas(t); if(ms.length)total=Math.max(total,nBR(ms[ms.length-1].s));
+    }
+  });
+  if(!total)total=totalDeclarado(linhas);
+  const itens=parseOrcamento(linhas).map(i=>({c:i.c,d:i.d,ncm:'',un:'',q:i.q,u:i.u,t:+(i.q*i.u).toFixed(2)}));
+  return {tipo:'pdf',
+    chave:chave.length===44?chave:'',
+    numero:mNum?mNum[1].replace(/\D/g,''):'',serie:'',
+    data:mData?`${mData[3]}-${mData[2]}-${mData[1]}`:hoje(),
+    emit:palpiteFornecedor(linhas),cnpj:'',
+    total,itens};
+}
+document.getElementById('notaInput').onchange=async e=>{
+  const arqs=[...e.target.files]; e.target.value=''; if(!arqs.length)return;
+  for(const f of arqs){
+    const nome=(f.name||'').toLowerCase();
+    try{
+      if(nome.endsWith('.xml')||/xml/.test(f.type)){
+        const t=await f.text();
+        const d=lerXmlNfe(t);
+        if(!d){toast('“'+f.name+'” não parece um XML de NF-e.');continue}
+        d.xml=t.length<200000?t:''; d.arquivo=f.name;
+        conferirNota(d);
+      }else if(nome.endsWith('.pdf')||f.type==='application/pdf'){
+        toast('Lendo '+f.name+'...');
+        const linhas=await linhasDoPdf(f);
+        const d=lerTextoDanfe(linhas); d.arquivo=f.name; d.linhas=linhas;
+        conferirNota(d);
+      }else if(/^image\//.test(f.type)){
+        const img=await comprimirImagem(f,1100,.6);
+        conferirNota({tipo:'foto',chave:'',numero:'',serie:'',data:hoje(),emit:'',cnpj:'',
+          total:0,itens:[],img,arquivo:f.name});
+      }else{
+        toast('“'+f.name+'”: envie o XML da NF-e, o PDF do DANFE ou uma foto.');
+      }
+    }catch(x){ toast('Não consegui ler “'+f.name+'”.'); }
+    break; /* uma por vez: cada nota passa pela tela de conferência */
+  }
+  if(arqs.length>1)toast('Enviei a primeira. Repita para as demais.');
+};
+function comprimirImagem(file,maxLado,qual){
+  return new Promise((ok,err)=>{
+    const r=new FileReader();
+    r.onload=()=>{const im=new Image();
+      im.onload=()=>{
+        const s=Math.min(1,maxLado/Math.max(im.width,im.height));
+        const cv=document.createElement('canvas');
+        cv.width=im.width*s|0; cv.height=im.height*s|0;
+        cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+        ok(cv.toDataURL('image/jpeg',qual));
+      };
+      im.onerror=err; im.src=r.result;};
+    r.onerror=err; r.readAsDataURL(file);
+  });
+}
+function conferirNota(d){
+  const soma=(d.itens||[]).reduce((s,i)=>s+(+i.t||0),0);
+  const dif=+( (+d.total||0)-soma ).toFixed(2);
+  NOTA_TMP=d;
+  abrir(`<h2>Nota lida</h2>
+  <p class="sub">${d.arquivo||''} · ${d.tipo==='xml'?'XML da NF-e (dados oficiais)':d.tipo==='pdf'?'PDF do DANFE (leitura por texto)':'foto'}</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <div class="stat"><span>Emitente</span><b style="font-size:13px;text-align:right">${d.emit||'—'}</b></div>
+    <div class="stat"><span>Número</span><b class="mono">${d.numero||'—'}</b></div>
+    <div class="stat"><span>Data</span><b class="mono">${d.data?d.data.split('-').reverse().join('/'):'—'}</b></div>
+    <div class="stat"><span>Itens encontrados</span><b class="mono">${(d.itens||[]).length}</b></div>
+    <div class="stat"><span>Total da nota</span><b class="mono">${brl(d.total)}</b></div>
+    ${(d.itens||[]).length&&Math.abs(dif)>=0.02?`<div class="stat"><span>Soma dos itens</span><b class="mono" style="color:var(--amber)">${brl(soma)}</b></div>`:''}
+  </div>
+  ${d.tipo==='xml'?'<p class="hint">Dados vindos do arquivo oficial da nota — não precisam de conferência.</p>'
+    :d.tipo==='pdf'?'<p class="hint">Leitura por texto: confira número, total e itens antes de salvar. Se o PDF for digitalizado (foto), pode não vir nada.</p>'
+    :'<p class="hint">Foto guardada. Preencha os dados da nota na próxima tela.</p>'}
+  <button class="btn" onclick="abrirNota('',true)">Conferir e salvar</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Descartar</button>`);
+}
+let NOTA_TMP=null;
+function abrirNota(id,daLeitura){
+  const n = id ? notas().find(x=>x.id===id)
+    : (daLeitura&&NOTA_TMP) ? NOTA_TMP
+    : {id:'',tipo:'manual',chave:'',numero:'',serie:'',data:hoje(),emit:'',cnpj:'',total:0,itens:[],link:'',obs:''};
+  panel._nota=n;
+  panel._its=JSON.parse(JSON.stringify(n.itens&&n.itens.length?n.itens.map(i=>({c:i.c||'',d:i.d||'',q:i.q||0,u:i.u||0,f:'',ncm:i.ncm||'',un:i.un||''})):[{c:'',d:'',q:1,u:0,f:''}]));
+  const cands=DB.lanc.slice().sort((a,b)=>b.data.localeCompare(a.data)).slice(0,60);
+  abrir(`<h2>${id?'Editar nota':'Nota fiscal'}</h2>
+  <label>Emitente / fornecedor</label><input id="n_emit" value="${(n.emit||'').replace(/"/g,'&quot;')}" list="dlForn">
+  <div class="row2">
+    <div><label>Número</label><input id="n_num" value="${n.numero||''}" inputmode="numeric"></div>
+    <div><label>Data</label><input type="date" id="n_data" value="${n.data||hoje()}"></div>
+  </div>
+  <label>Chave de acesso (44 dígitos)</label><input id="n_chave" value="${n.chave||''}" inputmode="numeric" placeholder="opcional">
+  <label>Link do arquivo no Drive</label><input id="n_link" value="${(n.link||'').replace(/"/g,'&quot;')}" placeholder="cole o link do PDF/XML guardado no Drive">
+  <p class="hint">Guarde o arquivo original no Drive e cole o link aqui — é ele que o cartório e a prefeitura vão pedir.</p>
+  <div class="divider"></div>
+  <label style="margin:0">Itens da nota</label>
+  <div id="itensNota"></div>
+  <button class="btn ghost mini" style="margin-top:8px" onclick="addItem()">+ Adicionar item</button>
+  <div class="stat" style="margin-top:12px;border-top:1px solid var(--line);border-bottom:0;padding-top:11px">
+    <span>Soma dos itens</span><b class="mono" id="n_somaitens"></b></div>
+  <label>Valor total da nota</label>
+  <input id="n_total" inputmode="numeric" value="${n.total?num2moeda(n.total):''}" oninput="onMoedaInput(this)">
+  <label>Vincular a um gasto já lançado</label>
+  <select id="n_lanc">
+    <option value="">Não vincular agora</option>
+    ${cands.map(l=>`<option value="${l.id}" ${n.lancId===l.id?'selected':''}>${l.data.split('-').reverse().join('/')} · ${l.desc} · ${(+l.total).toLocaleString('pt-BR',{minimumFractionDigits:2})}</option>`).join('')}
+  </select>
+  <label>Observações</label><textarea id="n_obs">${n.obs||''}</textarea>
+  ${n.img?`<img src="${n.img}" style="width:100%;border-radius:12px;margin-top:10px">`:''}
+  <div style="height:14px"></div>
+  <button class="btn" onclick="salvarNota('${id||''}')">Salvar nota</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  ITENS_DIV='itensNota'; ITENS_TOT='n_somaitens'; ITENS_CAT=false;
+  pintaItens();
+}
+function salvarNota(id){
+  const its=panel._its.filter(i=>String(i.d||'').trim()||+i.u>0)
+    .map(i=>({c:i.c||'',d:(i.d||'').trim(),ncm:i.ncm||'',un:i.un||'',
+      q:+i.q||0,u:+i.u||0,t:+((+i.q||0)*(+i.u||0)).toFixed(2)}));
+  const emit=val('n_emit').trim();
+  if(!emit){toast('Informe o emitente da nota.');return}
+  const base=panel._nota||{};
+  const total=moeda2num(val('n_total'))||its.reduce((s,i)=>s+i.t,0);
+  const n={id:id||uid(),at:Date.now(),tipo:base.tipo||'manual',
+    emit,cnpj:base.cnpj||'',numero:val('n_num').trim(),serie:base.serie||'',
+    chave:val('n_chave').replace(/\D/g,''),data:val('n_data')||hoje(),
+    total,itens:its,link:val('n_link').trim(),obs:val('n_obs').trim(),
+    lancId:val('n_lanc')||'',arquivo:base.arquivo||'',img:base.img||'',xml:base.xml||''};
+  const dup=notas().find(x=>x.id!==n.id&&n.chave&&x.chave===n.chave);
+  if(dup){toast('Essa nota já está cadastrada.');return}
+  if(id){const i=notas().findIndex(x=>x.id===id); notas()[i]=n;}
+  else notas().push(n);
+  if(n.lancId){
+    const l=DB.lanc.find(x=>x.id===n.lancId);
+    if(l&&!l.nf){ l.nf=n.numero||('chave '+n.chave.slice(-8)); l.at=Date.now(); }
+  }
+  NOTA_TMP=null; salvar(); fechar(); render(); toast('Nota salva');
+}
+function verNota(id){
+  const n=notas().find(x=>x.id===id); if(!n)return;
+  const l=n.lancId?DB.lanc.find(x=>x.id===n.lancId):null;
+  const soma=(n.itens||[]).reduce((s,i)=>s+(+i.t||0),0);
+  abrir(`<h2>${n.emit}</h2>
+  <p class="sub">Nota ${n.numero||'s/nº'}${n.serie?' · série '+n.serie:''} · ${n.data.split('-').reverse().join('/')}
+    · <span class="tag">${n.tipo==='xml'?'XML oficial':n.tipo==='pdf'?'lida do PDF':n.tipo==='foto'?'foto':'manual'}</span></p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    ${(n.itens||[]).length?(n.itens||[]).map(i=>`<div class="stat" style="align-items:flex-start">
+      <span style="flex:1;padding-right:8px">${i.d}
+        <div style="font-size:11.5px;color:var(--ink-2)">${(+i.q).toLocaleString('pt-BR')}${i.un?' '+i.un:''} × ${brl(i.u)}${i.c?' · cód. '+i.c:''}${i.ncm?' · NCM '+i.ncm:''}</div>
+      </span><b class="mono">${brl(i.t)}</b></div>`).join('')
+      :'<div class="empty">Sem itens detalhados</div>'}
+    <div class="stat" style="border-top:1px solid var(--line);border-bottom:0;margin-top:4px;padding-top:9px">
+      <span style="font-weight:700">Total da nota</span><b class="mono" style="font-size:17px">${brl(n.total)}</b></div>
+    ${Math.abs(n.total-soma)>=0.02&&(n.itens||[]).length?`<p class="hint">A soma dos itens dá ${brl(soma)} — a diferença costuma ser frete, desconto ou impostos.</p>`:''}
+  </div>
+  ${n.chave?`<p class="hint" style="word-break:break-all">Chave: ${n.chave}</p>`:''}
+  ${n.obs?`<p class="hint">${n.obs}</p>`:''}
+  ${l?`<div class="item" onclick="verGasto('${l.id}')"><div class="mid"><b>Gasto vinculado</b><small>${l.desc}</small></div>
+    <div class="val mono">${brl(l.total)}</div></div>`:'<p class="hint">Nenhum gasto vinculado a esta nota.</p>'}
+  ${n.img?`<img src="${n.img}" style="width:100%;border-radius:12px;margin:10px 0">`:''}
+  ${n.link?`<a class="btn dark mini" style="width:100%;text-align:center;text-decoration:none;display:block;padding:11px" href="${n.link}" target="_blank" rel="noopener">Abrir arquivo no Drive</a>`:''}
+  ${n.xml?`<button class="btn ghost mini" style="margin-top:9px" onclick="baixarXml('${n.id}')">Baixar o XML</button>`:''}
+  <div class="row2" style="margin-top:9px">
+    <button class="btn ghost mini" onclick="abrirNota('${n.id}')">Editar</button>
+    <button class="btn ghost mini" style="color:var(--red)" onclick="excluirNota('${n.id}')">Excluir</button>
+  </div>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function baixarXml(id){
+  const n=notas().find(x=>x.id===id); if(!n||!n.xml)return;
+  baixar((n.numero||'nota')+'.xml',n.xml,'text/xml');
+}
+function excluirNota(id){
+  const n=notas().find(x=>x.id===id); if(!n)return;
+  confirmar('Excluir nota',`Nota ${n.numero||''} de ${n.emit}. O gasto lançado continua existindo.`,'Excluir',()=>{
+    DB.notas=notas().filter(x=>x.id!==id); salvar(); fechar(); render(); toast('Nota excluída');
+  },true);
+}
+function renderNotas(){
+  const el=document.getElementById('notasBody'); if(!el)return;
+  const busca=alfa2((document.getElementById('fBuscaNota')||{}).value||'');
+  let L=notas().slice().sort((a,b)=>b.data.localeCompare(a.data));
+  if(busca)L=L.filter(n=>alfa2([n.emit,n.numero,n.obs,n.chave,(n.itens||[]).map(i=>i.d).join(' ')].join(' ')).includes(busca));
+  const total=L.reduce((s,n)=>s+ +n.total,0);
+  const semVinculo=L.filter(n=>!n.lancId).length;
+  const semArquivo=L.filter(n=>!n.link&&!n.img&&!n.xml).length;
+  const gastosSemNota=DB.lanc.filter(l=>isPago(l)&&!notas().some(n=>n.lancId===l.id)).length;
+
+  const itensTodos={};
+  notas().forEach(n=>(n.itens||[]).forEach(i=>{
+    const k=alfa2(i.d); if(!k)return;
+    const m=itensTodos[k]=itensTodos[k]||{nome:i.d,q:0,t:0,notas:0,un:i.un||''};
+    m.q+=+i.q||0; m.t+=+i.t||0; m.notas++;
+  }));
+  const consolidado=Object.values(itensTodos).sort((a,b)=>b.t-a.t);
+
+  el.innerHTML=`
+  <div class="kpicards" style="margin-top:12px">
+    <div class="kpic"><small>Notas guardadas</small><b class="mono">${notas().length}</b><u>${semArquivo?semArquivo+' sem arquivo':'todas com arquivo'}</u></div>
+    <div class="kpic"><small>Valor em notas</small><b class="mono">${brl(total)}</b><u>no filtro atual</u></div>
+    <div class="kpic"><small>Sem gasto vinculado</small><b class="mono">${semVinculo}</b><u>${semVinculo?'vincule para o relatório':'tudo vinculado'}</u></div>
+    <div class="kpic"><small>Gastos sem nota</small><b class="mono">${gastosSemNota}</b><u>pagos e sem NF anexada</u></div>
+  </div>
+  <div class="card">
+    <input id="fBuscaNota" placeholder="Buscar por fornecedor, número, item..." value="${busca?((document.getElementById('fBuscaNota')||{}).value||''):''}">
+    <button class="btn ghost mini" style="margin-top:9px" onclick="relatorioNotas()">📄 Relatório final de notas</button>
+  </div>
+  <div class="card">
+    <h3>Notas (${L.length})</h3>
+    ${L.length?L.map(n=>`<div class="item" onclick="verNota('${n.id}')">
+      <div class="dt"><b class="mono">${dia(n.data).d}</b><span>${dia(n.data).m}</span></div>
+      <div class="mid"><b>${n.emit}</b>
+        <small>nº ${n.numero||'s/nº'} · ${(n.itens||[]).length} item(ns)${n.lancId?'':' · <span style="color:var(--amber)">sem gasto vinculado</span>'}${(!n.link&&!n.img&&!n.xml)?' · <span style="color:var(--red)">sem arquivo</span>':''}</small></div>
+      <div class="val mono">${brl(n.total)}</div></div>`).join('')
+      :'<div class="empty"><b>Nenhuma nota guardada</b><p>Envie o XML da NF-e (extração exata), o PDF do DANFE ou uma foto da nota.</p></div>'}
+  </div>
+  ${consolidado.length?`<div class="acc ${ACC['nfitens']?'on':''}">
+    <div class="acch" onclick="toggleAcc('nfitens')"><h3>Itens comprados nas notas</h3>
+      <span class="cnt">${consolidado.length} item(ns)</span><span class="arw">▼</span></div>
+    <div class="accb">
+      ${consolidado.map(m=>`<div class="stat" style="align-items:flex-start">
+        <span style="flex:1;padding-right:8px">${m.nome}
+          <div style="font-size:11.5px;color:var(--ink-2)">${m.notas} nota${m.notas>1?'s':''}</div></span>
+        <div style="text-align:right"><b class="mono">${m.q.toLocaleString('pt-BR')}${m.un?' '+m.un:''}</b>
+          <div class="mono" style="font-size:11.5px;color:var(--ink-2)">${brl(m.t)}</div></div></div>`).join('')}
+    </div></div>`:''}
+  <p class="hint">Para o habite-se, o que vale é o arquivo original de cada nota. Guarde o PDF/XML no Drive e mantenha o link aqui — o app guarda os dados e o XML, mas não o PDF, para não estourar a memória do aparelho.</p>`;
+  const b=document.getElementById('fBuscaNota');
+  if(b)b.oninput=()=>renderNotas();
+}
+function relatorioNotas(){
+  const L=notas().slice().sort((a,b)=>a.data.localeCompare(b.data));
+  const total=L.reduce((s,n)=>s+ +n.total,0);
+  const porForn={};
+  L.forEach(n=>{const k=alfa2(n.emit)||'—';(porForn[k]=porForn[k]||{nome:n.emit,t:0,n:0}).t+=+n.total;porForn[k].n++});
+  const forns=Object.values(porForn).sort((a,b)=>b.t-a.t);
+  const semArquivo=L.filter(n=>!n.link&&!n.img&&!n.xml);
+  abrir(`<h2>Relatório de notas fiscais</h2>
+  <p class="sub">Para o habite-se e a prestação de contas da obra.</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <div class="stat"><span>Notas</span><b class="mono">${L.length}</b></div>
+    <div class="stat"><span>Valor total</span><b class="mono">${brl(total)}</b></div>
+    <div class="stat"><span>Período</span><b class="mono" style="font-size:13px">${L.length?L[0].data.split('-').reverse().join('/')+' a '+L[L.length-1].data.split('-').reverse().join('/'):'—'}</b></div>
+    <div class="stat"><span>Fornecedores</span><b class="mono">${forns.length}</b></div>
+  </div>
+  ${semArquivo.length?`<div class="card" style="box-shadow:none;background:rgba(196,83,77,.08);border-color:rgba(196,83,77,.3)">
+    <h3 style="color:var(--red)">⚠ ${semArquivo.length} nota(s) sem arquivo guardado</h3>
+    ${semArquivo.map(n=>`<div class="stat" onclick="verNota('${n.id}')" style="cursor:pointer">
+      <span>${n.emit} · nº ${n.numero||'s/nº'}</span><b class="mono">${brl(n.total)}</b></div>`).join('')}
+    <p class="hint">Anexe o XML/PDF ou o link do Drive nessas notas antes de pedir o habite-se.</p>
+  </div>`:''}
+  <div class="card" style="box-shadow:none">
+    <h3>Por fornecedor</h3>
+    ${forns.map(f=>`<div class="stat"><span>${f.nome} <small style="color:var(--ink-2)">${f.n} nota${f.n>1?'s':''}</small></span>
+      <b class="mono">${brl(f.t)}</b></div>`).join('')||'<div class="empty">Nenhuma nota</div>'}
+  </div>
+  <button class="btn dark" onclick="exportNotasCSV()">Baixar planilha das notas</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="exportItensNotasCSV()">Baixar planilha dos itens</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function exportNotasCSV(){
+  const h='Data;Emitente;CNPJ;Numero;Serie;Chave;Total;GastoVinculado;Link;Obs\n';
+  const linhas=notas().slice().sort((a,b)=>a.data.localeCompare(b.data)).map(n=>{
+    const l=n.lancId?DB.lanc.find(x=>x.id===n.lancId):null;
+    return [n.data,n.emit,n.cnpj||'',n.numero||'',n.serie||'',n.chave||'',(+n.total).toFixed(2),
+      l?l.desc:'',n.link||'',(n.obs||'').replace(/[;\n]/g,' ')].join(';');
+  });
+  baixar('notas-fiscais-c08-'+hoje()+'.csv','\ufeff'+h+linhas.join('\n'),'text/csv;charset=utf-8');
+  toast('Planilha gerada');
+}
+function exportItensNotasCSV(){
+  const h='Data;Emitente;NotaNum;Codigo;Descricao;NCM;Unidade;Qtd;Unitario;Total\n';
+  const linhas=[];
+  notas().slice().sort((a,b)=>a.data.localeCompare(b.data)).forEach(n=>{
+    (n.itens||[]).forEach(i=>linhas.push([n.data,n.emit,n.numero||'',i.c||'',i.d,i.ncm||'',i.un||'',
+      i.q,(+i.u).toFixed(2),(+i.t).toFixed(2)].join(';')));
+  });
+  baixar('itens-notas-c08-'+hoje()+'.csv','\ufeff'+h+linhas.join('\n'),'text/csv;charset=utf-8');
+  toast('Planilha gerada');
+}
+
 function verFechadas(){
   const fechadas=DB.cot.filter(c=>c.status!=='aberta').sort((a,b)=>(+b.at||0)-(+a.at||0));
   const orfaC=c=>c.status==='fechada'&&!(c.lancIds&&c.lancIds.some(id=>DB.lanc.some(l=>l.id===id)));
@@ -1542,6 +1879,12 @@ function refreshDatalists(){
   if(dlP) dlP.innerHTML=[...prods].sort((a,b)=>alfa(a,b)).map(p=>`<option value="${p.replace(/"/g,'&quot;')}">`).join('');
   const dlC=document.getElementById('dlCategorias');
   if(dlC) dlC.innerHTML=CATS_AZ.map(c=>`<option value="${c.n.replace(/"/g,'&quot;')}">`).join('');
+  const forns=new Set();
+  DB.lanc.forEach(l=>{ if(l.forn) forns.add(l.forn.trim()); });
+  DB.cot.forEach(c=>{ if(c.forn) forns.add(c.forn.trim()); });
+  (DB.notas||[]).forEach(n=>{ if(n.emit) forns.add(n.emit.trim()); });
+  const dlF=document.getElementById('dlForn');
+  if(dlF) dlF.innerHTML=[...forns].sort((a,b)=>alfa(a,b)).map(f=>`<option value="${f.replace(/"/g,'&quot;')}">`).join('');
 }
 /* ---------- combobox de tipo de produto (dropdown próprio, sem estilo nativo do navegador) ---------- */
 function familiasExistentes(){
@@ -2586,7 +2929,7 @@ function importar(modo){
   const d=panel._imp;
   if(modo==='trocar'){
     ACAO_PENDENTE=()=>{
-      DB=d; DB.fotos=DB.fotos||[]; DB.cfg=DB.cfg||{inicio:'',meses:8,area:0}; DB.catExtra=DB.catExtra||[]; DB.exc=DB.exc||[];
+      DB=d; DB.fotos=DB.fotos||[]; DB.notas=DB.notas||[]; DB.cfg=DB.cfg||{inicio:'',meses:8,area:0}; DB.catExtra=DB.catExtra||[]; DB.exc=DB.exc||[];
       rebuildCategorias(); normalizarCategorias(); salvar();fechar();render();toast('Base substituída');
     };
     abrir(`<h2>Substituir tudo?</h2>
@@ -2606,6 +2949,8 @@ function importar(modo){
     const novosC=(d.cot||[]).filter(c=>!existeC.has(chaveDup(c,'cot'))&&!setExc.has('cot|'+chaveDup(c,'cot')));
     const novasF=(d.fotos||[]).filter(f=>!idsF.has(f.id));
     const novosP=(d.passos||[]).filter(p=>!idsP.has(p.id));
+    const idsN=new Set((DB.notas||[]).map(x=>x.id));
+    DB.notas=(DB.notas||[]).concat((d.notas||[]).filter(x=>!idsN.has(x.id)));
     const novasCx=(d.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
     DB.lanc=DB.lanc.concat(novosL); DB.cot=DB.cot.concat(novosC);
     DB.fotos=DB.fotos.concat(novasF); DB.passos=DB.passos.concat(novosP);
@@ -2620,6 +2965,7 @@ function importar(modo){
   DB.cot=fundir(DB.cot,d.cot).lista;
   DB.fotos=fundir(DB.fotos,d.fotos).lista;
   DB.passos=fundir(DB.passos,d.passos).lista;
+  DB.notas=fundir(DB.notas||[],d.notas||[]).lista;
   aplicarExclusoes();
   const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
   const novasCx=(d.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
@@ -2945,7 +3291,7 @@ function gravarSnap(){
     if(snaps.some(s=>s.dia===hj))return;
     snaps.push({dia:hj,em:new Date().toISOString(),
       resumo:{lanc:DB.lanc.length,cot:DB.cot.length,fotos:DB.fotos.length},
-      dados:JSON.stringify({lanc:DB.lanc,cot:DB.cot,passos:DB.passos,equipe:DB.equipe||[],
+      dados:JSON.stringify({lanc:DB.lanc,cot:DB.cot,passos:DB.passos,equipe:DB.equipe||[],notas:DB.notas||[],
         catExtra:DB.catExtra||[],cfg:DB.cfg,exc:DB.exc||[]})});
     while(snaps.length>7)snaps.shift();
     localStorage.setItem(SNAP_KEY,JSON.stringify(snaps));
@@ -2972,7 +3318,7 @@ function restaurarSnap(diaSnap){
       try{
         const d=JSON.parse(s.dados);
         DB.lanc=d.lanc||[]; DB.cot=d.cot||[]; DB.passos=d.passos||[];
-        DB.equipe=d.equipe||[]; DB.catExtra=d.catExtra||[]; DB.exc=d.exc||[];
+        DB.equipe=d.equipe||[]; DB.notas=d.notas||[]; DB.catExtra=d.catExtra||[]; DB.exc=d.exc||[];
         if(d.cfg)DB.cfg=d.cfg;
         rebuildCategorias(); salvar(); fechar(); render();
         toast('Dados restaurados');
@@ -3110,6 +3456,7 @@ function renderIO(){
     <div class="stat"><span>Lançamentos</span><b class="mono">${DB.lanc.length}</b></div>
     <div class="stat"><span>Cotações abertas</span><b class="mono">${DB.cot.filter(c=>c.status==='aberta').length}</b></div>
     <div class="stat"><span>Fotos no álbum</span><b class="mono">${DB.fotos.length}</b></div>
+    <div class="stat"><span>Notas fiscais</span><b class="mono">${(DB.notas||[]).length}</b></div>
     ${SESSAO?`<div class="stat"><span>Sincronização</span><b style="color:${SYNC_OK?'var(--green)':'var(--red)'}">${SYNC_OK?'em dia ✓':'falhou, tentando de novo'}</b></div>
     <div class="stat"><span>Conta</span><b style="font-size:12.5px">${SESSAO.user.email}</b></div>`:''}
   </div>
@@ -3186,6 +3533,7 @@ function verManual(){
     <p><b>Painel</b> — total investido (dividido em administrativas e construção), fase atual da obra com pendências (toque em "Gerenciar" para criar, mover de etapa ou ver as já concluídas), contas a pagar, saldo de material a receber e gasto por categoria. O ícone de olho no topo esconde ou mostra os valores em tela.</p>
     <p><b>Gastos</b> — todos os lançamentos. Dá para duplicar, repetir todo mês, ratear entre várias etapas de uma vez, controlar entregas parciais e anexar foto ou link do documento.</p>
     <p><b>Cotações</b> — orçamentos para comparar fornecedores antes de comprar (não entra na conta ainda). Quando há mais de uma proposta para a mesma coisa, o app compara pelo preço unitário de cada item, recalculando todas para a mesma quantidade — assim um orçamento com quantidade menor não parece mais barato só por isso. Em "Comparar item a item" dá para ver quem tem o melhor preço de cada produto. Se negociar um desconto no fechamento, lance no campo "Desconto negociado" (ou use "Arredondar total") — ele é dividido entre os itens conforme o valor de cada um. Quando fechar, use "Virou compra" para virar gasto de verdade. Dá para importar um PDF de orçamento e o app já tenta preencher os itens sozinho, pra você só conferir.</p>
+    <p><b>Notas</b> — arquivo das notas fiscais da obra, que a prefeitura pede no habite-se. Envie o XML da NF-e (o app extrai emitente, número, chave e todos os itens automaticamente), o PDF do DANFE (leitura por texto, confira antes de salvar) ou uma foto. Cada nota pode ser vinculada ao gasto correspondente, e "Relatório final de notas" gera as planilhas por nota e por item.</p>
     <p><b>Itens</b> — resumo por material e por tipo de produto comprado, com filtro por etapa e por tipo.</p>
     <p><b>Equipe</b> — cadastro de pedreiro, servente e ajudantes com o valor da diária. "Lançar semana" marca os dias trabalhados e cria automaticamente o gasto na etapa Mão de obra, entrando nas contas a pagar como qualquer outro.</p>
     <p><b>Fotos</b> — álbum com data e hora. "Tirar foto" abre a câmera, "Da galeria" deixa escolher uma já existente. "Ver em sequência" mostra o álbum como uma linha do tempo, com setas ou arrastando o dedo.</p>
