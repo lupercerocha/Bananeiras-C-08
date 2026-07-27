@@ -772,6 +772,30 @@ function carregar(){
   });
 }
 const somaItens=its=>(its||[]).reduce((s,i)=>s+(+i.q||0)*(+i.u||0),0);
+/* divide o desconto entre os itens conforme o peso de cada um no total;
+   as sobras de arredondamento vão para o item de maior valor, então a soma bate exatamente */
+function rateioDesconto(its,desc){
+  const base=(its||[]).map(i=>(+i.q||0)*(+i.u||0));
+  const soma=base.reduce((s,v)=>s+v,0);
+  const d=Math.min(Math.max(+desc||0,0),soma);
+  if(!(d>0)||!(soma>0))return base.map(()=>0);
+  const out=base.map(v=>Math.round(v/soma*d*100)/100);
+  const dif=+(d-out.reduce((s,v)=>s+v,0)).toFixed(2);
+  if(Math.abs(dif)>=0.01){
+    let iMax=0; base.forEach((v,i)=>{if(v>base[iMax])iMax=i});
+    out[iMax]=+(out[iMax]+dif).toFixed(2);
+  }
+  return out;
+}
+/* itens com a fatia de desconto que cabe a cada um (o unitário original é preservado) */
+function itensComDesconto(c){
+  const its=(c.itens||[]).map(i=>({...i}));
+  const d=+c.desconto||0;
+  if(!(d>0))return its;
+  const cortes=rateioDesconto(its,d);
+  its.forEach((i,k)=>{ i.descItem=cortes[k]; });
+  return its;
+}
 
 /* ---------- anexos (compra e cotação) ---------- */
 let ANX_ALVO=null; // array em edição (panel._anx)
@@ -1251,7 +1275,7 @@ function analisarGrupo(props){
   });
   const analise=props.map(p=>{
     const ajuste=(p.itens||[]).filter(it=>(+it.u||0)<0)
-      .reduce((s,it)=>s+((+it.q||1)*(+it.u||0)),0);
+      .reduce((s,it)=>s+((+it.q||1)*(+it.u||0)),0) - (+p.desconto||0);
     let custo=0, tem=0, vence=0;
     linhas.forEach(m=>{
       const o=m.ofertas[p.id]; if(!o)return;
@@ -2160,7 +2184,15 @@ function abrirCot(c){
   <div id="itens"></div>
   <button class="btn ghost mini" style="margin-top:8px" onclick="addItem()">+ Adicionar item</button>
   <div class="stat" style="margin-top:12px;border-top:1px solid var(--line);border-bottom:0;padding-top:11px">
-    <span style="font-weight:700">Total da cotação</span><b class="mono" id="c_tot" style="font-size:18px"></b></div>
+    <span>Soma dos itens</span><b class="mono" id="c_tot"></b></div>
+  <div class="row2" style="margin-top:6px;align-items:end">
+    <div><label style="margin-top:0">Desconto negociado</label>
+      <input id="c_desc" inputmode="numeric" value="${c.desconto?num2moeda(c.desconto):''}" placeholder="0,00" oninput="onMoedaInput(this);totItens()"></div>
+    <div><button class="btn ghost mini" onclick="arredondarCot()">Arredondar total</button></div>
+  </div>
+  <div class="stat" style="border-bottom:0">
+    <span style="font-weight:700">Total da cotação</span><b class="mono" id="c_totfinal" style="font-size:18px"></b></div>
+  <p class="hint">O desconto é dividido entre os itens conforme o valor de cada um, então o preço unitário usado nas comparações e na compra já sai com o desconto embutido.</p>
   <label>Observações</label><textarea id="c_obs" placeholder="Condições, prazo de entrega, devolução de palete...">${c.obs||''}</textarea>
   <div style="height:14px"></div>
   <button class="btn" onclick="salvarCot('${c.id}')">Salvar cotação</button>
@@ -2211,7 +2243,26 @@ function chgItem(i,campo,v){
     totItens();
   }
 }
-function totItens(){const el=document.getElementById(ITENS_TOT);if(el)el.textContent=brl(somaItens(panel._its))}
+function totItens(){
+  const el=document.getElementById(ITENS_TOT), sub=somaItens(panel._its);
+  if(el)el.textContent=brl(sub);
+  const dEl=document.getElementById('c_desc'), fEl=document.getElementById('c_totfinal');
+  if(dEl&&fEl){
+    let d=moeda2num(dEl.value);
+    if(d>sub){ d=sub; dEl.value=num2moeda(d); }
+    fEl.textContent=brl(sub-d);
+  }
+}
+function arredondarCot(){
+  const sub=somaItens(panel._its);
+  if(!(sub>0)){toast('Lance os itens primeiro.');return}
+  const alvo=Math.floor(sub);
+  const d=+(sub-alvo).toFixed(2);
+  if(d<0.01){toast('O total já está redondo.');return}
+  document.getElementById('c_desc').value=num2moeda(d);
+  totItens();
+  toast('Desconto de '+brl(d)+' aplicado');
+}
 function addItem(){
   const catPadrao=document.getElementById('x_cat')?(val('x_cat')||cat('c00').n):cat('c00').n;
   panel._its.push({c:'',d:'',q:1,u:0,f:'',cat:catPadrao});
@@ -2222,9 +2273,11 @@ function delItem(i){panel._its.splice(i,1);pintaItens()}
 
 function salvarCot(id){
   const its=panel._its.filter(i=>String(i.d||'').trim()||+i.u>0);
+  const sub=somaItens(its);
+  const desconto=Math.min(Math.max(moeda2num(val('c_desc')),0),sub);
   const c={id:id||uid(),at:Date.now(),data:hoje(),item:val('c_item').trim(),forn:val('c_forn').trim(),
     itens:its.length?its:[{c:'',d:val('c_item').trim(),q:1,u:0,f:''}],
-    total:somaItens(its),validade:val('c_val'),anexos:ANX_ALVO||[],obs:val('c_obs').trim(),status:'aberta'};
+    desconto,total:+(sub-desconto).toFixed(2),validade:val('c_val'),anexos:ANX_ALVO||[],obs:val('c_obs').trim(),status:'aberta'};
   if(!c.item){toast('Descreva do que se trata a cotação.');return}
   if(id){const i=DB.cot.findIndex(x=>x.id===id);c.status=DB.cot[i].status;DB.cot[i]=c}else DB.cot.push(c);
   salvar();fechar();render();toast('Cotação salva');
@@ -2239,8 +2292,14 @@ function verCot(id){
         <div style="font-size:11.5px;color:var(--ink-2)">${(+i.q||0).toLocaleString('pt-BR')} × ${brl(i.u)}${i.c?' · cód. '+i.c:''}${i.f?' · '+i.f:''}</div>
       </span><b class="mono">${brl((+i.q||0)*(+i.u||0))}</b></div>`).join('')}
     <div class="stat" style="border-top:1px solid var(--line);border-bottom:0;margin-top:4px;padding-top:9px">
-      <span style="font-weight:700">Total</span><b class="mono" style="font-size:17px">${brl(c.total)}</b></div>
+      <span${+c.desconto>0?'':' style="font-weight:700"'}>${+c.desconto>0?'Soma dos itens':'Total'}</span>
+      <b class="mono"${+c.desconto>0?'':' style="font-size:17px"'}>${brl(somaItens(its))}</b></div>
+    ${+c.desconto>0?`<div class="stat" style="border-bottom:0"><span>Desconto negociado</span>
+      <b class="mono" style="color:var(--green)">− ${brl(c.desconto)}</b></div>
+    <div class="stat" style="border-bottom:0"><span style="font-weight:700">Total da cotação</span>
+      <b class="mono" style="font-size:17px">${brl(c.total)}</b></div>`:''}
   </div>
+  ${+c.desconto>0?'<p class="hint">O desconto é dividido entre os itens conforme o valor de cada um — o preço unitário de cada produto já sai com ele embutido na comparação e na compra.</p>':''}
   ${c.obs?`<p class="hint">${c.obs}</p>`:''}
   ${(c.anexos&&c.anexos.length)?`<button class="btn dark mini" style="width:100%" onclick='verAnexoLista(${JSON.stringify(c.anexos)})'>📎 Ver anexos (${c.anexos.length})</button>`:''}
   <div style="height:10px"></div>
@@ -2269,11 +2328,12 @@ function virouCompra(id){
   abrirConfirmarCompra(c);
 }
 function abrirConfirmarCompra(c){
-  const its=(c.itens&&c.itens.length)?c.itens:[{c:'',d:c.item,q:1,u:c.total,f:''}];
-  panel._itC=JSON.parse(JSON.stringify(its)).map(i=>({...i,cats:[i.cat||'c00']}));
+  const base=(c.itens&&c.itens.length)?itensComDesconto(c):[{c:'',d:c.item,q:1,u:c.total,f:''}];
+  panel._itC=JSON.parse(JSON.stringify(base)).map(i=>({...i,cats:[i.cat||'c00']}));
   panel._cotOrig=c;
   abrir(`<h2>Lançar compra</h2>
   <p class="sub">${c.forn||'Sem fornecedor'} · marque em quais etapas cada item entra</p>
+  ${+c.desconto>0?`<p class="hint" style="margin-top:0">Desconto de ${brl(c.desconto)} já dividido entre os itens — a soma dos lançamentos fecha em ${brl(c.total)}.</p>`:''}
   <div id="itensCompra"></div>
   <label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0;margin-top:10px">
     <input type="checkbox" id="ic_pago" checked style="width:20px;height:20px;flex:none">
@@ -2286,10 +2346,11 @@ function abrirConfirmarCompra(c){
 function pintaItensCompra(){
   const etapasCon=CATS_AZ.filter(x=>x.g==='con');
   document.getElementById('itensCompra').innerHTML=panel._itC.map((it,i)=>{
-    const n=it.cats.length, valorItem=(+it.q||0)*(+it.u||0);
+    const n=it.cats.length, bruto=(+it.q||0)*(+it.u||0), corte=+it.descItem||0;
+    const valorItem=+(bruto-corte).toFixed(2);
     return `<div class="grp" style="background:var(--surface-2);margin-bottom:8px">
      <h4>${it.d||'—'}${it.familia?` <span class="tag">${it.familia}</span>`:''}</h4>
-     <div class="qt">${(+it.q||0).toLocaleString('pt-BR')} × ${brl(it.u)} = <b class="mono">${brl(valorItem)}</b>${it.c?' · cód. '+it.c:''}</div>
+     <div class="qt">${(+it.q||0).toLocaleString('pt-BR')} × ${brl(it.u)}${corte>0?` = ${brl(bruto)} <span style="color:var(--green)">− ${brl(corte)} de desconto</span>`:''} = <b class="mono">${brl(valorItem)}</b>${it.c?' · cód. '+it.c:''}</div>
      <label style="margin-top:8px">Etapas desta compra</label>
      <div style="display:flex;flex-wrap:wrap;gap:2px 0;margin:4px 0 2px">
        ${etapasCon.map(x=>`<label style="display:inline-flex;align-items:center;gap:5px;margin:3px 10px 3px 0;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0">
@@ -2328,7 +2389,10 @@ function confirmarCompra(){
 
   const idsGerados=[];
   panel._itC.forEach(it=>{
-    const total=(+it.q||0)*(+it.u||0), n=it.cats.length;
+    const bruto=(+it.q||0)*(+it.u||0);
+    const total=+(bruto-(+it.descItem||0)).toFixed(2);
+    const unit=(+it.q||0)>0?total/(+it.q):total;
+    const n=it.cats.length;
     let rateio=[];
     if(n>1){
       const cada=Math.floor((total/n)*100)/100;
@@ -2336,7 +2400,7 @@ function confirmarCompra(){
     }
     const novoId=uid(); idsGerados.push(novoId);
     DB.lanc.push({id:novoId,at:Date.now(),data:hoje(),desc:it.d||c.item,familia:(it.familia||'').trim(),cat:it.cats[0],
-      forn:it.f||c.forn,qtd:+it.q||1,unit:+it.u||0,total,rateio,
+      forn:it.f||c.forn,qtd:+it.q||1,unit,total,rateio,
       pag:pago?'Pago':'A pagar',nf:'',anexos:c.anexos||[],obs:c.obs||'',
       ctrl:false,qtdRec:0,baixas:[]});
   });
@@ -3121,7 +3185,7 @@ function verManual(){
   <div class="card" style="box-shadow:none;margin-top:10px">
     <p><b>Painel</b> — total investido (dividido em administrativas e construção), fase atual da obra com pendências (toque em "Gerenciar" para criar, mover de etapa ou ver as já concluídas), contas a pagar, saldo de material a receber e gasto por categoria. O ícone de olho no topo esconde ou mostra os valores em tela.</p>
     <p><b>Gastos</b> — todos os lançamentos. Dá para duplicar, repetir todo mês, ratear entre várias etapas de uma vez, controlar entregas parciais e anexar foto ou link do documento.</p>
-    <p><b>Cotações</b> — orçamentos para comparar fornecedores antes de comprar (não entra na conta ainda). Quando há mais de uma proposta para a mesma coisa, o app compara pelo preço unitário de cada item, recalculando todas para a mesma quantidade — assim um orçamento com quantidade menor não parece mais barato só por isso. Em "Comparar item a item" dá para ver quem tem o melhor preço de cada produto. Quando fechar, use "Virou compra" para virar gasto de verdade. Dá para importar um PDF de orçamento e o app já tenta preencher os itens sozinho, pra você só conferir.</p>
+    <p><b>Cotações</b> — orçamentos para comparar fornecedores antes de comprar (não entra na conta ainda). Quando há mais de uma proposta para a mesma coisa, o app compara pelo preço unitário de cada item, recalculando todas para a mesma quantidade — assim um orçamento com quantidade menor não parece mais barato só por isso. Em "Comparar item a item" dá para ver quem tem o melhor preço de cada produto. Se negociar um desconto no fechamento, lance no campo "Desconto negociado" (ou use "Arredondar total") — ele é dividido entre os itens conforme o valor de cada um. Quando fechar, use "Virou compra" para virar gasto de verdade. Dá para importar um PDF de orçamento e o app já tenta preencher os itens sozinho, pra você só conferir.</p>
     <p><b>Itens</b> — resumo por material e por tipo de produto comprado, com filtro por etapa e por tipo.</p>
     <p><b>Equipe</b> — cadastro de pedreiro, servente e ajudantes com o valor da diária. "Lançar semana" marca os dias trabalhados e cria automaticamente o gasto na etapa Mão de obra, entrando nas contas a pagar como qualquer outro.</p>
     <p><b>Fotos</b> — álbum com data e hora. "Tirar foto" abre a câmera, "Da galeria" deixa escolher uma já existente. "Ver em sequência" mostra o álbum como uma linha do tempo, com setas ou arrastando o dedo.</p>
