@@ -6,11 +6,11 @@
 <meta name="theme-color" content="#0A1F2E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="application-name" content="Obra C08">
-<meta name="apple-mobile-web-app-title" content="Obra C08">
+<meta name="application-name" content="Gestão Obras C08">
+<meta name="apple-mobile-web-app-title" content="Gestão Obras C08">
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Obra Bananeiras C08</title>
+<title>Gestão Obras C08</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMEExRjJFIi8+CjxwYXRoIGQ9Ik0xNCAzMCBMMzIgMTYgTDUwIDMwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxNkEzOTQiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0yMCAyNyBWNDggSDQ0IFYyNyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTZBMzk0IiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8bGluZSB4MT0iMzIiIHkxPSIzNiIgeDI9IjMyIiB5Mj0iNDgiIHN0cm9rZT0iIzE2QTM5NCIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+Cg==">
 <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
 <style>
@@ -593,6 +593,7 @@ function mesclarSeguro(vindo){
   const novasCx=(vindo.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
   DB.catExtra=(DB.catExtra||[]).concat(novasCx); n+=novasCx.length;
   rebuildCategorias();
+  normalizarCategorias();
   aplicarExclusoes();
   if(vindo.cfg&&(+vindo.cfg.at||0)>(+((DB.cfg||{}).at)||0)) DB.cfg=vindo.cfg;
   else if(!DB.cfg||!DB.cfg.inicio) DB.cfg=vindo.cfg||DB.cfg;
@@ -755,6 +756,7 @@ function carregar(){
   DB.exc=DB.exc||[];
   DB.equipe=DB.equipe||[];
   rebuildCategorias();
+  normalizarCategorias();
   (DB.passos||[]).forEach(p=>{ if(!p.cat) p.cat='c00'; });
   (DB.lanc||[]).forEach(l=>{
     if(!l.anexos) l.anexos = l.link?[{id:uid(),tipo:'link',nome:'Link do Drive',dado:l.link}]:[];
@@ -1065,7 +1067,12 @@ function verCategoria(catId){
 }
 function renderGastos(){
   const sel=document.getElementById('fCat');
-  if(sel.options.length<2) CATS_AZ.forEach(c=>sel.add(new Option(c.n,c.id)));
+  if(sel.options.length!==CATS_AZ.length+1){
+    const antes=sel.value;
+    sel.innerHTML='<option value="">Todas as categorias</option>'
+      +CATS_AZ.map(c=>`<option value="${c.id}">${c.n}</option>`).join('');
+    if(CATS_AZ.some(c=>c.id===antes))sel.value=antes;
+  }
   const iniEl=document.getElementById('fDataIni'), fimEl=document.getElementById('fDataFim'), semEl=document.getElementById('fSemPeriodo');
   if(!iniEl.value&&!fimEl.value&&!iniEl.dataset.tocado){
     iniEl.value=hoje().slice(0,8)+'01'; fimEl.value=hoje();
@@ -1133,6 +1140,10 @@ function renderCot(){
   const grupos=Object.values(G).sort((a,b)=>alfa(a.nome,b.nome));
   const prev=grupos.reduce((s,g)=>{
     const com=g.props.filter(p=>+p.total>0).sort((a,b)=>a.total-b.total);
+    if(g.props.length>1){
+      const A=analisarGrupo(g.props);
+      if(A.completas.length) return s+A.completas[0].custoNorm;
+    }
     return s+(com.length?+com[0].total:0)},0);
   const semPreco=C.filter(p=>!(+p.total>0)).length;
   document.getElementById('cotPrev').innerHTML=
@@ -1155,17 +1166,24 @@ function renderCot(){
         <div class="val mono">${+c.total>0?brl(c.total):'<span class="tag">a cotar</span>'}</div></div>`;
     }
 
-    const eco=com.length>1?pior.total-venc.total:0;
+    const A=analisarGrupo(g.props);
+    const usarNorm=A.temItens&&A.completas.length>1;
+    const ord=usarNorm
+      ? A.validas.slice().sort((a,b)=>a.custoNorm-b.custoNorm).map(a=>({p:a.p,v:a.custoNorm,a}))
+      : com.map(p=>({p,v:+p.total,a:null}));
+    const venc2=ord[0], pior2=ord[ord.length-1];
+    const eco=ord.length>1?pior2.v-venc2.v:0;
     return `<div class="grp">
       <h4>${g.nome}</h4>
-      <div class="qt">${g.props.length} propostas${com.length?' · melhor preço em destaque':''}</div>
-      ${com.map((p,i)=>`<div class="prop ${i===0?'win':''}" onclick="verCot('${p.id}')">
-        <span class="nm">${p.forn||'sem fornecedor'}${i===0?'<span class="win-tag">menor</span>':''}</span>
-        <span class="vl mono">${brl(p.total)}</span></div>`).join('')}
+      <div class="qt">${g.props.length} propostas${usarNorm?' · comparadas pelo preço unitário':(com.length?' · melhor preço em destaque':'')}</div>
+      ${ord.map((x,i)=>`<div class="prop ${i===0&&(!x.a||x.a.completa)?'win':''}" onclick="verCot('${x.p.id}')">
+        <span class="nm">${x.p.forn||'sem fornecedor'}${i===0&&(!x.a||x.a.completa)?'<span class="win-tag">menor</span>':''}${x.a&&!x.a.completa?'<span class="tag" style="margin-left:6px">faltam '+x.a.faltam+'</span>':''}</span>
+        <span class="vl mono">${brl(x.v)}${usarNorm&&Math.abs(x.v-(+x.p.total))>0.01?`<small style="display:block;font-weight:400;color:var(--ink-2);font-size:11px">orçou ${brl(x.p.total)}</small>`:''}</span></div>`).join('')}
       ${sem.map(p=>`<div class="prop" onclick="verCot('${p.id}')">
         <span class="nm">${p.forn||'sem fornecedor'}</span>
         <span class="vl"><span class="tag">a cotar</span></span></div>`).join('')}
-      ${eco>0?`<p class="hint" style="margin-top:8px">Escolhendo ${venc.forn||'a menor'}, você economiza ${brl(eco)} em relação à mais cara — ${(eco/pior.total*100).toFixed(0)}%.</p>`:''}
+      ${eco>0?`<p class="hint" style="margin-top:8px">Escolhendo ${venc2.p.forn||'a menor'}, você economiza ${brl(eco)} em relação à mais cara — ${(eco/pior2.v*100).toFixed(0)}%.${usarNorm&&A.algumaQtdDiverge?' As propostas pediram quantidades diferentes, então os valores acima foram recalculados para a mesma quantidade.':''}</p>`:''}
+      ${A.temItens&&g.props.length>1?`<button class="btn ghost mini" style="margin-top:8px" onclick="event.stopPropagation();verComparativo(${JSON.stringify(g.nome).replace(/"/g,'&quot;')})">Comparar item a item</button>`:''}
     </div>`;
   }).join('')||'<div class="empty"><b>Sem cotações abertas</b><p>Registre um orçamento antes de comprar.</p></div>';
 
@@ -1175,6 +1193,147 @@ function renderCot(){
     ?`<button class="btn ${temOrfa?'danger':'ghost'} mini" style="width:100%" onclick="verFechadas()">${temOrfa?'⚠ ':''}Ver fechadas e arquivadas (${fechadas.length})</button>`
     :'';
 }
+/* ---------- comparação de propostas por preço unitário ---------- */
+function chaveItem(d){
+  return String(d||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ')
+    .replace(/(\d)(kg|mm|cm|mt|ml|lt|un|pc|cx|sc)\b/g,'$1 $2')
+    .trim();
+}
+const STOP_IT=new Set(['de','da','do','das','dos','com','sem','para','e','a','o','em','no','na',
+  'un','und','unid','uni','pc','pcs','cx','pct','mt','m','kg','g','lt','l','sc','par','jg','rl','fd']);
+function tokensItem(d){
+  return chaveItem(d).split(' ').filter(t=>t&&!STOP_IT.has(t))
+    .map(t=>(t.length>3&&t.endsWith('s'))?t.slice(0,-1):t);
+}
+/* mesmo item escrito de jeitos diferentes ("Tijolos Blocos 14x19x39" x "Tijolo bloco 14x19x39").
+   Palavras com número (bitola, medida) pesam o dobro, por serem as que realmente identificam o produto. */
+function simItens(a,b){
+  const A=new Set(a), B=new Set(b), peso=t=>/\d/.test(t)?2:1;
+  let inter=0, pa=0, pb=0;
+  A.forEach(t=>{pa+=peso(t); if(B.has(t))inter+=peso(t)});
+  B.forEach(t=>{pb+=peso(t)});
+  const uniao=pa+pb-inter;
+  return uniao>0?inter/uniao:0;
+}
+/* Só trata como o mesmo produto se a palavra principal de um aparecer no outro
+   (evita fundir "canaleta 14x19x39" com "tijolo 14x19x39", que só diferem no nome). */
+function mesmoItem(a,b){
+  const s=simItens(a,b);
+  if(s>=0.85)return s;
+  const cabecaBate=(a.length&&b.includes(a[0]))||(b.length&&a.includes(b[0]));
+  return (cabecaBate&&s>=0.6)?s:0;
+}
+/* Compara propostas do mesmo grupo item a item, usando uma quantidade de referência
+   para cada item — assim um orçamento com quantidade menor não "ganha" por acaso. */
+function analisarGrupo(props){
+  const linhas=[];
+  props.forEach(p=>{
+    (p.itens||[]).forEach(it=>{
+      const u=+it.u||0;
+      if(u<0)return;                       /* desconto/frete entram como ajuste, não como item */
+      const toks=tokensItem(it.d); if(!toks.length)return;
+      let alvo=null, melhor=0;
+      linhas.forEach(x=>{const s=mesmoItem(toks,x.toks); if(s>melhor){melhor=s;alvo=x}});
+      if(!alvo){ alvo={nome:(it.d||'').trim(),toks,qtds:[],ofertas:{}}; linhas.push(alvo); }
+      const q=+it.q||0;
+      if(q>0)alvo.qtds.push(q);
+      const ant=alvo.ofertas[p.id];
+      alvo.ofertas[p.id]= ant ? {q:ant.q+q, u:Math.min(ant.u,u)} : {q,u};
+    });
+  });
+  linhas.forEach(m=>{
+    const qs=m.qtds.filter(x=>x>0);
+    m.qtdRef=qs.length?Math.max(...qs):1;
+    m.divergeQtd=new Set(qs).size>1;
+    const us=Object.values(m.ofertas).map(o=>o.u).filter(u=>u>0);
+    m.melhorUnit=us.length?Math.min(...us):0;
+  });
+  const analise=props.map(p=>{
+    const ajuste=(p.itens||[]).filter(it=>(+it.u||0)<0)
+      .reduce((s,it)=>s+((+it.q||1)*(+it.u||0)),0);
+    let custo=0, tem=0, vence=0;
+    linhas.forEach(m=>{
+      const o=m.ofertas[p.id]; if(!o)return;
+      custo+=m.qtdRef*o.u; tem++;
+      if(o.u>0&&Math.abs(o.u-m.melhorUnit)<0.005)vence++;
+    });
+    return {p,custoNorm:custo+ajuste,ajuste,tem,vence,
+      completa:linhas.length>0&&tem===linhas.length, faltam:linhas.length-tem};
+  });
+  const validas=analise.filter(a=>a.tem>0);
+  const completas=validas.filter(a=>a.completa).sort((a,b)=>a.custoNorm-b.custoNorm);
+  const cestaMista=linhas.reduce((s,m)=>s+m.qtdRef*m.melhorUnit,0);
+  return {linhas,analise,validas,completas,cestaMista,
+    algumaQtdDiverge:linhas.some(m=>m.divergeQtd),
+    temItens:linhas.length>0,
+    venc:completas[0]||null, pior:completas[completas.length-1]||null};
+}
+function verComparativo(nomeGrupo){
+  const props=DB.cot.filter(c=>c.status==='aberta'
+    && String(c.item||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+       === String(nomeGrupo||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+  if(props.length<2){toast('Precisa de pelo menos duas propostas.');return}
+  const A=analisarGrupo(props);
+  if(!A.temItens){toast('As propostas não têm itens detalhados para comparar.');return}
+  const nomeF=p=>p.forn||'sem fornecedor';
+
+  const linhas=A.linhas.map(m=>{
+    const ofertas=props.map(p=>({p,o:m.ofertas[p.id]})).filter(x=>x.o&&x.o.u>0)
+      .sort((a,b)=>a.o.u-b.o.u);
+    if(!ofertas.length)return '';
+    const melhor=ofertas[0];
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+      <b style="font-size:14px">${m.nome}</b>
+      <div style="font-size:11.5px;color:var(--ink-2);margin-bottom:6px">
+        comparando ${m.qtdRef.toLocaleString('pt-BR')} un.${m.divergeQtd?' · <span style="color:var(--amber)">as propostas pediram quantidades diferentes</span>':''}</div>
+      ${ofertas.map((x,i)=>{
+        const dif=i===0?0:(x.o.u-melhor.o.u)/melhor.o.u*100;
+        return `<div class="stat" style="padding:5px 0;border:0">
+          <span style="font-size:13px">${i===0?'🏆 ':''}${nomeF(x.p)}
+            ${x.o.q!==m.qtdRef?`<small style="color:var(--ink-2)">(cotou ${x.o.q.toLocaleString('pt-BR')})</small>`:''}</span>
+          <span style="text-align:right">
+            <b class="mono" style="font-size:13.5px">${brl(x.o.u)}<small style="font-weight:400;color:var(--ink-2)">/un</small></b>
+            <div class="mono" style="font-size:11.5px;color:var(--ink-2)">${brl(m.qtdRef*x.o.u)}${i>0?` · +${dif.toFixed(1)}%`:''}</div>
+          </span></div>`}).join('')}
+      ${props.filter(p=>!m.ofertas[p.id]).map(p=>
+        `<div class="stat" style="padding:5px 0;border:0;opacity:.55"><span style="font-size:13px">${nomeF(p)}</span>
+         <span class="tag">não cotou</span></div>`).join('')}
+    </div>`;
+  }).join('');
+
+  const ranking=A.validas.slice().sort((a,b)=>a.custoNorm-b.custoNorm);
+  const melhorCompleta=A.venc;
+  const economiaMista=melhorCompleta?melhorCompleta.custoNorm-A.cestaMista:0;
+
+  abrir(`<h2>Comparativo item a item</h2>
+  <p class="sub">${nomeGrupo} · ${props.length} propostas · ${A.linhas.length} item(ns)</p>
+
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <h3>Custo para a mesma quantidade</h3>
+    ${ranking.map((a,i)=>`<div class="stat" onclick="verCot('${a.p.id}')" style="cursor:pointer">
+      <span>${i===0&&a.completa?'🏆 ':''}${nomeF(a.p)}
+        ${!a.completa?`<small style="color:var(--amber)">faltam ${a.faltam} item(ns)</small>`:''}
+        ${a.ajuste<0?`<small style="color:var(--ink-2)">inclui desconto</small>`:''}
+      </span>
+      <b class="mono">${brl(a.custoNorm)}</b></div>`).join('')}
+    <p class="hint">Cada proposta foi recalculada com a mesma quantidade de cada item, pelo preço unitário dela. É isso que torna a comparação justa quando os orçamentos pedem quantidades diferentes.</p>
+  </div>
+
+  ${A.completas.length>1?`<p class="hint" style="margin-top:0">Fechando com ${nomeF(A.venc.p)} você paga ${brl(A.pior.custoNorm-A.venc.custoNorm)} a menos que na proposta mais cara.</p>`:''}
+  ${economiaMista>0.01?`<div class="card" style="box-shadow:none;background:rgba(63,158,104,.08);border-color:rgba(63,158,104,.35)">
+    <h3 style="color:var(--green)">Comprando cada item no mais barato</h3>
+    <div class="stat" style="border:0;padding-top:0"><span>Cesta mista</span><b class="mono">${brl(A.cestaMista)}</b></div>
+    <p class="hint" style="margin-top:0">Economiza mais ${brl(economiaMista)} em relação ao melhor fornecedor único — só compensa se valer a pena dividir a compra (frete, viagem, prazo).</p>
+  </div>`:''}
+
+  <div class="card" style="box-shadow:none">
+    <h3>Preço unitário por item</h3>
+    ${linhas}
+  </div>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+
 function verFechadas(){
   const fechadas=DB.cot.filter(c=>c.status!=='aberta').sort((a,b)=>(+b.at||0)-(+a.at||0));
   const orfaC=c=>c.status==='fechada'&&!(c.lancIds&&c.lancIds.some(id=>DB.lanc.some(l=>l.id===id)));
@@ -1222,7 +1381,13 @@ function toggleAcc(chave){
 }
 function renderItens(){
   const selE=document.getElementById('fEtapaItens');
-  if(selE.options.length<2) CATS_AZ.filter(c=>c.g==='con').forEach(c=>selE.add(new Option(c.n,c.id)));
+  const etapasCon=CATS_AZ.filter(c=>c.g==='con');
+  if(selE.options.length!==etapasCon.length+1){
+    const antes=selE.value;
+    selE.innerHTML='<option value="">Todas as etapas</option>'
+      +etapasCon.map(c=>`<option value="${c.id}">${c.n}</option>`).join('');
+    if(etapasCon.some(c=>c.id===antes))selE.value=antes;
+  }
   const fe=selE.value, busca=alfa2(document.getElementById('fBuscaItens').value);
 
   const selT=document.getElementById('fTipoItens');
@@ -2358,7 +2523,7 @@ function importar(modo){
   if(modo==='trocar'){
     ACAO_PENDENTE=()=>{
       DB=d; DB.fotos=DB.fotos||[]; DB.cfg=DB.cfg||{inicio:'',meses:8,area:0}; DB.catExtra=DB.catExtra||[]; DB.exc=DB.exc||[];
-      rebuildCategorias(); salvar();fechar();render();toast('Base substituída');
+      rebuildCategorias(); normalizarCategorias(); salvar();fechar();render();toast('Base substituída');
     };
     abrir(`<h2>Substituir tudo?</h2>
     <p class="sub">Os dados deste aparelho serão apagados e trocados pelos do arquivo. Não é possível desfazer.</p>
@@ -2380,7 +2545,7 @@ function importar(modo){
     const novasCx=(d.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
     DB.lanc=DB.lanc.concat(novosL); DB.cot=DB.cot.concat(novosC);
     DB.fotos=DB.fotos.concat(novasF); DB.passos=DB.passos.concat(novosP);
-    DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias();
+    DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias(); normalizarCategorias();
     aplicarExclusoes();
     salvar();fechar();render();
     toast((novosL.length+novosC.length+novasF.length+novosP.length+novasCx.length)+' item(ns) novo(s) importado(s)');
@@ -2394,7 +2559,7 @@ function importar(modo){
   aplicarExclusoes();
   const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
   const novasCx=(d.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
-  DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias();
+  DB.catExtra=(DB.catExtra||[]).concat(novasCx); rebuildCategorias(); normalizarCategorias();
   if(d.cfg&&(+d.cfg.at||0)>(+((DB.cfg||{}).at)||0)) DB.cfg=d.cfg;
   salvar();fechar();render();toast('Bases juntadas');
 }
@@ -2751,23 +2916,128 @@ function restaurarSnap(diaSnap){
     },true);
 }
 
+/* Conserta dados em que o NOME da categoria foi gravado no lugar do id
+   (vinha de importações e de cotações convertidas em compra) — registra como categoria de verdade. */
+function normalizarCategorias(){
+  let mudou=false;
+  const arruma=(obj,campo,grupo)=>{
+    const v=obj[campo];
+    if(!v)return;
+    if(CATS_AZ.some(c=>c.id===v))return;
+    const novo=garantirCategoria(v,grupo||'con');
+    if(novo!==v){ obj[campo]=novo; mudou=true; }
+  };
+  (DB.lanc||[]).forEach(l=>{
+    arruma(l,'cat');
+    (l.rateio||[]).forEach(r=>arruma(r,'cat'));
+  });
+  (DB.fotos||[]).forEach(f=>arruma(f,'cat'));
+  (DB.passos||[]).forEach(p=>arruma(p,'cat'));
+  if(mudou)salvar();
+}
+function usoCategoria(id){
+  let n=0;
+  (DB.lanc||[]).forEach(l=>{
+    if((l.rateio&&l.rateio.length)?l.rateio.some(r=>r.cat===id):l.cat===id)n++;
+  });
+  return n;
+}
 function verCategorias(){
-  const custom=(DB.catExtra||[]).slice().sort((a,b)=>alfa(a.n,b.n));
-  abrir(`<h2>Categorias personalizadas</h2>
-  <p class="sub">Criadas automaticamente ao digitar um nome novo em vez de escolher da lista.</p>
-  <div class="card" style="box-shadow:none;margin-top:10px">
-    ${custom.length?custom.map(c=>`<div class="stat"><span>${c.n} <span class="tag ${c.g}">${c.g==='adm'?'adm':'obra'}</span></span>
-      <button class="iconbtn" style="background:var(--surface-2);color:var(--red);width:28px;height:28px" onclick="excluirCategoria('${c.id}')">×</button></div>`).join('')
-      :'<div class="empty">Nenhuma criada ainda</div>'}
+  const ehCustom=id=>(DB.catExtra||[]).some(c=>c.id===id);
+  const linha=c=>{
+    const uso=usoCategoria(c.id), cst=ehCustom(c.id);
+    return `<div class="stat" style="align-items:center">
+      <span style="flex:1;min-width:0">${c.n}
+        <div style="font-size:11.5px;color:var(--ink-2)">${uso?uso+' lançamento'+(uso>1?'s':''):'sem uso'}${cst?'':' · padrão do sistema'}</div>
+      </span>
+      ${cst?`<button class="iconbtn" style="background:var(--surface-2);width:30px;height:30px;font-size:13px" onclick="editarCategoria('${c.id}')" title="Renomear">✎</button>
+        <button class="iconbtn" style="background:var(--surface-2);color:var(--red);width:30px;height:30px;margin-left:6px" onclick="excluirCategoria('${c.id}')" title="Excluir">×</button>`
+        :`<span class="tag">fixa</span>`}
+    </div>`;
+  };
+  const con=CATS_AZ.filter(c=>c.g==='con'), adm=CATS_AZ.filter(c=>c.g==='adm');
+  abrir(`<h2>Categorias</h2>
+  <p class="sub">Etapas da obra e categorias administrativas usadas em gastos, cotações, fotos e pendências.</p>
+  <button class="btn" style="margin-top:10px" onclick="editarCategoria()">+ Nova categoria</button>
+  <div class="card" style="box-shadow:none;margin-top:12px">
+    <h3>Construção (${con.length})</h3>
+    ${con.map(linha).join('')||'<div class="empty">Nenhuma</div>'}
   </div>
-  <p class="hint">Excluir aqui não apaga lançamentos já feitos nela — eles continuam existindo, só some da lista para escolher em novos.</p>
+  <div class="card" style="box-shadow:none">
+    <h3>Administrativas (${adm.length})</h3>
+    ${adm.map(linha).join('')||'<div class="empty">Nenhuma</div>'}
+  </div>
+  <p class="hint">As categorias padrão não podem ser apagadas. Renomear uma categoria criada por você atualiza automaticamente todos os lançamentos dela.</p>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
+function editarCategoria(id){
+  const c=(DB.catExtra||[]).find(x=>x.id===id)||{id:'',n:'',g:'con'};
+  abrir(`<h2>${id?'Editar categoria':'Nova categoria'}</h2>
+  ${id?`<p class="sub">Usada em ${usoCategoria(id)} lançamento(s).</p>`:''}
+  <label>Nome</label><input id="ct_n" value="${c.n.replace(/"/g,'&quot;')}" placeholder="Ex: 08 Paisagismo">
+  <label>Tipo</label>
+  <select id="ct_g">
+    <option value="con" ${c.g!=='adm'?'selected':''}>Construção (entra no custo da obra)</option>
+    <option value="adm" ${c.g==='adm'?'selected':''}>Administrativa (terreno, cartório, taxas)</option>
+  </select>
+  <p class="hint">Comece o nome com número (01, 02...) para as etapas ficarem na ordem certa da obra.</p>
+  <button class="btn" onclick="salvarCategoria('${c.id}')">Salvar</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verCategorias()">Voltar</button>`);
+}
+function salvarCategoria(id){
+  const n=val('ct_n').trim(), g=val('ct_g');
+  if(!n){toast('Informe o nome.');return}
+  const igual=CATS_AZ.find(c=>alfa2(c.n)===alfa2(n)&&c.id!==id);
+  if(igual){toast('Já existe uma categoria com esse nome.');return}
+  DB.catExtra=DB.catExtra||[];
+  if(id){
+    const c=DB.catExtra.find(x=>x.id===id); if(!c)return;
+    c.n=n; c.g=g; c.at=Date.now();
+  }else{
+    DB.catExtra.push({id:'cx-'+alfa2(n).replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)+'-'+uid().slice(0,4),
+      n,g,at:Date.now()});
+  }
+  rebuildCategorias(); salvar(); render(); verCategorias();
+  toast(id?'Categoria atualizada':'Categoria criada');
+}
 function excluirCategoria(id){
-  confirmar('Excluir categoria','Lançamentos já feitos nela continuam existindo normalmente.','Excluir',()=>{
-    DB.catExtra=(DB.catExtra||[]).filter(c=>c.id!==id);
-    rebuildCategorias(); salvar(); fechar(); render(); toast('Categoria removida da lista');
+  const c=(DB.catExtra||[]).find(x=>x.id===id); if(!c)return;
+  const uso=usoCategoria(id);
+  if(uso>0){
+    const destinos=CATS_AZ.filter(x=>x.id!==id&&x.g===c.g);
+    abrir(`<h2>Excluir "${c.n}"</h2>
+    <p class="sub">Essa categoria está em ${uso} lançamento(s). Escolha para onde eles vão.</p>
+    <label>Mover os lançamentos para</label>
+    <select id="ct_dest">${destinos.map(x=>`<option value="${x.id}">${x.n}</option>`).join('')}</select>
+    <div style="height:14px"></div>
+    <button class="btn danger" onclick="confirmarExclusaoCategoria('${id}')">Mover e excluir</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="verCategorias()">Cancelar</button>`);
+    return;
+  }
+  confirmar('Excluir categoria',`"${c.n}" não está em uso.`,'Excluir',()=>{
+    DB.catExtra=(DB.catExtra||[]).filter(x=>x.id!==id);
+    rebuildCategorias(); salvar(); render(); verCategorias(); toast('Categoria excluída');
   },true);
+}
+function confirmarExclusaoCategoria(id){
+  const dest=val('ct_dest'); if(!dest){toast('Escolha a categoria de destino.');return}
+  (DB.lanc||[]).forEach(l=>{
+    let mudou=false;
+    if(l.cat===id){l.cat=dest;mudou=true}
+    (l.rateio||[]).forEach(r=>{if(r.cat===id){r.cat=dest;mudou=true}});
+    if(l.rateio&&l.rateio.length){
+      const junta={};
+      l.rateio.forEach(r=>{junta[r.cat]=(junta[r.cat]||0)+(+r.valor||0)});
+      const novo=Object.keys(junta).map(k=>({cat:k,valor:+junta[k].toFixed(2)}));
+      if(novo.length!==l.rateio.length){l.rateio=novo;mudou=true}
+      if(l.rateio.length===1){l.cat=l.rateio[0].cat;l.rateio=[];mudou=true}
+    }
+    if(mudou)l.at=Date.now();
+  });
+  (DB.fotos||[]).forEach(f=>{if(f.cat===id)f.cat=dest});
+  (DB.passos||[]).forEach(p=>{if(p.cat===id){p.cat=dest;p.at=Date.now()}});
+  DB.catExtra=(DB.catExtra||[]).filter(x=>x.id!==id);
+  rebuildCategorias(); salvar(); render(); verCategorias(); toast('Categoria excluída e lançamentos movidos');
 }
 function renderIO(){
   document.getElementById('ioBody').innerHTML=`<h2>Importações e exportações</h2>
@@ -2791,7 +3061,7 @@ function renderIO(){
   <button class="btn ghost mini" onclick="verRestauracao()">Pontos de restauração</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="abrirCfg()">Prazo e área construída</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="abrirDuplicados()">Verificar duplicados</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="verCategorias()">Categorias personalizadas</button>`;
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verCategorias()">Categorias e etapas</button>`;
 }
 
 /* ---------- avatar / conta / manual ---------- */
@@ -2851,12 +3121,12 @@ function verManual(){
   <div class="card" style="box-shadow:none;margin-top:10px">
     <p><b>Painel</b> — total investido (dividido em administrativas e construção), fase atual da obra com pendências (toque em "Gerenciar" para criar, mover de etapa ou ver as já concluídas), contas a pagar, saldo de material a receber e gasto por categoria. O ícone de olho no topo esconde ou mostra os valores em tela.</p>
     <p><b>Gastos</b> — todos os lançamentos. Dá para duplicar, repetir todo mês, ratear entre várias etapas de uma vez, controlar entregas parciais e anexar foto ou link do documento.</p>
-    <p><b>Cotações</b> — orçamentos para comparar fornecedores antes de comprar (não entra na conta ainda). Quando fechar, use "Virou compra" para virar gasto de verdade. Dá para importar um PDF de orçamento e o app já tenta preencher os itens sozinho, pra você só conferir.</p>
+    <p><b>Cotações</b> — orçamentos para comparar fornecedores antes de comprar (não entra na conta ainda). Quando há mais de uma proposta para a mesma coisa, o app compara pelo preço unitário de cada item, recalculando todas para a mesma quantidade — assim um orçamento com quantidade menor não parece mais barato só por isso. Em "Comparar item a item" dá para ver quem tem o melhor preço de cada produto. Quando fechar, use "Virou compra" para virar gasto de verdade. Dá para importar um PDF de orçamento e o app já tenta preencher os itens sozinho, pra você só conferir.</p>
     <p><b>Itens</b> — resumo por material e por tipo de produto comprado, com filtro por etapa e por tipo.</p>
     <p><b>Equipe</b> — cadastro de pedreiro, servente e ajudantes com o valor da diária. "Lançar semana" marca os dias trabalhados e cria automaticamente o gasto na etapa Mão de obra, entrando nas contas a pagar como qualquer outro.</p>
     <p><b>Fotos</b> — álbum com data e hora. "Tirar foto" abre a câmera, "Da galeria" deixa escolher uma já existente. "Ver em sequência" mostra o álbum como uma linha do tempo, com setas ou arrastando o dedo.</p>
     <p><b>Indicadores</b> — prazo da obra, ritmo de gasto, gráfico mensal, rankings e qualidade do registro.</p>
-    <p><b>Importações</b> — backup, planilha em CSV, importar/juntar dados de outro aparelho ou arquivo, prazo e área construída, verificar duplicados e categorias personalizadas.</p>
+    <p><b>Importações</b> — backup, planilha em CSV, importar/juntar dados de outro aparelho ou arquivo, prazo e área construída, verificar duplicados e o cadastro de categorias e etapas (criar, renomear e excluir).</p>
     <p><b>Conta (canto superior direito)</b> — trocar sua foto de perfil, reler este manual e sair do app.</p>
   </div>
   <p class="hint">Os dados ficam salvos neste aparelho e sincronizam automaticamente com a nuvem quando você está logado — inclusive as exclusões, então apagar em um aparelho remove no outro também. O app guarda uma cópia de si mesmo, então abre no canteiro mesmo sem sinal, e faz um ponto de restauração por dia (em Importações) caso algo dê errado.</p>

@@ -1,6 +1,6 @@
 {
-  "name": "Obra Bananeiras C08",
-  "short_name": "Obra C08",
+  "name": "Gestão Obras C08",
+  "short_name": "Gestão Obras",
   "description": "Controle de gastos, cotações e fotos da obra em Bananeiras-PB",
   "lang": "pt-BR",
   "dir": "ltr",
@@ -8,11 +8,17 @@
   "scope": "./",
   "id": "./",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "portrait-primary",
   "background_color": "#0A1F2E",
   "theme_color": "#0A1F2E",
-  "categories": ["productivity", "finance"],
+  "categories": [
+    "productivity",
+    "finance"
+  ],
   "icons": [
     {
       "src": "icon-192.png",
