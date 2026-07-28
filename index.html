@@ -269,7 +269,7 @@ a{color:var(--teal)}
     </div>
     <p style="text-align:center;color:#8FB8C4;font-size:11.5px;margin-top:14px">Os dados sincronizam entre seus aparelhos automaticamente.</p>
     <p id="ag_teste" style="text-align:center;margin-top:10px;display:none">
-      <a href="#" onclick="modoTeste();return false" style="color:#8FB8C4;font-size:11.5px;text-decoration:underline">Modo teste (sem login, só localmente)</a>
+      <a href="#" onclick="modoTeste();return false" style="color:#8FB8C4;font-size:11.5px;text-decoration:underline">Entrar sem a nuvem (dados deste aparelho)</a>
     </p>
   </div>
 </div>
@@ -304,6 +304,10 @@ a{color:var(--teal)}
 
 <!-- ============ PAINEL ============ -->
 <section class="view on" id="v-painel">
+  <div class="card avisos" id="cardNuvem" style="display:none;border-left-color:var(--red)">
+    <h3 style="color:var(--red)">Sem sincronização</h3>
+    <div id="nuvemMsg"></div>
+  </div>
   <div class="card avisos" id="cardAvisos" style="display:none">
     <h3>Precisa de atenção</h3>
     <div id="avisosList"></div>
@@ -374,10 +378,16 @@ a{color:var(--teal)}
       <input type="date" id="fDataIni">
       <input type="date" id="fDataFim">
     </div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('mes')">Este mês</button>
+      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('ano')">Este ano</button>
+      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('tudo')">Desde o início</button>
+    </div>
     <label class="chkline" style="margin-top:8px;display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="fSemPeriodo" style="width:auto"> Todos os períodos
     </label>
-    <div class="stat" style="margin-top:10px"><span>Total filtrado</span><b class="mono" id="gTotal">R$ 0,00</b></div>
+    <div class="stat" style="margin-top:10px"><span id="gTotalLbl">Total no período</span><b class="mono" id="gTotal">R$ 0,00</b></div>
+    <div class="stat" id="gTotalGeralLinha" style="border-bottom:0"><span>Total geral da obra</span><b class="mono" id="gTotalGeral">R$ 0,00</b></div>
   </div>
   <div class="card" id="gastosCard"><div id="gastosList"></div></div>
 </section>
@@ -526,7 +536,9 @@ let SESSAO=null, SYNC_TIMER=null, SYNC_OK=true;
 async function iniciarAuth(){
   document.getElementById('ag_senha').addEventListener('keydown',e=>{if(e.key==='Enter')fazerLogin()});
   try{ if(window.self!==window.top) document.getElementById('ag_teste').style.display='block'; }catch(e){ document.getElementById('ag_teste').style.display='block'; }
-  const {data}=await supa.auth.getSession();
+  let data=null;
+  try{ ({data}=await supa.auth.getSession()); }
+  catch(e){ document.getElementById('ag_teste').style.display='block'; }
   if(data&&data.session){ await entrarNoApp(data.session); }
   else{ document.getElementById('authGate').style.display='flex'; }
 }
@@ -536,6 +548,7 @@ function modoTeste(){
   carregar();
   gravarSnap();
   render();
+  toast('Modo local: nada será enviado para a nuvem');
 }
 async function fazerLogin(){
   const email=document.getElementById('ag_email').value.trim();
@@ -546,7 +559,13 @@ async function fazerLogin(){
   btn.textContent='Entrando...'; btn.disabled=true;
   const {data,error}=await supa.auth.signInWithPassword({email,password:senha});
   btn.textContent='Entrar'; btn.disabled=false;
-  if(error){ erro.textContent='E-mail ou senha incorretos.'; erro.style.display='block'; return; }
+  if(error){
+    const semRede=/fetch|network|failed|relation|does not exist|schema/i.test(error.message||'');
+    erro.textContent=semRede?'Não consegui falar com a nuvem agora.':'E-mail ou senha incorretos.';
+    erro.style.display='block';
+    document.getElementById('ag_teste').style.display='block';
+    return;
+  }
   await entrarNoApp(data.session);
 }
 async function sair(){
@@ -993,6 +1012,7 @@ function render(){
   renderIO();
   renderNotas();
   renderAvatar();
+  renderNuvem();
   renderAvisos();
   renderEquipe();
   const pagos=DB.lanc.filter(isPago);
@@ -1131,6 +1151,13 @@ function renderGastos(){
   }
   L=L.sort((a,b)=>b.data.localeCompare(a.data));
   document.getElementById('gTotal').textContent=brl(L.reduce((s,l)=>s+ +l.total,0));
+  const fmt=d=>d?d.split('-').reverse().slice(0,2).join('/'):'';
+  document.getElementById('gTotalLbl').textContent=
+    semPeriodo?'Total de todos os períodos':`Total de ${fmt(dIni)||'início'} a ${fmt(dFim)||'hoje'}`;
+  const geral=DB.lanc.reduce((s,l)=>s+ +l.total,0);
+  document.getElementById('gTotalGeral').textContent=brl(geral);
+  document.getElementById('gTotalGeralLinha').style.display=
+    (semPeriodo||L.length===DB.lanc.length)?'none':'flex';
   document.getElementById('gastosList').innerHTML=L.map(l=>{
     const p=dia(l.data), falta=l.ctrl?(+l.qtd - +l.qtdRec):0, ab=!isPago(l), pp=pagoParcial(l);
     return `<div class="item" onclick="verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
@@ -1147,6 +1174,16 @@ document.getElementById('fSit').onchange=renderGastos;
 document.getElementById('fBusca').oninput=renderGastos;
 document.getElementById('fDataIni').onchange=e=>{e.target.dataset.tocado='1';renderGastos()};
 document.getElementById('fDataFim').onchange=e=>{e.target.dataset.tocado='1';renderGastos()};
+function periodoRapido(qual){
+  const ini=document.getElementById('fDataIni'), fim=document.getElementById('fDataFim'),
+        sem=document.getElementById('fSemPeriodo');
+  sem.checked=(qual==='tudo');
+  ini.disabled=fim.disabled=sem.checked;
+  if(qual==='mes'){ ini.value=hoje().slice(0,8)+'01'; fim.value=hoje(); }
+  else if(qual==='ano'){ ini.value=hoje().slice(0,4)+'-01-01'; fim.value=hoje(); }
+  ini.dataset.tocado='1'; fim.dataset.tocado='1';
+  renderGastos();
+}
 document.getElementById('fSemPeriodo').onchange=()=>{
   const on=document.getElementById('fSemPeriodo').checked;
   document.getElementById('fDataIni').disabled=on; document.getElementById('fDataFim').disabled=on;
@@ -3237,6 +3274,26 @@ function verTextoPdf(){
 }
 
 /* ---------- avisos do painel ---------- */
+function renderNuvem(){
+  const card=document.getElementById('cardNuvem'); if(!card)return;
+  if(!SESSAO){
+    card.style.display='block';
+    document.getElementById('nuvemMsg').innerHTML=
+      '<p style="font-size:13.5px;margin:0">Você entrou em modo local. Os lançamentos estão salvos só neste aparelho — nada vai para a nuvem nem para os outros aparelhos.</p>'+
+      '<button class="btn ghost mini" style="margin-top:9px" onclick="exportJSON()">Exportar backup agora</button>'+
+      '<button class="btn ghost mini" style="margin-top:9px" onclick="location.reload()">Tentar entrar na conta</button>';
+    return;
+  }
+  if(!SYNC_OK){
+    card.style.display='block';
+    document.getElementById('nuvemMsg').innerHTML=
+      '<p style="font-size:13.5px;margin:0">A última sincronização falhou. Seus dados continuam salvos neste aparelho.</p>'+
+      '<button class="btn ghost mini" style="margin-top:9px" onclick="ressincronizar(true)">Tentar de novo</button>'+
+      '<button class="btn ghost mini" style="margin-top:9px" onclick="exportJSON()">Exportar backup agora</button>';
+    return;
+  }
+  card.style.display='none';
+}
 function renderAvisos(){
   const hj=hoje(), avisos=[];
   const emDias=d=>Math.ceil((new Date(d)-new Date(hj))/864e5);
