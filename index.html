@@ -346,7 +346,7 @@ a{color:var(--teal)}
   <button data-v="equipe"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.4 2.9-5.2 6.5-5.2s6.5 1.8 6.5 5.2"/><path d="M16.5 5.2a3.2 3.2 0 0 1 0 6.2M18 14.4c2.2.5 3.5 2 3.5 4.4"/></svg>Equipe</button>
   <button data-v="fotos"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8.5 7l1.5-2.5h4L15.5 7"/></svg>Fotos</button>
   <button data-v="rel"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Indicadores</button>
-  <button data-v="io"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>Importações</button>
+  <button data-v="io"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>Configurações</button>
 </nav>
 </div>
 
@@ -500,6 +500,7 @@ a{color:var(--teal)}
     </div>
   </div>
   <div class="acoes" style="margin-top:0">
+    <button class="btn soft" onclick="verTipos()"><span class="ic">🗂️</span>Tipos de produto</button>
     <button class="btn soft" onclick="abrirPreencherTipos()"><span class="ic">🏷️</span>Preencher tipos</button>
   </div>
   <div id="itensObra"></div>
@@ -683,8 +684,10 @@ function mesclarSeguro(vindo){
   n+=mesclarLista(DB.passos,vindo.passos,null,null);
   DB.equipe=DB.equipe||[];
   DB.notas=DB.notas||[];
+  DB.tipos=DB.tipos||[];
   n+=mesclarLista(DB.equipe,vindo.equipe,null,null);
   n+=mesclarLista(DB.notas,vindo.notas,null,null);
+  (vindo.tipos||[]).forEach(t=>{ if(!DB.tipos.some(x=>alfa2(x)===alfa2(t)))DB.tipos.push(t); });
   const idsCx=new Set((DB.catExtra||[]).map(c=>c.id));
   const novasCx=(vindo.catExtra||[]).filter(c=>!idsCx.has(c.id)&&!catIdPorNome(c.n));
   DB.catExtra=(DB.catExtra||[]).concat(novasCx); n+=novasCx.length;
@@ -881,6 +884,7 @@ function carregar(){
   DB.exc=DB.exc||[];
   DB.equipe=DB.equipe||[];
   DB.notas=DB.notas||[];
+  DB.tipos=DB.tipos||[];
   rebuildCategorias();
   normalizarCategorias();
   (DB.passos||[]).forEach(p=>{ if(!p.cat) p.cat='c00'; });
@@ -2500,11 +2504,87 @@ function refreshDatalists(){
 /* ---------- combobox de tipo de produto (dropdown próprio, sem estilo nativo do navegador) ---------- */
 function familiasExistentes(){
   const vistos={};
-  DB.lanc.forEach(l=>{
-    const v=(l.familia||'').trim(); if(!v)return;
-    const k=alfa2(v); if(!vistos[k]) vistos[k]=v;
-  });
+  const anota=v=>{v=String(v||'').trim(); if(!v)return; const k=alfa2(v); if(!vistos[k])vistos[k]=v;};
+  (DB.tipos||[]).forEach(anota);
+  DB.lanc.forEach(l=>anota(l.familia));
+  DB.cot.forEach(c=>(c.itens||[]).forEach(i=>anota(i.familia)));
   return Object.values(vistos).sort((a,b)=>alfa(a,b));
+}
+function usoTipo(nome){
+  const k=alfa2(nome);
+  return DB.lanc.filter(l=>alfa2(l.familia||'')===k).length;
+}
+function verTipos(){
+  const lista=familiasExistentes();
+  abrir(`<h2>Tipos de produto</h2>
+  <p class="sub">Agrupam produtos parecidos com descrições diferentes — todas as bitolas de ferro em "Ferro", por exemplo.</p>
+  <button class="btn" style="margin-top:10px" onclick="editarTipo()">+ Novo tipo</button>
+  <div class="card" style="box-shadow:none;margin-top:12px">
+    ${lista.length?lista.map(t=>{
+      const u=usoTipo(t), esc=t.replace(/'/g,"\\\\'").replace(/"/g,'&quot;');
+      return `<div class="stat" style="align-items:center">
+      <span style="flex:1;min-width:0">${t}
+        <div style="font-size:11.5px;color:var(--ink-2)">${u?u+' lançamento'+(u>1?'s':''):'sem uso'}</div></span>
+      <button class="iconbtn" style="background:var(--surface-2);width:30px;height:30px;font-size:13px" onclick="editarTipo('${esc}')" title="Renomear">✎</button>
+      <button class="iconbtn" style="background:var(--surface-2);color:var(--red);width:30px;height:30px;margin-left:6px" onclick="excluirTipo('${esc}')" title="Excluir">×</button>
+    </div>`}).join(''):'<div class="empty"><b>Nenhum tipo ainda</b><p>Eles nascem sozinhos ao lançar gastos, ou crie um aqui.</p></div>'}
+  </div>
+  <p class="hint">Renomear atualiza todos os lançamentos, cotações e notas que usam o tipo.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function editarTipo(atual){
+  const esc=String(atual||'').replace(/'/g,"\\\\'").replace(/"/g,'&quot;');
+  abrir(`<h2>${atual?'Renomear tipo':'Novo tipo de produto'}</h2>
+  ${atual?`<p class="sub">Usado em ${usoTipo(atual)} lançamento(s).</p>`:''}
+  <label>Nome</label><input id="tp_n" data-cap="1" value="${esc}" placeholder="Ex: Hidráulica">
+  <div style="height:14px"></div>
+  <button class="btn" onclick="salvarTipo('${esc}')">Salvar</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verTipos()">Voltar</button>`);
+}
+function trocarTipoEmTudo(de,para){
+  const k=alfa2(de);
+  DB.lanc.forEach(l=>{ if(alfa2(l.familia||'')===k){ l.familia=para; l.at=Date.now(); } });
+  DB.cot.forEach(c=>{ let m=false;
+    (c.itens||[]).forEach(i=>{ if(alfa2(i.familia||'')===k){ i.familia=para; m=true; } });
+    if(m)c.at=Date.now(); });
+  (DB.notas||[]).forEach(n=>(n.itens||[]).forEach(i=>{ if(alfa2(i.familia||'')===k) i.familia=para; }));
+  DB.tipos=(DB.tipos||[]).filter(t=>alfa2(t)!==k);
+}
+function salvarTipo(atual){
+  const novo=capNomes(val('tp_n'));
+  if(!novo){toast('Informe o nome.');return}
+  const jaTem=familiasExistentes().find(t=>alfa2(t)===alfa2(novo)&&alfa2(t)!==alfa2(atual||''));
+  if(jaTem){toast('Já existe o tipo "'+jaTem+'".');return}
+  DB.tipos=DB.tipos||[];
+  if(atual) trocarTipoEmTudo(atual,novo);
+  if(!DB.tipos.some(t=>alfa2(t)===alfa2(novo))) DB.tipos.push(novo);
+  salvar(); render(); verTipos(); toast(atual?'Tipo renomeado':'Tipo criado');
+}
+function excluirTipo(nome){
+  const u=usoTipo(nome);
+  if(u>0){
+    const destinos=familiasExistentes().filter(t=>alfa2(t)!==alfa2(nome));
+    const esc=String(nome).replace(/'/g,"\\\\'").replace(/"/g,'&quot;');
+    abrir(`<h2>Excluir "${nome}"</h2>
+    <p class="sub">Está em ${u} lançamento(s). Escolha o que fazer com eles.</p>
+    <label>Mover para</label>
+    <select id="tp_dest"><option value="">Deixar sem tipo</option>
+      ${destinos.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('')}</select>
+    <div style="height:14px"></div>
+    <button class="btn danger" onclick="confirmarExclusaoTipo('${esc}')">Aplicar e excluir</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="verTipos()">Cancelar</button>`);
+    return;
+  }
+  confirmar('Excluir tipo',`"${nome}" não está em uso.`,'Excluir',()=>{
+    DB.tipos=(DB.tipos||[]).filter(t=>alfa2(t)!==alfa2(nome));
+    salvar(); render(); verTipos(); toast('Tipo excluído');
+  },true);
+}
+function confirmarExclusaoTipo(nome){
+  const dest=val('tp_dest');
+  trocarTipoEmTudo(nome,dest);
+  salvar(); render(); verTipos();
+  toast(dest?'Movido para "'+dest+'"':'Tipo removido dos lançamentos');
 }
 function comboFamiliaFiltrar(input){
   const wrap=input.closest('.combo'); if(!wrap)return;
@@ -4076,7 +4156,7 @@ function gravarSnap(){
     if(snaps.some(s=>s.dia===hj))return;
     snaps.push({dia:hj,em:new Date().toISOString(),
       resumo:{lanc:DB.lanc.length,cot:DB.cot.length,fotos:DB.fotos.length},
-      dados:JSON.stringify({lanc:DB.lanc,cot:DB.cot,passos:DB.passos,equipe:DB.equipe||[],notas:DB.notas||[],
+      dados:JSON.stringify({lanc:DB.lanc,cot:DB.cot,passos:DB.passos,equipe:DB.equipe||[],notas:DB.notas||[],tipos:DB.tipos||[],
         catExtra:DB.catExtra||[],cfg:DB.cfg,exc:DB.exc||[]})});
     while(snaps.length>7)snaps.shift();
     localStorage.setItem(SNAP_KEY,JSON.stringify(snaps));
@@ -4103,7 +4183,7 @@ function restaurarSnap(diaSnap){
       try{
         const d=JSON.parse(s.dados);
         DB.lanc=d.lanc||[]; DB.cot=d.cot||[]; DB.passos=d.passos||[];
-        DB.equipe=d.equipe||[]; DB.notas=d.notas||[]; DB.catExtra=d.catExtra||[]; DB.exc=d.exc||[];
+        DB.equipe=d.equipe||[]; DB.notas=d.notas||[]; DB.tipos=d.tipos||[]; DB.catExtra=d.catExtra||[]; DB.exc=d.exc||[];
         if(d.cfg)DB.cfg=d.cfg;
         rebuildCategorias(); salvar(); fechar(); render();
         toast('Dados restaurados');
@@ -4235,8 +4315,8 @@ function confirmarExclusaoCategoria(id){
   rebuildCategorias(); salvar(); render(); verCategorias(); toast('Categoria excluída e lançamentos movidos');
 }
 function renderIO(){
-  document.getElementById('ioBody').innerHTML=`<h2>Importações e exportações</h2>
-  <p class="sub">Backup, planilhas e sincronização entre aparelhos.</p>
+  document.getElementById('ioBody').innerHTML=`<h2>Configurações</h2>
+  <p class="sub">Backup, sincronização, cadastros e ajustes da obra.</p>
   <div class="card" style="box-shadow:none;margin-top:10px">
     <div class="stat"><span>Lançamentos</span><b class="mono">${DB.lanc.length}</b></div>
     <div class="stat"><span>Cotações abertas</span><b class="mono">${DB.cot.filter(c=>c.status==='aberta').length}</b></div>
@@ -4325,10 +4405,10 @@ function verManual(){
     <p><b>Equipe</b> — cadastro de pedreiro, servente e ajudantes com o valor da diária. "Lançar semana" marca os dias trabalhados e cria automaticamente o gasto na etapa Mão de obra, entrando nas contas a pagar como qualquer outro.</p>
     <p><b>Fotos</b> — álbum com data e hora. "Tirar foto" abre a câmera, "Da galeria" deixa escolher uma já existente. "Ver em sequência" mostra o álbum como uma linha do tempo, com setas ou arrastando o dedo.</p>
     <p><b>Indicadores</b> — prazo da obra, ritmo de gasto, gráfico mensal, rankings e qualidade do registro.</p>
-    <p><b>Importações</b> — backup, planilha em CSV, importar/juntar dados de outro aparelho ou arquivo, prazo e área construída, verificar duplicados e o cadastro de categorias e etapas (criar, renomear e excluir).</p>
+    <p><b>Configurações</b> — backup, planilha em CSV, importar/juntar dados de outro aparelho ou arquivo, prazo e área construída, verificar duplicados e os cadastros de categorias/etapas e de tipos de produto.</p>
     <p><b>Conta (canto superior direito)</b> — trocar sua foto de perfil, reler este manual e sair do app.</p>
   </div>
-  <p class="hint">Os dados ficam salvos neste aparelho e sincronizam automaticamente com a nuvem quando você está logado — inclusive as exclusões, então apagar em um aparelho remove no outro também. O app guarda uma cópia de si mesmo, então abre no canteiro mesmo sem sinal, e faz um ponto de restauração por dia (em Importações) caso algo dê errado.</p>
+  <p class="hint">Os dados ficam salvos neste aparelho e sincronizam automaticamente com a nuvem quando você está logado — inclusive as exclusões, então apagar em um aparelho remove no outro também. O app guarda uma cópia de si mesmo, então abre no canteiro mesmo sem sinal, e faz um ponto de restauração por dia (em Configurações) caso algo dê errado.</p>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
 document.getElementById('olhoBtn').onclick=()=>{

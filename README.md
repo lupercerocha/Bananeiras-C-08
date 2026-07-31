@@ -66,6 +66,7 @@ equipe    trabalhadores e valor da diária
 passos    pendências por etapa da obra
 fotos     álbum da obra
 catExtra  categorias criadas por você
+tipos     tipos de produto cadastrados
 exc       marcas de exclusão (para a sincronização)
 cfg       início, prazo, área construída e foto do perfil
 ```
@@ -90,7 +91,7 @@ A lista vem separada em concorrências, cotações com preço e a cotar. O botã
 
 **Equipe** — pedreiro, servente e ajudantes com valor de diária. O lançamento da semana marca os dias trabalhados e vira gasto na etapa de mão de obra.
 
-**Tipos de produto** — ao lançar ou importar, o sistema deduz o tipo de cada material (Ferro, Hidráulica, Ferramentas da Obra, Material elétrico...), reaproveitando a grafia que você já usa. Sempre dá para corrigir antes de salvar.
+**Tipos de produto** — ao lançar ou importar, o sistema deduz o tipo de cada material (Ferro, Hidráulica, Ferramentas da Obra, Material elétrico...), reaproveitando a grafia que você já usa. Sempre dá para corrigir antes de salvar, e o cadastro completo (criar, renomear, excluir e mover) fica na aba Itens, em "Tipos de produto".
 
 **Texto padronizado** — o que você digita em nomes, descrições e fornecedores ganha a primeira letra maiúscula por palavra ao sair do campo, respeitando preposições ("Maria do Socorro", "Pá de Areia"), siglas (CA, PVC, LTDA) e códigos com número (14x19x39, 1/2, 6,00mm). Vale também para o texto vindo de PDF, que costuma chegar todo em maiúsculas.
 
@@ -98,7 +99,7 @@ A lista vem separada em concorrências, cotações com preço e a cotar. O botã
 
 **Indicadores** — prazo consumido, ritmo mensal, projeção pelo próprio ritmo, custo por m² e qualidade do registro.
 
-**Importações** — backup, planilha CSV, junção de bases e pontos de restauração dos últimos 7 dias.
+**Configurações** — backup, planilha CSV, junção de bases, pontos de restauração dos últimos 7 dias, prazo e área construída, e os cadastros de categorias/etapas.
 
 ---
 
@@ -120,8 +121,8 @@ A lista vem separada em concorrências, cotações com preço e a cotar. O botã
 
 ## Manutenção
 
-Antes de qualquer mudança grande, exporte o backup em **Importações → Exportar backup**, em cada aparelho.
+Antes de qualquer mudança grande, exporte o backup em **Configurações → Exportar backup**, em cada aparelho.
 
-Se algo der errado depois de uma importação, **Importações → Pontos de restauração** volta os dados para como estavam em qualquer um dos últimos 7 dias.
+Se algo der errado depois de uma importação, **Configurações → Pontos de restauração** volta os dados para como estavam em qualquer um dos últimos 7 dias.
 
-Se aparecerem lançamentos repetidos, **Importações → Verificar duplicados** compara por conteúdo (data, descrição e valor) e remove as cópias, mantendo a versão mais completa.
+Se aparecerem lançamentos repetidos, **Configurações → Verificar duplicados** compara por conteúdo (data, descrição e valor) e remove as cópias, mantendo a versão mais completa.
