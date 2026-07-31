@@ -517,13 +517,14 @@ a{color:var(--teal)}
 
 </main>
 
-<input type="file" id="anexoInput" accept="image/*,.pdf" multiple hidden>
+<input type="file" id="anexoInput" accept="image/*,application/pdf,.pdf,.xml,.xlsx,.doc,.docx" multiple hidden>
 <input type="file" id="fotoPerfilInput" accept="image/*" hidden>
 <input type="file" id="pdfCotInput" accept="application/pdf,.pdf" hidden>
 <input type="file" id="notaInput" accept=".xml,text/xml,application/xml,application/pdf,.pdf,image/*" multiple hidden>
 <datalist id="dlProdutos"></datalist>
 <datalist id="dlCategorias"></datalist>
 <datalist id="dlForn"></datalist>
+<datalist id="dlConc"></datalist>
 <div class="sheet" id="sheet"><div class="bg" onclick="fechar()"></div><div class="panel" id="panel"></div></div>
 <div class="toast" id="toast"></div>
 
@@ -689,6 +690,35 @@ const CATS=[
  {id:'c07',g:'con',n:'07 Mão de obra'}
 ];
 const cat=id=>CATS_AZ.find(c=>c.id===id)||CATS.find(c=>c.id===id)||{n:'—',g:'con'};
+/* ---------- capitalização automática dos nomes digitados ---------- */
+const CAP_MINUSCULAS=new Set(['de','da','do','das','dos','e','com','sem','para','por','em','no','na','nos','nas',
+  'a','o','as','os','ao','aos','à','às','ou','the','of']);
+const CAP_SIGLAS=new Set(['CA','CB','PVC','CPVC','PPR','NBR','ABNT','LED','MDF','OSB','EPI','EPS','PU','PVA',
+  'UN','UND','KG','MT','CM','MM','KV','ML','LT','CX','PCT','SC','DIN','IP','USB','TV','LTDA','ME','EPP','SA',
+  'RRT','ART','NF','NFE','CNPJ','CPF','PB','PE','RN','CE','SP','RJ','MG','BA','GO','DF','CEP','CC']);
+function capNomes(s){
+  const t=String(s==null?'':s).trim().replace(/\s+/g,' ');
+  if(!t)return '';
+  return t.split(' ').map((w,i)=>{
+    if(/\d/.test(w))return w;                                    /* 14x19x39, 8.0, 1/2, 6,00mm */
+    const nu=w.toUpperCase(), nl=w.toLowerCase();
+    if(CAP_MINUSCULAS.has(nl)) return i===0? nl.charAt(0).toUpperCase()+nl.slice(1) : nl;
+    if(CAP_SIGLAS.has(nu.replace(/[^A-ZÀ-Ý]/g,''))) return nu;
+    return nl.charAt(0).toUpperCase()+nl.slice(1);
+  }).join(' ');
+}
+/* aplica ao sair do campo, nos inputs marcados com data-cap */
+document.addEventListener('blur',e=>{
+  const el=e.target;
+  if(el&&el.dataset&&el.dataset.cap==='1'&&el.value){
+    const novo=capNomes(el.value);
+    if(novo!==el.value){
+      el.value=novo;
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+  }
+},true);
+
 const alfa=(a,b)=>String(a).localeCompare(String(b),'pt-BR',{sensitivity:'base'});
 const alfa2=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 let CATS_AZ=CATS.slice().sort((a,b)=>alfa(a.n,b.n));
@@ -837,7 +867,7 @@ function pintaAnexos(elId){
   if(!box)return;
   box.innerHTML=(ANX_ALVO||[]).map((a,i)=>`
     <div class="anx" onclick="verAnexo(${i})">
-      <div class="ic">${a.tipo==='imagem'?`<img src="${a.dado}">`:'🔗'}</div>
+      <div class="ic">${a.tipo==='imagem'?`<img src="${a.dado}">`:a.tipo==='arquivo'?(/pdf/i.test(a.mime||a.nome)?'📄':'📎'):'🔗'}</div>
       <div class="nm">${a.nome||(a.tipo==='imagem'?'Foto do documento':'Link')}</div>
       <button class="rm" onclick="event.stopPropagation();rmAnexo(${i},'${elId}')">×</button>
     </div>`).join('')
@@ -845,7 +875,7 @@ function pintaAnexos(elId){
       <input id="anx_link" placeholder="Colar link (Drive, foto...)" style="flex:2">
       <button class="btn mini ghost" style="flex:0 0 auto;padding:11px 14px" onclick="addAnexoLink('${elId}')">+ Link</button>
     </div>
-    <button class="btn mini ghost" style="margin-top:7px;width:100%" onclick="abrirAnexoFoto('${elId}')">📎 Anexar foto do documento</button>`;
+    <button class="btn mini ghost" style="margin-top:7px;width:100%" onclick="abrirAnexoFoto('${elId}')">📎 Anexar PDF ou foto (pode escolher vários)</button>`;
 }
 function addAnexoLink(elId){
   const v=document.getElementById('anx_link').value.trim();
@@ -855,31 +885,29 @@ function addAnexoLink(elId){
 }
 function abrirAnexoFoto(elId){ ANX_ELID=elId; document.getElementById('anexoInput').click(); }
 let ANX_ELID=null;
-document.getElementById('anexoInput').onchange=e=>{
-  const files=[...e.target.files]; if(!files.length)return;
-  let restantes=files.length;
-  files.forEach(f=>{
-    const r=new FileReader();
-    r.onload=()=>{
-      const im=new Image();
-      im.onload=()=>{
-        const M=1000, s=Math.min(1,M/Math.max(im.width,im.height));
-        const cv=document.createElement('canvas');
-        cv.width=im.width*s|0; cv.height=im.height*s|0;
-        cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
-        ANX_ALVO.push({id:uid(),tipo:'imagem',nome:f.name||'Foto do documento',dado:cv.toDataURL('image/jpeg',.6)});
-        if(--restantes===0) pintaAnexos(ANX_ELID);
-      };
-      im.src=r.result;
-    };
-    r.readAsDataURL(f);
-  });
-  e.target.value='';
+document.getElementById('anexoInput').onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=''; if(!files.length)return;
+  for(const f of files){
+    if(/^image\//.test(f.type)){
+      try{
+        const dado=await comprimirImagem(f,1000,.6);
+        ANX_ALVO.push({id:uid(),tipo:'imagem',nome:f.name||'Foto do documento',dado});
+      }catch(x){ toast('Não consegui ler '+(f.name||'a imagem')); }
+    }else{
+      const id=uid();
+      toast('Guardando '+f.name+'...');
+      const meta=await salvarArquivoAnexo('anx:'+id,f);
+      ANX_ALVO.push({id,tipo:'arquivo',nome:meta.nome,mime:meta.mime,tam:meta.tam,path:meta.path,local:meta.local});
+    }
+    pintaAnexos(ANX_ELID);
+  }
+  toast(files.length>1?files.length+' anexos adicionados':'Anexo adicionado');
 };
 function rmAnexo(i,elId){ ANX_ALVO.splice(i,1); pintaAnexos(elId); }
 function verAnexo(i){
   const a=ANX_ALVO[i];
   if(a.tipo==='link'){ window.open(a.dado,'_blank'); return; }
+  if(a.tipo==='arquivo'){ mostrarArquivoAnexo(a,'fechar()'); return; }
   abrir(`<h2>${a.nome}</h2>
     <img src="${a.dado}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
     <button class="btn ghost mini" onclick="fecharAnexoView()">Fechar</button>`);
@@ -891,13 +919,14 @@ function verAnexoLista(list){
   ANX_VER=list||[];
   abrir(`<h2>Anexos</h2><div class="card" style="box-shadow:none;margin-top:10px">
     ${ANX_VER.length?ANX_VER.map((a,i)=>`<div class="anx" onclick="verAnexoDet(${i})">
-      <div class="ic">${a.tipo==='imagem'?`<img src="${a.dado}">`:'🔗'}</div>
+      <div class="ic">${a.tipo==='imagem'?`<img src="${a.dado}">`:a.tipo==='arquivo'?(/pdf/i.test(a.mime||a.nome)?'📄':'📎'):'🔗'}</div>
       <div class="nm">${a.nome||(a.tipo==='imagem'?'Foto do documento':'Link')}</div></div>`).join(''):'<div class="empty">Nenhum anexo</div>'}
   </div><button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
 function verAnexoDet(i){
   const a=ANX_VER[i];
   if(a.tipo==='link'){ window.open(a.dado,'_blank'); return; }
+  if(a.tipo==='arquivo'){ mostrarArquivoAnexo(a,`verAnexoLista(ANX_VER)`); return; }
   abrir(`<h2>${a.nome}</h2><img src="${a.dado}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
   <button class="btn ghost mini" onclick="fechar()">Fechar</button>`);
 }
@@ -1210,36 +1239,46 @@ function renderCot(){
   const semPeriodo=semEl.checked, dIni=iniEl.value, dFim=fimEl.value;
   let C=DB.cot.filter(c=>c.status==='aberta'&&(semPeriodo||((!dIni||c.data>=dIni)&&(!dFim||c.data<=dFim))));
   if(busca) C=C.filter(c=>alfa2([c.item,c.forn,c.obs,(c.itens||[]).map(i=>i.d).join(' ')].join(' ')).includes(busca));
-  const chave=t=>String(t||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  /* cada cotação vale por si; só concorrem entre si as que você marcar com a mesma concorrência */
   const G={};
-  C.forEach(c=>{const k=chave(c.item);(G[k]=G[k]||{nome:c.item,props:[]}).props.push(c)});
-  const grupos=Object.values(G).sort((a,b)=>alfa(a.nome,b.nome));
-  const prev=grupos.reduce((s,g)=>{
+  C.forEach(c=>{
+    const k=String(c.conc||'').trim()?'conc:'+alfa2(c.conc):'solo:'+c.id;
+    (G[k]=G[k]||{nome:String(c.conc||'').trim()||c.item,conc:String(c.conc||'').trim(),props:[]}).props.push(c);
+  });
+  const grupos=Object.values(G).sort((a,b)=>(b.props.length-a.props.length)||alfa(a.nome,b.nome));
+  const valorGrupo=g=>{
     const com=g.props.filter(p=>+p.total>0).sort((a,b)=>a.total-b.total);
-    if(g.props.length>1){
+    if(g.conc&&g.props.length>1){
       const A=analisarGrupo(g.props);
-      if(A.completas.length) return s+A.completas[0].custoNorm;
+      if(A.completas.length) return A.completas[0].custoNorm;   /* só a menor da concorrência */
+      return com.length?+com[0].total:0;
     }
-    return s+(com.length?+com[0].total:0)},0);
+    return com.reduce((s,p)=>s+ +p.total,0);                    /* avulsas somam todas */
+  };
+  const prev=grupos.reduce((s,g)=>s+valorGrupo(g),0);
   const semPreco=C.filter(p=>!(+p.total>0)).length;
+  const nConc=grupos.filter(g=>g.conc&&g.props.length>1).length;
+  const nSolo=C.length-grupos.filter(g=>g.conc&&g.props.length>1).reduce((s,g)=>s+g.props.length,0);
   document.getElementById('cotPrev').innerHTML=
-    `<div class="stat" style="border:0;padding-top:0"><span>Previsão pelos menores preços</span>
+    `<div class="stat" style="border:0;padding-top:0"><span>Previsão de pagamento</span>
       <b class="mono" style="font-size:17px">${brl(prev)}</b></div>
-     ${semPreco?`<p class="hint" style="margin-top:0">${semPreco} cotação(ões) ainda sem preço — a previsão está incompleta.</p>`:''}`;
+     <p class="hint" style="margin-top:0">Soma de ${nSolo} cotação(ões) avulsa(s)${nConc?` + a menor de ${nConc} concorrência(s)`:''}.</p>
+     ${semPreco?`<p class="hint" style="margin-top:0">${semPreco} ainda sem preço — a previsão está incompleta.</p>`:''}`;
 
   document.getElementById('cotList').innerHTML=grupos.map(g=>{
     const com=g.props.filter(p=>+p.total>0).sort((a,b)=>a.total-b.total);
     const sem=g.props.filter(p=>!(+p.total>0));
     const venc=com[0], pior=com[com.length-1];
 
-    if(g.props.length===1){
-      const c=g.props[0];
+    if(!(g.conc&&g.props.length>1)){
+      return g.props.map(c=>{
       let vTag='';
       if(c.validade){const dd=Math.ceil((new Date(c.validade)-new Date())/864e5);
         vTag=dd<0?'<span class="tag pend">vencida</span>':`<span class="tag ${dd<=2?'pend':''}">vence em ${dd}d</span>`}
       return `<div class="item" onclick="verCot('${c.id}')">
-        <div class="mid"><b>${c.item}</b><small>${c.forn||'sem fornecedor'} ${vTag}</small></div>
+        <div class="mid"><b>${c.item}</b><small>${c.forn||'sem fornecedor'} ${vTag}${c.conc?` · <span class="tag">${c.conc}</span>`:''}</small></div>
         <div class="val mono">${+c.total>0?brl(c.total):'<span class="tag">a cotar</span>'}</div></div>`;
+      }).join('');
     }
 
     const A=analisarGrupo(g.props);
@@ -1249,9 +1288,9 @@ function renderCot(){
       : com.map(p=>({p,v:+p.total,a:null}));
     const venc2=ord[0], pior2=ord[ord.length-1];
     const eco=ord.length>1?pior2.v-venc2.v:0;
-    return `<div class="grp">
-      <h4>${g.nome}</h4>
-      <div class="qt">${g.props.length} propostas${usarNorm?' · comparadas pelo preço unitário':(com.length?' · melhor preço em destaque':'')}</div>
+    return `<div class="grp" style="border-left:3px solid var(--teal)">
+      <h4>⚖ ${g.nome}</h4>
+      <div class="qt">Concorrência · ${g.props.length} propostas${usarNorm?' · comparadas pelo preço unitário':(com.length?' · melhor preço em destaque':'')}</div>
       ${ord.map((x,i)=>`<div class="prop ${i===0&&(!x.a||x.a.completa)?'win':''}" onclick="verCot('${x.p.id}')">
         <span class="nm">${x.p.forn||'sem fornecedor'}${i===0&&(!x.a||x.a.completa)?'<span class="win-tag">menor</span>':''}${x.a&&!x.a.completa?'<span class="tag" style="margin-left:6px">faltam '+x.a.faltam+'</span>':''}</span>
         <span class="vl mono">${brl(x.v)}${usarNorm&&Math.abs(x.v-(+x.p.total))>0.01?`<small style="display:block;font-weight:400;color:var(--ink-2);font-size:11px">orçou ${brl(x.p.total)}</small>`:''}</span></div>`).join('')}
@@ -1259,7 +1298,7 @@ function renderCot(){
         <span class="nm">${p.forn||'sem fornecedor'}</span>
         <span class="vl"><span class="tag">a cotar</span></span></div>`).join('')}
       ${eco>0?`<p class="hint" style="margin-top:8px">Escolhendo ${venc2.p.forn||'a menor'}, você economiza ${brl(eco)} em relação à mais cara — ${(eco/pior2.v*100).toFixed(0)}%.${usarNorm&&A.algumaQtdDiverge?' As propostas pediram quantidades diferentes, então os valores acima foram recalculados para a mesma quantidade.':''}</p>`:''}
-      ${A.temItens&&g.props.length>1?`<button class="btn ghost mini" style="margin-top:8px" onclick="event.stopPropagation();verComparativo(${JSON.stringify(g.nome).replace(/"/g,'&quot;')})">Comparar item a item</button>`:''}
+      ${A.temItens&&g.props.length>1?`<button class="btn ghost mini" style="margin-top:8px" onclick="event.stopPropagation();verComparativo(${JSON.stringify(g.conc).replace(/"/g,'&quot;')})">Comparar item a item</button>`:''}
     </div>`;
   }).join('')||'<div class="empty"><b>Sem cotações abertas</b><p>Registre um orçamento antes de comprar.</p></div>';
 
@@ -1346,9 +1385,7 @@ function analisarGrupo(props){
     venc:completas[0]||null, pior:completas[completas.length-1]||null};
 }
 function verComparativo(nomeGrupo){
-  const props=DB.cot.filter(c=>c.status==='aberta'
-    && String(c.item||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-       === String(nomeGrupo||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+  const props=DB.cot.filter(c=>c.status==='aberta'&&alfa2(c.conc||'')===alfa2(nomeGrupo||'')&&String(c.conc||'').trim());
   if(props.length<2){toast('Precisa de pelo menos duas propostas.');return}
   const A=analisarGrupo(props);
   if(!A.temItens){toast('As propostas não têm itens detalhados para comparar.');return}
@@ -1432,7 +1469,7 @@ function lerXmlNfe(xml){
   for(let i=0;i<dets.length;i++){
     const prod=dets[i].getElementsByTagName('prod')[0];
     if(!prod)continue;
-    itens.push({c:txtTag(prod,'cProd'),d:txtTag(prod,'xProd'),ncm:txtTag(prod,'NCM'),
+    itens.push({c:txtTag(prod,'cProd'),d:capNomes(txtTag(prod,'xProd')),ncm:txtTag(prod,'NCM'),
       un:txtTag(prod,'uCom'),q:+txtTag(prod,'qCom')||0,
       u:+txtTag(prod,'vUnCom')||0,t:+txtTag(prod,'vProd')||0});
   }
@@ -1440,7 +1477,7 @@ function lerXmlNfe(xml){
     chave:(inf.getAttribute('Id')||'').replace(/\D/g,''),
     numero:txtTag(ide,'nNF'),serie:txtTag(ide,'serie'),
     data:(dh||'').slice(0,10),
-    emit:txtTag(emitN,'xNome'),cnpj:txtTag(emitN,'CNPJ')||txtTag(emitN,'CPF'),
+    emit:capNomes(txtTag(emitN,'xNome')),cnpj:txtTag(emitN,'CNPJ')||txtTag(emitN,'CPF'),
     total:+txtTag(tot,'vNF')||itens.reduce((s,i)=>s+i.t,0),
     itens};
 }
@@ -1463,7 +1500,7 @@ function lerTextoDanfe(linhas){
     chave:chave.length===44?chave:'',
     numero:mNum?mNum[1].replace(/\D/g,''):'',serie:'',
     data:mData?`${mData[3]}-${mData[2]}-${mData[1]}`:hoje(),
-    emit:palpiteFornecedor(linhas),cnpj:'',
+    emit:capNomes(palpiteFornecedor(linhas)),cnpj:'',
     total,itens};
 }
 document.getElementById('notaInput').onchange=async e=>{
@@ -1538,7 +1575,7 @@ function abrirNota(id,daLeitura){
   panel._its=JSON.parse(JSON.stringify(n.itens&&n.itens.length?n.itens.map(i=>({c:i.c||'',d:i.d||'',q:i.q||0,u:i.u||0,f:'',ncm:i.ncm||'',un:i.un||''})):[{c:'',d:'',q:1,u:0,f:''}]));
   const cands=DB.lanc.slice().sort((a,b)=>b.data.localeCompare(a.data)).slice(0,60);
   abrir(`<h2>${id?'Editar nota':'Nota fiscal'}</h2>
-  <label>Emitente / fornecedor</label><input id="n_emit" value="${(n.emit||'').replace(/"/g,'&quot;')}" list="dlForn">
+  <label>Emitente / fornecedor</label><input id="n_emit" data-cap="1" value="${(n.emit||'').replace(/"/g,'&quot;')}" list="dlForn">
   <div class="row2">
     <div><label>Número</label><input id="n_num" value="${n.numero||''}" inputmode="numeric"></div>
     <div><label>Data</label><input type="date" id="n_data" value="${n.data||hoje()}"></div>
@@ -1571,7 +1608,8 @@ function salvarNota(id){
   const its=panel._its.filter(i=>String(i.d||'').trim()||+i.u>0)
     .map(i=>({c:i.c||'',d:(i.d||'').trim(),ncm:i.ncm||'',un:i.un||'',
       q:+i.q||0,u:+i.u||0,t:+((+i.q||0)*(+i.u||0)).toFixed(2)}));
-  const emit=val('n_emit').trim();
+  preencherFamilias(its);
+  const emit=capNomes(val('n_emit'));
   if(!emit){toast('Informe o emitente da nota.');return}
   const base=panel._nota||{};
   const total=moeda2num(val('n_total'))||its.reduce((s,i)=>s+i.t,0);
@@ -1723,7 +1761,7 @@ function lancarItensDaNota(id){
   if(!(n.itens||[]).length){toast('Essa nota não tem itens para lançar.');return}
   const jaLancados=(n.lancIds||[]).filter(x=>DB.lanc.some(l=>l.id===x)).length;
   const seguir=()=>{
-    const its=n.itens.map(i=>({c:i.c||'',d:i.d,q:+i.q||1,u:+i.u||0,f:n.emit,familia:'',cat:'c00'}));
+    const its=preencherFamilias(n.itens.map(i=>({c:i.c||'',d:i.d,q:+i.q||1,u:+i.u||0,f:n.emit,familia:'',cat:'c00'})));
     abrirConfirmarCompra({id:'',item:n.emit,forn:n.emit,total:n.total,itens:its,
       anexos:[],obs:'NF '+(n.numero||'')+(n.chave?' · chave '+n.chave.slice(-8):''),
       desconto:0,_nota:n});
@@ -1732,6 +1770,102 @@ function lancarItensDaNota(id){
     confirmar('Lançar de novo?',`Esta nota já gerou ${jaLancados} lançamento(s). Lançar outra vez vai duplicar os gastos.`,
       'Lançar mesmo assim',seguir,true);
   }else seguir();
+}
+
+/* ---------- palpite do tipo de produto ---------- */
+const FAMILIAS_PADRAO=[
+  /* a ordem importa: o primeiro que casar vence, então o mais específico vem antes */
+  [/vergalh|ca\s?-?\s?50|ca\s?-?\s?60|\bferro\b|estribo|arame/i,'Ferro'],
+  [/coluna|verga\b|coxim|pre\s?moldad|pré\s?moldad/i,'Pré-moldado'],
+  [/canaleta/i,'Canaleta'],
+  [/bloco|tijolo/i,'Tijolo'],
+  [/cimento|argamassa|rejunte|\bcal\b|massa\s*(unica|única)/i,'Cimento e argamassa'],
+  [/areia|arisco/i,'Areia'],
+  [/brita|seixo|pedra\s*(britada|marroada)/i,'Brita'],
+  [/telha|cumeeira/i,'Telha'],
+  [/prego|parafuso|bucha|arruela|porca|abraçadeira|abracadeira/i,'Fixação'],
+  /* ferramentas antes de madeira e elétrico: "peneira de madeira", "enxada com cabo" */
+  [/enxad|\bpa\b|\bpá\b|balde|peneira|talhadeira|carrinho\s*de\s*m|colher\s*de\s*pedreiro|martelo|marreta|trena|prumo|n[ií]vel\b|serrote|broca|ponteiro|desempenadeira|esquadro|linha\s*de\s*pedreiro|vassoura|espátula|espatula/i,'Ferramentas da Obra'],
+  [/fossa|sumidouro/i,'Fossa'],
+  [/vaso\s*sanit|bacia|chuveiro|\bpia\b|cuba|lavat[óo]rio|assento\s*sanit/i,'Louças e metais'],
+  [/tubo|joelho|\bluva\b|registro|torneira|caixa\s*d.?[aá]gua|mangueira|veda\s*rosca|adesivo\s*pl|sif[ãa]o|ralo|esgoto|conex[ãa]o|cola\s*pvc/i,'Hidráulica'],
+  [/cabo\s*(semi|flex|pp|de\s*cobre|r[íi]gido)|\bcabo\s*\d|\bfio\b|disjuntor|eletroduto|tomada|interruptor|l[âa]mpada|lumin[áa]ria|energisa|aterramento|cantoneira\s*rex|cabe[çc]ote|quadro\s*de\s*distrib|padr[ãa]o\s*de\s*energia/i,'Material elétrico'],
+  [/caibro|madeira|ripa|t[áa]bua|sarrafo|compensad|forma\s*de\s*madeira/i,'Madeira'],
+  [/porta\b|janela|batente|fechadura|dobradi[çc]a|ferrolho|esquadria/i,'Esquadrias'],
+  [/tinta|selador|verniz|massa\s*corrida|pincel|\blixa\b|rolo\s*de\s*pintura/i,'Pintura'],
+  [/piso|porcelanato|azulejo|revestimento|soleira|rodap[ée]/i,'Revestimento'],
+  [/m[ãa]o\s*de\s*obra|di[áa]ria|pedreiro|servente|ajudante/i,'Mão de obra'],
+];
+function palpiteFamilia(desc){
+  const d=String(desc||''); if(!d.trim())return '';
+  const alvo=alfa2(d);
+  const jaUsadas=(typeof familiasExistentes==='function')?familiasExistentes():[];
+  /* 1) um tipo que você já usa e que é a PRIMEIRA palavra do produto ("Prego 15x18" -> Prego) */
+  let ini='';
+  jaUsadas.forEach(f=>{const k=alfa2(f);
+    if(k.length>=3&&alvo.startsWith(k)&&k.length>ini.length)ini=f;});
+  if(ini)return ini;
+  /* 2) tabela de materiais; se você já tem um tipo equivalente, mantém a sua grafia */
+  for(const [re,nome] of FAMILIAS_PADRAO){
+    if(!re.test(d))continue;
+    const k=alfa2(nome);
+    const eq=jaUsadas.find(f=>{const a=alfa2(f); return a===k||a.includes(k)||k.includes(a);});
+    return eq||nome;
+  }
+  /* 3) último recurso: qualquer tipo seu citado na descrição */
+  let melhor='';
+  jaUsadas.forEach(f=>{const k=alfa2(f);
+    if(k.length>=3&&alvo.includes(k)&&k.length>melhor.length)melhor=f;});
+  return melhor;
+}
+function preencherFamilias(itens){
+  (itens||[]).forEach(i=>{ if(!String(i.familia||'').trim()) i.familia=palpiteFamilia(i.d); });
+  return itens;
+}
+
+/* ---------- anexos em arquivo (PDF e outros), guardados no aparelho e na nuvem ---------- */
+async function salvarArquivoAnexo(chave,file){
+  const meta={nome:file.name||'arquivo',mime:file.type||'application/octet-stream',tam:file.size||0,local:false,path:''};
+  try{ await idbPut(chave,file); meta.local=true; }catch(e){}
+  if(SESSAO){
+    try{
+      const ext=((file.name||'').split('.').pop()||'bin').toLowerCase().slice(0,6);
+      const path=SESSAO.user.id+'/'+chave.replace(/[^a-zA-Z0-9\-_.]/g,'_')+'.'+ext;
+      const {error}=await supa.storage.from('notas').upload(path,file,{upsert:true,contentType:meta.mime});
+      if(!error)meta.path=path;
+    }catch(e){}
+  }
+  return meta;
+}
+async function urlDeAnexo(a){
+  try{ const f=await idbGet('anx:'+a.id); if(f)return {url:URL.createObjectURL(f),tipo:f.type||a.mime||''}; }catch(e){}
+  if(a.path&&SESSAO){
+    try{
+      const {data,error}=await supa.storage.from('notas').createSignedUrl(a.path,3600);
+      if(!error&&data&&data.signedUrl)return {url:data.signedUrl,tipo:a.mime||''};
+    }catch(e){}
+  }
+  return null;
+}
+async function mostrarArquivoAnexo(a,voltar){
+  const r=await urlDeAnexo(a);
+  if(!r){
+    abrir(`<h2>${a.nome}</h2>
+    <p class="sub">O arquivo não está neste aparelho.</p>
+    <p class="hint">${a.path?'Ele tem cópia na nuvem, mas não consegui baixar agora — verifique a conexão.'
+      :'Ele foi anexado em outro aparelho antes do envio para a nuvem estar ativo. Anexe de novo por aqui, se precisar.'}</p>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="${voltar||'fechar()'}">Voltar</button>`);
+    return;
+  }
+  const ehPdf=/pdf/i.test(r.tipo)||/\.pdf$/i.test(a.nome||'');
+  const ehImg=/^image\//i.test(r.tipo);
+  abrir(`<h2>${a.nome}</h2>
+  ${ehPdf?`<iframe src="${r.url}" style="width:100%;height:66vh;border:1px solid var(--line);border-radius:12px;margin-top:10px;background:#fff"></iframe>`
+    :ehImg?`<img src="${r.url}" style="width:100%;border-radius:12px;margin-top:10px">`
+    :'<p class="hint">Não dá para exibir esse tipo de arquivo aqui — use o botão abaixo.</p>'}
+  <a class="btn dark" style="margin-top:10px;text-decoration:none;display:block;text-align:center;padding:11px" href="${r.url}" download="${a.nome}">Baixar</a>
+  <a class="btn ghost mini" style="margin-top:9px;text-decoration:none;display:block;text-align:center;padding:11px" href="${r.url}" target="_blank" rel="noopener">Abrir em outra aba</a>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="${voltar||'fechar()'}">Voltar</button>`);
 }
 
 function renderNotas(){
@@ -2027,6 +2161,10 @@ function refreshDatalists(){
   (DB.notas||[]).forEach(n=>{ if(n.emit) forns.add(n.emit.trim()); });
   const dlF=document.getElementById('dlForn');
   if(dlF) dlF.innerHTML=[...forns].sort((a,b)=>alfa(a,b)).map(f=>`<option value="${f.replace(/"/g,'&quot;')}">`).join('');
+  const concs=new Set();
+  DB.cot.forEach(c=>{ if(String(c.conc||'').trim()) concs.add(c.conc.trim()); });
+  const dlCc=document.getElementById('dlConc');
+  if(dlCc) dlCc.innerHTML=[...concs].sort((a,b)=>alfa(a,b)).map(c=>`<option value="${c.replace(/"/g,'&quot;')}">`).join('');
 }
 /* ---------- combobox de tipo de produto (dropdown próprio, sem estilo nativo do navegador) ---------- */
 function familiasExistentes(){
@@ -2056,7 +2194,9 @@ function comboEscolherFamilia(el,valor){
   input.value=valor;
   wrap.querySelector('.combo-list').style.display='none';
   const idx=input.dataset.itemIndex;
-  if(idx!==undefined && idx!=='') chgItem(+idx,'familia',valor);
+  if(idx===undefined||idx==='')return;
+  if(input.dataset.alvo==='itC'){ if(panel._itC&&panel._itC[+idx]) panel._itC[+idx].familia=valor; }
+  else chgItem(+idx,'familia',valor);
 }
 function comboFechar(input){
   const wrap=input.closest('.combo'); if(!wrap)return;
@@ -2332,7 +2472,7 @@ function abrirPendencias(){
   <p class="sub">Organizadas por etapa da obra. Marque como concluída para tirar da lista da fase atual.</p>
   <div style="margin:10px 0">
     <label>Nova pendência</label>
-    <input id="pd_txt" placeholder="Ex: Fechar a laje">
+    <input id="pd_txt" data-cap="1" placeholder="Ex: Fechar a laje">
     <label style="margin-top:8px">Etapa</label>
     <select id="pd_cat">${etapasCon.map(e=>`<option value="${e.id}">${e.n}</option>`).join('')}</select>
     <button class="btn" style="margin-top:9px" onclick="novaPendencia()">+ Adicionar</button>
@@ -2347,7 +2487,7 @@ function abrirPendencias(){
   <button class="btn ghost mini" style="margin-top:14px" onclick="fechar()">Fechar</button>`);
 }
 function novaPendencia(){
-  const txt=val('pd_txt').trim(), cid=val('pd_cat');
+  const txt=capNomes(val('pd_txt')), cid=val('pd_cat');
   if(!txt){toast('Escreva a pendência.');return}
   const n=(DB.passos.filter(p=>p.cat===cid).reduce((m,p)=>Math.max(m,p.n||0),0))+1;
   DB.passos.push({id:uid(),at:Date.now(),n,txt,cat:cid,ok:false});
@@ -2365,7 +2505,7 @@ function abrirGasto(l){
   abrir(`<h2>${l.id?'Editar gasto':'Lançar gasto'}</h2>
   <p class="sub">O valor entra por inteiro na data do pagamento.</p>
   <label>Data</label><input type="date" id="x_data" value="${l.data}">
-  <div id="descUnica"><label>Descrição</label><input id="x_desc" list="dlProdutos" value="${l.desc}" placeholder="Ex: 100 sacos de cimento 50kg">
+  <div id="descUnica"><label>Descrição</label><input id="x_desc" data-cap="1" list="dlProdutos" value="${l.desc}" placeholder="Ex: 100 sacos de cimento 50kg">
     <label>Tipo de produto (opcional)</label>
     <div class="combo"><input id="x_fam" autocomplete="off"
       oninput="comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
@@ -2385,7 +2525,7 @@ function abrirGasto(l){
   <p class="hint">Marque para cimento, ferro e outros que servem à obra toda. Escolha as etapas e o valor é dividido igualmente entre elas.</p>
   <div id="rateioBox" style="display:${l.rateio&&l.rateio.length?'block':'none'}"></div>
   </div>
-  <label>Fornecedor</label><input id="x_forn" value="${l.forn}" placeholder="Ex: Lumar Bananeiras">
+  <label>Fornecedor</label><input id="x_forn" data-cap="1" value="${l.forn}" placeholder="Ex: Lumar Bananeiras">
   ${l.id?'':`<label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0">
     <input type="checkbox" id="x_multi" style="width:20px;height:20px;flex:none">
     Mais de um item nesta compra</label>
@@ -2658,9 +2798,12 @@ function abrirCot(c){
   panel._its=JSON.parse(JSON.stringify(c.itens&&c.itens.length?c.itens:[{c:'',d:'',q:1,u:0,f:''}]));
   abrir(`<h2>${c.id?'Editar cotação':'Nova cotação'}</h2>
   <p class="sub">Preço de mercado. Ainda não é gasto.</p>
-  <label>Do que se trata</label><input id="c_item" value="${c.item||''}" placeholder="Ex: Blocos e canaletas de concreto">
+  <label>Do que se trata</label><input id="c_item" data-cap="1" value="${c.item||''}" placeholder="Ex: Blocos e canaletas de concreto">
   <p class="hint">Use o mesmo texto ao cotar com outros fornecedores — é o que agrupa as propostas para comparar.</p>
-  <label>Fornecedor</label><input id="c_forn" value="${c.forn||''}">
+  <label>Fornecedor</label><input id="c_forn" data-cap="1" value="${c.forn||''}">
+  <label>Concorrência (opcional)</label>
+  <input id="c_conc" data-cap="1" list="dlConc" value="${(c.conc||'').replace(/"/g,'&quot;')}" placeholder="Ex: Ferro da fundação">
+  <p class="hint">Só preencha quando esta proposta disputar a MESMA compra com outro fornecedor. Cotações com a mesma concorrência entram na previsão só pela menor; as demais somam todas.</p>
   <label>Validade da proposta</label><input type="date" id="c_val" value="${c.validade||''}">
   <label>Anexos</label>
   <div id="anexosCot"></div>
@@ -2698,7 +2841,7 @@ function pintaItens(){
          <input ${moedaAttrs(it.u)} oninput="onMoedaInput(this);chgItem(${i},'u',moeda2num(this.value))"></div>
      </div>
      <label>Descrição</label>
-     <input value="${(it.d||'').replace(/"/g,'&quot;')}" list="dlProdutos" placeholder="Ex: Bloco 14x19x39cm" oninput="chgItem(${i},'d',this.value)">
+     <input value="${(it.d||'').replace(/"/g,'&quot;')}" list="dlProdutos" data-cap="1" placeholder="Ex: Bloco 14x19x39cm" oninput="chgItem(${i},'d',this.value)">
      <label>Tipo de produto (opcional)</label>
      <div class="combo"><input data-item-index="${i}" autocomplete="off"
        oninput="chgItem(${i},'familia',this.value);comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
@@ -2711,7 +2854,7 @@ function pintaItens(){
        <div><label>Cód. (opcional)</label>
          <input value="${(it.c||'').replace(/"/g,'&quot;')}" oninput="chgItem(${i},'c',this.value)"></div>
        <div><label>Fornecedor (opcional)</label>
-         <input value="${(it.f||'').replace(/"/g,'&quot;')}" oninput="chgItem(${i},'f',this.value)"></div>
+         <input value="${(it.f||'').replace(/"/g,'&quot;')}" data-cap="1" oninput="chgItem(${i},'f',this.value)"></div>
      </div>
      <div class="stat" style="border:0;padding-bottom:0">
        <span style="font-size:12px">Total do item</span>
@@ -2760,7 +2903,8 @@ function salvarCot(id){
   const its=panel._its.filter(i=>String(i.d||'').trim()||+i.u>0);
   const sub=somaItens(its);
   const desconto=Math.min(Math.max(moeda2num(val('c_desc')),0),sub);
-  const c={id:id||uid(),at:Date.now(),data:hoje(),item:val('c_item').trim(),forn:val('c_forn').trim(),
+  const c={id:id||uid(),at:Date.now(),data:hoje(),item:capNomes(val('c_item')),forn:capNomes(val('c_forn')),
+    conc:capNomes(val('c_conc')),
     itens:its.length?its:[{c:'',d:val('c_item').trim(),q:1,u:0,f:''}],
     desconto,total:+(sub-desconto).toFixed(2),validade:val('c_val'),anexos:ANX_ALVO||[],obs:val('c_obs').trim(),status:'aberta'};
   if(!c.item){toast('Descreva do que se trata a cotação.');return}
@@ -2803,9 +2947,11 @@ function reabrirCot(id){
 }
 function outraProposta(id){
   const c=DB.cot.find(x=>x.id===id);
-  abrirCot({id:'',item:c.item,forn:'',validade:'',obs:'',
+  const conc=String(c.conc||'').trim()||c.item;
+  if(!String(c.conc||'').trim()){ c.conc=conc; c.at=Date.now(); salvar(); }
+  abrirCot({id:'',item:c.item,forn:'',validade:'',obs:'',conc,
     itens:(c.itens||[]).map(i=>({c:i.c,d:i.d,q:i.q,u:0,f:'',familia:i.familia||''}))});
-  toast('Mesmos itens, novo fornecedor');
+  toast('Concorrência "'+conc+'" — informe o novo fornecedor');
 }
 function arquivarCot(id){const _a=DB.cot.find(x=>x.id===id);_a.status='arquivada';_a.at=Date.now();salvar();fechar();render();toast('Cotação arquivada')}
 function virouCompra(id){
@@ -2813,11 +2959,11 @@ function virouCompra(id){
   abrirConfirmarCompra(c);
 }
 function abrirConfirmarCompra(c){
-  const base=(c.itens&&c.itens.length)?itensComDesconto(c):[{c:'',d:c.item,q:1,u:c.total,f:''}];
+  const base=preencherFamilias((c.itens&&c.itens.length)?itensComDesconto(c):[{c:'',d:c.item,q:1,u:c.total,f:''}]);
   panel._itC=JSON.parse(JSON.stringify(base)).map(i=>({...i,cats:[i.cat||'c00']}));
   panel._cotOrig=c;
   abrir(`<h2>Lançar compra</h2>
-  <p class="sub">${c.forn||'Sem fornecedor'} · marque em quais etapas cada item entra</p>
+  <p class="sub">${c.conc?`⚖ ${c.conc} · `:''}${c.forn||'Sem fornecedor'} · marque em quais etapas cada item entra</p>
   ${+c.desconto>0?`<p class="hint" style="margin-top:0">Desconto de ${brl(c.desconto)} já dividido entre os itens — a soma dos lançamentos fecha em ${brl(c.total)}.</p>`:''}
   <div id="itensCompra"></div>
   <label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0;margin-top:10px">
@@ -2836,6 +2982,11 @@ function pintaItensCompra(){
     return `<div class="grp" style="background:var(--surface-2);margin-bottom:8px">
      <h4>${it.d||'—'}${it.familia?` <span class="tag">${it.familia}</span>`:''}</h4>
      <div class="qt">${(+it.q||0).toLocaleString('pt-BR')} × ${brl(it.u)}${corte>0?` = ${brl(bruto)} <span style="color:var(--green)">− ${brl(corte)} de desconto</span>`:''} = <b class="mono">${brl(valorItem)}</b>${it.c?' · cód. '+it.c:''}</div>
+     <label style="margin-top:6px">Tipo de produto</label>
+     <div class="combo"><input data-item-index="${i}" data-alvo="itC" autocomplete="off" value="${(it.familia||'').replace(/"/g,'&quot;')}"
+       placeholder="Ex: Ferramentas, Hidráulica..."
+       oninput="panel._itC[${i}].familia=this.value;comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)">
+       <div class="combo-list"></div></div>
      <label style="margin-top:8px">Etapas desta compra</label>
      <div style="display:flex;flex-wrap:wrap;gap:2px 0;margin:4px 0 2px">
        ${etapasCon.map(x=>`<label style="display:inline-flex;align-items:center;gap:5px;margin:3px 10px 3px 0;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0">
@@ -2924,7 +3075,7 @@ function formFoto(img){
   <label>Data e hora</label><input type="datetime-local" id="f_dh" value="${agora}">
   <label>Etapa</label><select id="f_cat">${CATS_AZ.filter(c=>c.g==='con').map(c=>
     `<option value="${c.id}">${c.n}</option>`).join('')}</select>
-  <label>Legenda</label><input id="f_leg" placeholder="Ex: terreno limpo, vista da frente">
+  <label>Legenda</label><input id="f_leg" data-cap="1" placeholder="Ex: terreno limpo, vista da frente">
   <div style="height:14px"></div>
   <button class="btn" onclick="salvarFoto('${'IMG'}')">Salvar no álbum</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Descartar</button>`);
@@ -3125,8 +3276,9 @@ function importar(modo){
 /* ---------- importar orçamento em PDF (lido no próprio navegador) ---------- */
 const UNIDS_PDF=['un','und','unid','uni','pc','pç','pcs','mt','m','m2','m²','m3','m³','kg','g','cx','pct','sc','lt','l','par','jg','barra','bar','rl','fd','dz'];
 function limparDescPdf(desc,q){
+  /* tira até 3 sobras de coluna no fim: quantidade e unidade (UN, UND, MT...) */
   let tk=desc.replace(/\s*R\$\s*$/i,'').split(/\s+/).filter(Boolean);
-  for(let j=0;j<Math.min(3,tk.length);j++){
+  for(let j=0;j<Math.min(2,tk.length);j++){
     if(/^[\d.,]+$/.test(tk[j])&&Math.abs(nBR(tk[j])-q)<0.001){
       let corte=j+1;
       if(tk[corte]&&UNIDS_PDF.includes(tk[corte].toLowerCase().replace(/\.$/,''))) corte++;
@@ -3134,19 +3286,21 @@ function limparDescPdf(desc,q){
       break;
     }
   }
-  for(let p=0;p<2;p++){
-    if(!tk.length)break;
-    const ult=tk[tk.length-1].toLowerCase().replace(/\.$/,'');
-    if(UNIDS_PDF.includes(ult)&&tk.length>1&&Math.abs(nBR(tk[tk.length-2])-q)<0.001){ tk.splice(-2); continue; }
+  for(let p=0;p<3;p++){
+    if(tk.length<2)break;
+    const ult=tk[tk.length-1].toLowerCase().replace(/[.\s]+$/,'');
+    if(UNIDS_PDF.includes(ult)){ tk.pop(); continue; }
     if(/^[\d.,]+$/.test(ult)&&Math.abs(nBR(ult)-q)<0.001){ tk.pop(); continue; }
     break;
   }
+  while(tk.length>1&&/^[.\-–]+$/.test(tk[tk.length-1]))tk.pop();
   return tk.join(' ').trim();
 }
 function parseOrcamento(linhas){
   const itens=[];
   linhas.forEach(t=>{
     if(/^\s*(total|subtotal|desconto|frete|valor a pagar|vlr total)/i.test(t))return;
+    if(/economizou|desconto|acr[eé]scimo|total\s*geral|total\s*l[ií]quido|anterior\s*em\s*aberto|saldo\s*anterior/i.test(t))return;
     const ms=acharMoedas(t);
     if(ms.length<2)return;
     const total=nBR(ms[ms.length-1].s), unit=nBR(ms[ms.length-2].s);
@@ -3154,18 +3308,25 @@ function parseOrcamento(linhas){
     const q=Math.round(total/unit*1000)/1000;
     if(!(q>0)||q>100000)return;
     let desc=t.slice(0,ms[ms.length-2].i).trim(), cod='';
-    const mc=desc.match(/^(\d{3,6})\s+/);
+    const mc=desc.match(/^(\d{3,14})\s+/);
     if(mc){cod=mc[1];desc=desc.slice(mc[0].length)}
     desc=limparDescPdf(desc,q).replace(/\s{2,}/g,' ');
     if(desc.replace(/[^A-Za-zÀ-ÿ]/g,'').length<3)return;
-    itens.push({c:cod,d:desc,q,u:unit,f:''});
+    itens.push({c:cod,d:capNomes(desc),q,u:unit,f:''});
   });
   return itens;
 }
+/* nos pedidos há vários "totais": o que vale é o líquido, e o "saldo anterior em aberto" não é desta compra */
 function totalDeclarado(linhas){
-  let v=0;
-  linhas.forEach(t=>{if(/total/i.test(t)){const ms=acharMoedas(t);if(ms.length)v=Math.max(v,nBR(ms[ms.length-1].s))}});
-  return v;
+  let liquido=0, geral=0;
+  linhas.forEach(t=>{
+    if(/anterior|em\s*aberto|saldo|limite|cr[eé]dito/i.test(t))return;
+    const ms=acharMoedas(t); if(!ms.length)return;
+    const v=nBR(ms[ms.length-1].s);
+    if(/total\s*l[ií]quido|valor\s*l[ií]quido|total\s*a\s*pagar|valor\s*total\s*da\s*nota/i.test(t)) liquido=Math.max(liquido,v);
+    else if(/total/i.test(t)) geral=Math.max(geral,v);
+  });
+  return liquido||geral;
 }
 function palpiteFornecedor(linhas){
   for(const t of linhas.slice(0,8)){
@@ -3180,8 +3341,14 @@ function palpiteFornecedor(linhas){
 }
 function palpiteValidade(linhas){
   const t=linhas.join(' ');
-  const m=t.match(/valid[^\d]{0,25}(\d{2})\/(\d{2})\/(\d{4})/i);
-  return m?`${m[3]}-${m[2]}-${m[1]}`:'';
+  const m=t.match(/valid[^\d]{0,30}(\d{2})\/(\d{2})\/(\d{4})/i);
+  if(m)return `${m[3]}-${m[2]}-${m[1]}`;
+  const d=t.match(/valid[^\d]{0,40}(\d{1,3})\s*dias?/i);
+  if(d){
+    const dt=new Date(); dt.setDate(dt.getDate()+ +d[1]);
+    return new Date(dt.getTime()-dt.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  }
+  return '';
 }
 let PDF_LIDO=null;
 /* ---------- leitura de orçamento: números, linhas e saídas alternativas ---------- */
@@ -3350,8 +3517,10 @@ function processarLinhasOrcamento(linhas,origem){
     <div class="stat"><span>Soma dos itens</span><b class="mono">${brl(soma)}</b></div>
     ${tot>0?`<div class="stat"><span>Total no arquivo</span><b class="mono">${brl(tot)}</b></div>`:''}
   </div>
-  ${Math.abs(dif)>=0.01?`<p class="hint">A soma não bate com o total do arquivo (diferença de ${brl(dif)}) — normalmente é desconto ou frete.</p>
-  <button class="btn" onclick="usarOrcamentoLido(true)">Conferir, ajustando ao total</button>
+  ${Math.abs(dif)>=0.01?`<p class="hint">${dif<0
+      ? 'O arquivo dá um desconto de '+brl(-dif)+' sobre a soma dos itens — dá para já trazer esse desconto preenchido.'
+      : 'O total do arquivo é '+brl(dif)+' maior que a soma dos itens — costuma ser frete.'}</p>
+  <button class="btn" onclick="usarOrcamentoLido(true)">${dif<0?'Conferir, já com o desconto':'Conferir, incluindo o frete'}</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="usarOrcamentoLido(false)">Conferir sem ajustar</button>`
   :`<button class="btn" onclick="usarOrcamentoLido(false)">Conferir e criar cotação</button>`}
   <button class="btn ghost mini" style="margin-top:9px" onclick="escolherLinhasItens()">Faltou item? Escolher na mão</button>
@@ -3363,9 +3532,14 @@ function usarOrcamentoLido(ajustar){
   const p=PDF_LIDO; if(!p)return;
   const itens=JSON.parse(JSON.stringify(p.itens));
   const dif=Math.round((p.tot-p.soma)*100)/100;
-  if(ajustar&&Math.abs(dif)>=0.01) itens.push({c:'',d:dif<0?'Desconto negociado':'Frete / acréscimo',q:1,u:dif,f:''});
-  abrirCot({id:'',item:'',forn:p.forn||'',validade:p.val||'',itens,
-    obs:'Importado do PDF '+p.nome});
+  let desconto=0;
+  if(ajustar&&Math.abs(dif)>=0.01){
+    if(dif<0) desconto=-dif;                                   /* desconto do fornecedor */
+    else itens.push({c:'',d:'Frete / acréscimo',q:1,u:dif,f:''}); /* acréscimo vira item */
+  }
+  preencherFamilias(itens);
+  abrirCot({id:'',item:'',forn:capNomes(p.forn||''),validade:p.val||'',itens,desconto,
+    obs:'Importado de '+p.nome});
 }
 function verTextoPdf(){
   const p=PDF_LIDO; if(!p)return;
@@ -3472,8 +3646,8 @@ function renderEquipe(){
 function abrirTrabalhador(id){
   const t=equipe().find(x=>x.id===id)||{id:'',nome:'',funcao:'',diaria:0};
   abrir(`<h2>${id?'Editar trabalhador':'Novo trabalhador'}</h2>
-  <label>Nome</label><input id="t_nome" value="${t.nome}" placeholder="Ex: João">
-  <label>Função</label><input id="t_func" value="${t.funcao||''}" placeholder="Pedreiro, servente, ajudante...">
+  <label>Nome</label><input id="t_nome" data-cap="1" value="${t.nome}" placeholder="Ex: João">
+  <label>Função</label><input id="t_func" data-cap="1" value="${t.funcao||''}" placeholder="Pedreiro, servente, ajudante...">
   <label>Valor da diária</label><input id="t_diaria" inputmode="numeric" value="${t.diaria?num2moeda(t.diaria):''}" placeholder="0,00" oninput="onMoedaInput(this)">
   <div style="height:14px"></div>
   <button class="btn" onclick="salvarTrabalhador('${t.id}')">Salvar</button>
@@ -3483,7 +3657,7 @@ function abrirTrabalhador(id){
 function salvarTrabalhador(id){
   const nome=val('t_nome').trim();
   if(!nome){toast('Informe o nome.');return}
-  const dados={nome,funcao:val('t_func').trim(),diaria:moeda2num(val('t_diaria')),at:Date.now()};
+  const dados={nome:capNomes(nome),funcao:capNomes(val('t_func')),diaria:moeda2num(val('t_diaria')),at:Date.now()};
   if(id){Object.assign(equipe().find(x=>x.id===id),dados)}
   else{equipe().push({id:uid(),...dados})}
   salvar();fechar();render();toast('Trabalhador salvo');
