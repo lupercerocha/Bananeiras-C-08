@@ -404,6 +404,8 @@ a{color:var(--teal)}
   <button class="btn" onclick="abrirCot()">+ Nova cotação</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="document.getElementById('pdfCotInput').click()">📄 Importar orçamento em PDF</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="colarOrcamento()">✍️ Colar texto do orçamento</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="montarConcorrencia()">⚖ Montar concorrência entre cotações</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="compraEmLote()">✔ Confirmar compra de várias cotações</button>
   <div class="card" style="margin-top:12px">
     <h3>Previsão de gastos</h3>
     <div id="cotPrev"></div>
@@ -947,6 +949,8 @@ function executarPendente(){ const fn=ACAO_PENDENTE; ACAO_PENDENTE=null; if(fn) 
 
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const hoje=()=>new Date().toISOString().slice(0,10);
+const daquiADias=n=>{const d=new Date();d.setDate(d.getDate()+(+n||0));
+  return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);};
 const isPago=l=>l.pag!=='A pagar';
 const pagoParcial=l=>(l.pagamentos||[]).reduce((s,p)=>s+ +p.valor,0);
 const saldoAPagar=l=>isPago(l)?0:Math.max(0,+l.total-pagoParcial(l));
@@ -1265,22 +1269,23 @@ function renderCot(){
      <p class="hint" style="margin-top:0">Soma de ${nSolo} cotação(ões) avulsa(s)${nConc?` + a menor de ${nConc} concorrência(s)`:''}.</p>
      ${semPreco?`<p class="hint" style="margin-top:0">${semPreco} ainda sem preço — a previsão está incompleta.</p>`:''}`;
 
-  document.getElementById('cotList').innerHTML=grupos.map(g=>{
+  const gruposConc=grupos.filter(g=>g.conc&&g.props.length>1);
+  const soltas=grupos.filter(g=>!(g.conc&&g.props.length>1)).reduce((a,g)=>a.concat(g.props),[]);
+  const comPreco=soltas.filter(c=>+c.total>0).sort((a,b)=>b.total-a.total);
+  const aCotar=soltas.filter(c=>!(+c.total>0)).sort((a,b)=>alfa(a.item,b.item));
+
+  const tagVal=c=>{
+    if(!c.validade)return '';
+    const dd=Math.ceil((new Date(c.validade)-new Date())/864e5);
+    return dd<0?'<span class="tag pend">vencida</span>':`<span class="tag ${dd<=2?'pend':''}">vence em ${dd}d</span>`;
+  };
+  const linhaCot=c=>`<div class="item" onclick="verCot('${c.id}')">
+      <div class="mid"><b>${c.item}</b><small>${c.forn||'sem fornecedor'} ${tagVal(c)}</small></div>
+      <div class="val mono">${+c.total>0?brl(c.total):'<span class="tag">a cotar</span>'}</div></div>`;
+
+  const blocoConc=g=>{
     const com=g.props.filter(p=>+p.total>0).sort((a,b)=>a.total-b.total);
     const sem=g.props.filter(p=>!(+p.total>0));
-    const venc=com[0], pior=com[com.length-1];
-
-    if(!(g.conc&&g.props.length>1)){
-      return g.props.map(c=>{
-      let vTag='';
-      if(c.validade){const dd=Math.ceil((new Date(c.validade)-new Date())/864e5);
-        vTag=dd<0?'<span class="tag pend">vencida</span>':`<span class="tag ${dd<=2?'pend':''}">vence em ${dd}d</span>`}
-      return `<div class="item" onclick="verCot('${c.id}')">
-        <div class="mid"><b>${c.item}</b><small>${c.forn||'sem fornecedor'} ${vTag}${c.conc?` · <span class="tag">${c.conc}</span>`:''}</small></div>
-        <div class="val mono">${+c.total>0?brl(c.total):'<span class="tag">a cotar</span>'}</div></div>`;
-      }).join('');
-    }
-
     const A=analisarGrupo(g.props);
     const usarNorm=A.temItens&&A.completas.length>1;
     const ord=usarNorm
@@ -1298,9 +1303,19 @@ function renderCot(){
         <span class="nm">${p.forn||'sem fornecedor'}</span>
         <span class="vl"><span class="tag">a cotar</span></span></div>`).join('')}
       ${eco>0?`<p class="hint" style="margin-top:8px">Escolhendo ${venc2.p.forn||'a menor'}, você economiza ${brl(eco)} em relação à mais cara — ${(eco/pior2.v*100).toFixed(0)}%.${usarNorm&&A.algumaQtdDiverge?' As propostas pediram quantidades diferentes, então os valores acima foram recalculados para a mesma quantidade.':''}</p>`:''}
-      ${A.temItens&&g.props.length>1?`<button class="btn ghost mini" style="margin-top:8px" onclick="event.stopPropagation();verComparativo(${JSON.stringify(g.conc).replace(/"/g,'&quot;')})">Comparar item a item</button>`:''}
+      <div class="row2" style="margin-top:8px">
+        ${A.temItens?`<button class="btn ghost mini" onclick="event.stopPropagation();verComparativo(${JSON.stringify(g.conc).replace(/"/g,'&quot;')})">Comparar item a item</button>`:'<span></span>'}
+        <button class="btn ghost mini" onclick="event.stopPropagation();desfazerConcorrencia(${JSON.stringify(g.conc).replace(/"/g,'&quot;')})">Desfazer</button>
+      </div>
     </div>`;
-  }).join('')||'<div class="empty"><b>Sem cotações abertas</b><p>Registre um orçamento antes de comprar.</p></div>';
+  };
+  const sub=(t,n)=>`<div style="font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);margin:14px 0 6px">${t}${n!==undefined?' ('+n+')':''}</div>`;
+
+  document.getElementById('cotList').innerHTML=
+    ((gruposConc.length?sub('Concorrências',gruposConc.length)+gruposConc.map(blocoConc).join(''):'')
+    +(comPreco.length?sub('Cotações com preço',comPreco.length)+comPreco.map(linhaCot).join(''):'')
+    +(aCotar.length?sub('A cotar',aCotar.length)+aCotar.map(linhaCot).join(''):''))
+    ||'<div class="empty"><b>Sem cotações abertas</b><p>Registre um orçamento antes de comprar.</p></div>';
 
   const fechadas=DB.cot.filter(c=>c.status!=='aberta').sort((a,b)=>(+b.at||0)-(+a.at||0));
   const temOrfa=fechadas.some(c=>c.status==='fechada'&&!(c.lancIds&&c.lancIds.some(id=>DB.lanc.some(l=>l.id===id))));
@@ -1383,6 +1398,111 @@ function analisarGrupo(props){
     algumaQtdDiverge:linhas.some(m=>m.divergeQtd),
     temItens:linhas.length>0,
     venc:completas[0]||null, pior:completas[completas.length-1]||null};
+}
+function compraEmLote(){
+  const abertas=DB.cot.filter(c=>c.status==='aberta'&&+c.total>0).sort((a,b)=>alfa(a.item,b.item));
+  if(!abertas.length){toast('Nenhuma cotação aberta com preço.');return}
+  const etapas=CATS_AZ.filter(c=>c.g==='con');
+  abrir(`<h2>Confirmar compras</h2>
+  <p class="sub">Marque as cotações que viraram compra. Cada item vira um lançamento, com o desconto já aplicado.</p>
+  <div style="max-height:44vh;overflow:auto;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:6px">
+    ${abertas.map(c=>{
+      const nIt=(c.itens||[]).length;
+      return `<label style="display:flex;gap:9px;align-items:flex-start;padding:9px 6px;border-bottom:1px solid var(--line)">
+      <input type="checkbox" class="clSel" value="${c.id}" style="width:auto;margin-top:3px">
+      <span style="flex:1;min-width:0"><b style="font-size:13.5px">${c.item}</b>
+        <div style="font-size:11.5px;color:var(--ink-2)">${c.forn||'sem fornecedor'} · ${nIt} item(ns)${+c.desconto>0?' · desconto '+brl(c.desconto):''}${c.conc?` · <span class="tag">⚖ ${c.conc}</span>`:''}</div>
+      </span><b class="mono" style="white-space:nowrap">${brl(c.total)}</b></label>`;
+    }).join('')}
+  </div>
+  <div class="stat" style="margin-top:10px"><span>Selecionado</span><b class="mono" id="cl_tot">R$ 0,00</b></div>
+  <label>Etapa dos itens que ainda não têm uma</label>
+  <select id="cl_cat">${etapas.map(e=>`<option value="${e.id}">${e.n}</option>`).join('')}</select>
+  <label class="chkline" style="margin-top:10px;display:flex;align-items:center;gap:8px">
+    <input type="checkbox" id="cl_pago" checked style="width:auto"> Já paguei tudo isso
+  </label>
+  <p class="hint">Se alguma cotação estiver numa concorrência, as concorrentes dela são arquivadas automaticamente.</p>
+  <button class="btn" onclick="confirmarCompraLote()">Confirmar compra</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  const upd=()=>{
+    const t=[...document.querySelectorAll('.clSel')].filter(x=>x.checked)
+      .reduce((s,x)=>{const c=DB.cot.find(y=>y.id===x.value); return s+(c?+c.total:0)},0);
+    document.getElementById('cl_tot').textContent=brl(t);
+  };
+  document.querySelectorAll('.clSel').forEach(c=>c.onchange=upd);
+}
+function confirmarCompraLote(){
+  const ids=[...document.querySelectorAll('.clSel')].filter(c=>c.checked).map(c=>c.value);
+  if(!ids.length){toast('Marque pelo menos uma cotação.');return}
+  const etapaPadrao=val('cl_cat')||'c00', pago=document.getElementById('cl_pago').checked;
+  let nLanc=0,nCot=0,arq=0,somaLanc=0;
+  ids.forEach(id=>{
+    const c=DB.cot.find(x=>x.id===id);
+    if(!c||c.status!=='aberta')return;
+    const its=(c.itens&&c.itens.length)?itensComDesconto(c):[{d:c.item,q:1,u:+c.total||0,f:c.forn}];
+    const gerados=[];
+    its.forEach(it=>{
+      const q=+it.q||1;
+      const total=+(q*(+it.u||0)-(+it.descItem||0)).toFixed(2);
+      const unit=q>0?total/q:total;
+      const catId=garantirCategoria(it.cat||etapaPadrao,'con');
+      const nid=uid(); gerados.push(nid); somaLanc+=total;
+      DB.lanc.push({id:nid,at:Date.now(),data:hoje(),desc:capNomes(it.d||c.item),
+        familia:(it.familia||palpiteFamilia(it.d||c.item)||'').trim(),cat:catId,
+        forn:it.f||c.forn,qtd:q,unit,total,rateio:[],
+        pag:pago?'Pago':'A pagar',nf:'',anexos:c.anexos||[],obs:c.obs||'',
+        ctrl:false,qtdRec:0,baixas:[]});
+      nLanc++;
+    });
+    c.status='fechada'; c.at=Date.now(); c.lancIds=gerados; nCot++;
+    if(String(c.conc||'').trim()){
+      DB.cot.filter(x=>x.status==='aberta'&&x.id!==c.id&&alfa2(x.conc||'')===alfa2(c.conc))
+        .forEach(x=>{x.status='arquivada'; x.at=Date.now(); arq++;});
+    }
+  });
+  salvar(); fechar(); render();
+  toast(`${nCot} compra(s) · ${nLanc} lançamento(s) · ${brl(somaLanc)}`+(arq?` · ${arq} concorrente(s) arquivada(s)`:''));
+}
+function montarConcorrencia(){
+  const abertas=DB.cot.filter(c=>c.status==='aberta').sort((a,b)=>b.data.localeCompare(a.data));
+  if(abertas.length<2){toast('Precisa de pelo menos duas cotações abertas.');return}
+  const concs=[...new Set(DB.cot.filter(c=>String(c.conc||'').trim()).map(c=>c.conc.trim()))].sort((a,b)=>alfa(a,b));
+  abrir(`<h2>Montar concorrência</h2>
+  <p class="sub">Marque as cotações que disputam a MESMA compra. Na previsão, só a menor delas conta.</p>
+  <label>Nome da concorrência</label>
+  <input id="mc_nome" data-cap="1" list="dlConc" placeholder="Ex: Louças do banheiro">
+  ${concs.length?`<p class="hint">Já existem: ${concs.map(c=>`<a href="#" onclick="document.getElementById('mc_nome').value=${JSON.stringify(c).replace(/"/g,'&quot;')};return false" style="color:var(--teal)">${c}</a>`).join(' · ')}</p>`:''}
+  <div style="max-height:46vh;overflow:auto;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:6px">
+    ${abertas.map(c=>`<label style="display:flex;gap:9px;align-items:flex-start;padding:9px 6px;border-bottom:1px solid var(--line)">
+      <input type="checkbox" class="mcSel" value="${c.id}" style="width:auto;margin-top:3px">
+      <span style="flex:1;min-width:0">
+        <b style="font-size:13.5px">${c.item}</b>
+        <div style="font-size:11.5px;color:var(--ink-2)">${c.forn||'sem fornecedor'} · ${+c.total>0?brl(c.total):'a cotar'}${c.conc?` · <span class="tag">⚖ ${c.conc}</span>`:''}</div>
+      </span></label>`).join('')}
+  </div>
+  <button class="btn" style="margin-top:10px" onclick="salvarConcorrencia()">Criar concorrência</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function salvarConcorrencia(){
+  const nome=capNomes(val('mc_nome'));
+  const ids=[...document.querySelectorAll('.mcSel')].filter(c=>c.checked).map(c=>c.value);
+  if(!nome){toast('Dê um nome à concorrência.');return}
+  if(ids.length<2){toast('Marque pelo menos duas cotações.');return}
+  ids.forEach(id=>{const c=DB.cot.find(x=>x.id===id); if(c){c.conc=nome; c.at=Date.now();}});
+  salvar(); fechar(); render();
+  toast(ids.length+' cotações em concorrência');
+}
+function desfazerConcorrencia(nome){
+  const alvo=DB.cot.filter(c=>alfa2(c.conc||'')===alfa2(nome));
+  confirmar('Desfazer concorrência',`As ${alvo.length} cotações voltam a valer sozinhas e todas somam na previsão.`,
+    'Desfazer',()=>{
+      alvo.forEach(c=>{c.conc=''; c.at=Date.now();});
+      salvar(); fechar(); render(); toast('Concorrência desfeita');
+    });
+}
+function tirarDaConcorrencia(id){
+  const c=DB.cot.find(x=>x.id===id); if(!c)return;
+  c.conc=''; c.at=Date.now(); salvar(); fechar(); render(); toast('Cotação fora da concorrência');
 }
 function verComparativo(nomeGrupo){
   const props=DB.cot.filter(c=>c.status==='aberta'&&alfa2(c.conc||'')===alfa2(nomeGrupo||'')&&String(c.conc||'').trim());
@@ -2796,15 +2916,14 @@ function darBaixa(id){
 function abrirCot(c){
   c=c||{id:'',item:'',forn:'',validade:'',obs:'',itens:[{c:'',d:'',q:1,u:0,f:''}]};
   panel._its=JSON.parse(JSON.stringify(c.itens&&c.itens.length?c.itens:[{c:'',d:'',q:1,u:0,f:''}]));
+  panel._cotConc=String(c.conc||'').trim();
   abrir(`<h2>${c.id?'Editar cotação':'Nova cotação'}</h2>
   <p class="sub">Preço de mercado. Ainda não é gasto.</p>
   <label>Do que se trata</label><input id="c_item" data-cap="1" value="${c.item||''}" placeholder="Ex: Blocos e canaletas de concreto">
   <p class="hint">Use o mesmo texto ao cotar com outros fornecedores — é o que agrupa as propostas para comparar.</p>
   <label>Fornecedor</label><input id="c_forn" data-cap="1" value="${c.forn||''}">
-  <label>Concorrência (opcional)</label>
-  <input id="c_conc" data-cap="1" list="dlConc" value="${(c.conc||'').replace(/"/g,'&quot;')}" placeholder="Ex: Ferro da fundação">
-  <p class="hint">Só preencha quando esta proposta disputar a MESMA compra com outro fornecedor. Cotações com a mesma concorrência entram na previsão só pela menor; as demais somam todas.</p>
-  <label>Validade da proposta</label><input type="date" id="c_val" value="${c.validade||''}">
+  <label>Validade da proposta</label><input type="date" id="c_val" value="${c.validade||daquiADias(5)}">
+  <p class="hint">Preenchida com 5 dias por padrão — ajuste se o fornecedor der outro prazo.</p>
   <label>Anexos</label>
   <div id="anexosCot"></div>
   <div class="divider"></div>
@@ -2904,7 +3023,7 @@ function salvarCot(id){
   const sub=somaItens(its);
   const desconto=Math.min(Math.max(moeda2num(val('c_desc')),0),sub);
   const c={id:id||uid(),at:Date.now(),data:hoje(),item:capNomes(val('c_item')),forn:capNomes(val('c_forn')),
-    conc:capNomes(val('c_conc')),
+    conc:(panel._cotConc||''),
     itens:its.length?its:[{c:'',d:val('c_item').trim(),q:1,u:0,f:''}],
     desconto,total:+(sub-desconto).toFixed(2),validade:val('c_val'),anexos:ANX_ALVO||[],obs:val('c_obs').trim(),status:'aberta'};
   if(!c.item){toast('Descreva do que se trata a cotação.');return}
@@ -2935,6 +3054,7 @@ function verCot(id){
   ${fechada?`<button class="btn ghost mini" style="width:100%" onclick="reabrirCot('${c.id}')">Reabrir cotação</button>`:`
   <button class="btn" onclick="virouCompra('${c.id}')">Virou compra</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="outraProposta('${c.id}')">Cotar com outro fornecedor</button>
+  ${String(c.conc||'').trim()?`<button class="btn ghost mini" style="margin-top:9px" onclick="tirarDaConcorrencia('${c.id}')">Tirar da concorrência "${c.conc}"</button>`:''}
   <div class="row2" style="margin-top:9px">
     <button class="btn ghost mini" onclick="abrirCot(DB.cot.find(x=>x.id==='${c.id}'))">Editar</button>
     <button class="btn ghost mini" onclick="arquivarCot('${c.id}')">Arquivar</button>
@@ -3538,8 +3658,9 @@ function usarOrcamentoLido(ajustar){
     else itens.push({c:'',d:'Frete / acréscimo',q:1,u:dif,f:''}); /* acréscimo vira item */
   }
   preencherFamilias(itens);
-  abrirCot({id:'',item:'',forn:capNomes(p.forn||''),validade:p.val||'',itens,desconto,
-    obs:'Importado de '+p.nome});
+  const obsExtra=(p.val&&p.val!==daquiADias(5))?` · o documento declara validade até ${p.val.split('-').reverse().join('/')}`:'';
+  abrirCot({id:'',item:'',forn:capNomes(p.forn||''),validade:daquiADias(5),itens,desconto,
+    obs:'Importado de '+p.nome+obsExtra});
 }
 function verTextoPdf(){
   const p=PDF_LIDO; if(!p)return;
