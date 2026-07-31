@@ -121,6 +121,19 @@ html[data-theme="dark"] .tag.adm{color:#E0A23C}
  font-weight:700;font-size:15px;cursor:pointer;letter-spacing:-.01em}
 .btn:active{transform:scale(.985)}
 .btn.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line)}
+.btn.soft{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
+/* grade de ações secundárias: 2 por linha no celular, 4 no computador */
+.acoes{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:9px}
+@media(min-width:620px){.acoes{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:620px){.acoes.tres{grid-template-columns:repeat(3,1fr)}}
+.acoes .btn{margin:0;padding:11px 6px;font-size:12.5px;font-weight:600;line-height:1.2;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:62px}
+.acoes .btn .ic{font-size:18px;line-height:1}
+.acoes .btn.perigo{color:var(--red)}
+/* linha de "marcar todos" nas listas de seleção */
+.selall{display:flex;align-items:center;gap:9px;padding:9px 8px;background:var(--surface-2);
+ border-radius:10px;margin-bottom:6px;font-size:13px;font-weight:600;cursor:pointer}
+.selall input{width:auto}
 .btn.dark{background:var(--navy)} html[data-theme="dark"] .btn.dark{background:var(--surface-2)}
 .btn.danger{background:var(--red)}
 .row2{display:flex;gap:9px} .row2>*{flex:1}
@@ -395,17 +408,23 @@ a{color:var(--teal)}
 <!-- ============ NOTAS FISCAIS ============ -->
 <section class="view" id="v-notas">
   <button class="btn" onclick="document.getElementById('notaInput').click()">📎 Enviar nota fiscal</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirNota()">+ Lançar nota manualmente</button>
+  <div class="acoes tres">
+    <button class="btn soft" onclick="abrirNota()"><span class="ic">＋</span>Lançar à mão</button>
+    <button class="btn soft" onclick="relatorioNotas()"><span class="ic">📊</span>Relatório</button>
+    <button class="btn soft" onclick="exportItensNotasCSV()"><span class="ic">⬇</span>Itens em CSV</button>
+  </div>
   <div id="notasBody"></div>
 </section>
 
 <!-- ============ COTAÇÕES ============ -->
 <section class="view" id="v-cot">
   <button class="btn" onclick="abrirCot()">+ Nova cotação</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="document.getElementById('pdfCotInput').click()">📄 Importar orçamento em PDF</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="colarOrcamento()">✍️ Colar texto do orçamento</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="montarConcorrencia()">⚖ Montar concorrência entre cotações</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="compraEmLote()">✔ Confirmar compra de várias cotações</button>
+  <div class="acoes">
+    <button class="btn soft" onclick="document.getElementById('pdfCotInput').click()"><span class="ic">📄</span>Importar PDF</button>
+    <button class="btn soft" onclick="colarOrcamento()"><span class="ic">✍️</span>Colar texto</button>
+    <button class="btn soft" onclick="montarConcorrencia()"><span class="ic">⚖</span>Concorrência</button>
+    <button class="btn soft" onclick="compraEmLote()"><span class="ic">✔</span>Comprar</button>
+  </div>
   <div class="card" style="margin-top:12px">
     <h3>Previsão de gastos</h3>
     <div id="cotPrev"></div>
@@ -461,11 +480,11 @@ a{color:var(--teal)}
     <h3>Álbum da obra</h3>
     <input type="file" id="fotoInput" accept="image/*" capture="environment" hidden>
     <input type="file" id="fotoInputGaleria" accept="image/*" hidden>
-    <div class="row2">
-      <button class="btn" onclick="document.getElementById('fotoInput').click()">📷 Tirar foto</button>
-      <button class="btn ghost" onclick="document.getElementById('fotoInputGaleria').click()">🖼️ Da galeria</button>
+    <div class="acoes tres" style="margin-top:0">
+      <button class="btn" onclick="document.getElementById('fotoInput').click()"><span class="ic">📷</span>Tirar foto</button>
+      <button class="btn soft" onclick="document.getElementById('fotoInputGaleria').click()"><span class="ic">🖼️</span>Galeria</button>
+      <button class="btn soft" onclick="verSequencia()"><span class="ic">▶</span>Ver em sequência</button>
     </div>
-    <button class="btn ghost mini" style="margin-top:9px" onclick="verSequencia()">▶ Ver fotos em sequência</button>
     <p class="hint">A foto é reduzida e guardada no aparelho com data, hora e etapa. Para o arquivo original em alta, envie também para a pasta Fotos do Drive.</p>
   </div>
   <div id="fotosWrap"></div>
@@ -1399,13 +1418,19 @@ function analisarGrupo(props){
     temItens:linhas.length>0,
     venc:completas[0]||null, pior:completas[completas.length-1]||null};
 }
+function marcarTodos(el,classe){
+  document.querySelectorAll('.'+classe).forEach(c=>{
+    if(c.checked!==el.checked){ c.checked=el.checked; if(c.onchange)c.onchange(); }
+  });
+}
 function compraEmLote(){
   const abertas=DB.cot.filter(c=>c.status==='aberta'&&+c.total>0).sort((a,b)=>alfa(a.item,b.item));
   if(!abertas.length){toast('Nenhuma cotação aberta com preço.');return}
   const etapas=CATS_AZ.filter(c=>c.g==='con');
   abrir(`<h2>Confirmar compras</h2>
   <p class="sub">Marque as cotações que viraram compra. Cada item vira um lançamento, com o desconto já aplicado.</p>
-  <div style="max-height:44vh;overflow:auto;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:6px">
+  <label class="selall" style="margin-top:10px"><input type="checkbox" onchange="marcarTodos(this,'clSel')"> Marcar todas (${abertas.length})</label>
+  <div style="max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:6px">
     ${abertas.map(c=>{
       const nIt=(c.itens||[]).length;
       return `<label style="display:flex;gap:9px;align-items:flex-start;padding:9px 6px;border-bottom:1px solid var(--line)">
@@ -1472,7 +1497,8 @@ function montarConcorrencia(){
   <label>Nome da concorrência</label>
   <input id="mc_nome" data-cap="1" list="dlConc" placeholder="Ex: Louças do banheiro">
   ${concs.length?`<p class="hint">Já existem: ${concs.map(c=>`<a href="#" onclick="document.getElementById('mc_nome').value=${JSON.stringify(c).replace(/"/g,'&quot;')};return false" style="color:var(--teal)">${c}</a>`).join(' · ')}</p>`:''}
-  <div style="max-height:46vh;overflow:auto;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:6px">
+  <label class="selall" style="margin-top:10px"><input type="checkbox" onchange="marcarTodos(this,'mcSel')"> Marcar todas (${abertas.length})</label>
+  <div style="max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:6px">
     ${abertas.map(c=>`<label style="display:flex;gap:9px;align-items:flex-start;padding:9px 6px;border-bottom:1px solid var(--line)">
       <input type="checkbox" class="mcSel" value="${c.id}" style="width:auto;margin-top:3px">
       <span style="flex:1;min-width:0">
@@ -2015,7 +2041,6 @@ function renderNotas(){
   </div>
   <div class="card">
     <input id="fBuscaNota" placeholder="Buscar por fornecedor, número, item..." value="${busca?((document.getElementById('fBuscaNota')||{}).value||''):''}">
-    <button class="btn ghost mini" style="margin-top:9px" onclick="relatorioNotas()">📄 Relatório final de notas</button>
   </div>
   <div class="card">
     <h3>Notas (${L.length})</h3>
@@ -3552,7 +3577,8 @@ function escolherLinhasItens(){
   const p=PDF_LIDO; if(!p)return;
   abrir(`<h2>Escolher as linhas dos itens</h2>
   <p class="sub">Marque as linhas que são produtos. O app lê quantidade e valores de cada uma.</p>
-  <div style="max-height:52vh;overflow:auto;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:8px">
+  <label class="selall" style="margin-top:10px"><input type="checkbox" onchange="marcarTodos(this,'lnItem')"> Marcar todas as linhas (${p.linhas.length})</label>
+  <div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:8px">
     ${p.linhas.map((t,i)=>{
       const n=acharMoedas(t).length;
       return `<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-bottom:1px solid var(--line);font-size:12px;font-family:monospace">
@@ -4026,18 +4052,20 @@ function renderIO(){
     <div class="stat"><span>Conta</span><b style="font-size:12.5px">${SESSAO.user.email}</b></div>`:''}
   </div>
   <button class="btn dark" onclick="exportJSON()">Exportar backup</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="verBackupTexto()">Ver backup como texto (copiar manualmente)</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="verBackupNovoTexto()">Ver só o que eu digitei (sem dados de exemplo)</button>
-  <div class="row2" style="margin-top:9px">
-    <button class="btn ghost mini" onclick="exportCSV()">Gastos em CSV</button>
-    <button class="btn ghost mini" onclick="document.getElementById('impInput').click()">Importar / juntar</button>
+  <div class="acoes">
+    <button class="btn soft" onclick="document.getElementById('impInput').click()"><span class="ic">⬆</span>Importar</button>
+    <button class="btn soft" onclick="exportCSV()"><span class="ic">⬇</span>Gastos CSV</button>
+    <button class="btn soft" onclick="verBackupTexto()"><span class="ic">📋</span>Backup em texto</button>
+    <button class="btn soft" onclick="verBackupNovoTexto()"><span class="ic">✂</span>Só o que digitei</button>
   </div>
   <p class="hint">Os dados sincronizam com a nuvem automaticamente. Continuam funcionando offline e são salvos também neste aparelho.</p>
   <div class="divider" style="margin:16px 0"></div>
-  <button class="btn ghost mini" onclick="verRestauracao()">Pontos de restauração</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirCfg()">Prazo e área construída</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirDuplicados()">Verificar duplicados</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="verCategorias()">Categorias e etapas</button>`;
+  <div class="acoes" style="margin-top:0">
+    <button class="btn soft" onclick="abrirCfg()"><span class="ic">📐</span>Prazo e área</button>
+    <button class="btn soft" onclick="verCategorias()"><span class="ic">🏷️</span>Categorias</button>
+    <button class="btn soft" onclick="abrirDuplicados()"><span class="ic">🔍</span>Duplicados</button>
+    <button class="btn soft" onclick="verRestauracao()"><span class="ic">⏱</span>Restaurar</button>
+  </div>`;
 }
 
 /* ---------- avatar / conta / manual ---------- */
