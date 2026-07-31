@@ -64,6 +64,45 @@ header .brand span{display:block;font-size:11px;color:#8FB8C4;letter-spacing:.08
 .acctMenu .div2{height:1px;background:var(--line);margin:6px 2px}
 
 main{padding:16px 14px 20px;max-width:760px;margin:0 auto}
+
+/* ---------- folha de impressão / salvar em PDF ---------- */
+#printArea{display:none}
+@media print{
+  @page{size:A4 portrait;margin:14mm 12mm}
+  html,body{background:#fff!important;color:#000!important}
+  .topbar,main,.sheet,#authGate,.toast,nav,header{display:none!important}
+  #printArea{display:block!important;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#000}
+  .pf-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
+    border-bottom:2px solid #0A1F2E;padding-bottom:8px;margin-bottom:14px}
+  .pf-top h1{font-size:17pt;margin:0;color:#0A1F2E}
+  .pf-sub{font-size:8.5pt;color:#444;margin-top:2px}
+  .pf-data{font-size:8.5pt;color:#444;white-space:nowrap}
+  .pf-forn{margin-bottom:16px}
+  .pf-forn h2{font-size:12.5pt;margin:0 0 1px;color:#0A1F2E;border-bottom:1px solid #bbb;padding-bottom:3px}
+  .pf-fsub{font-size:8.5pt;color:#555;margin-bottom:8px}
+  .pc{border:1px solid #ccc;border-radius:5px;padding:8px 10px;margin-bottom:10px;page-break-inside:avoid}
+  .pc-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .pc-h b{font-size:11pt}
+  .pc-tag{font-size:7.5pt;background:#eee;border-radius:3px;padding:1px 5px;margin-left:6px;white-space:nowrap}
+  .pc-v{font-size:12pt;font-weight:700;white-space:nowrap}
+  .pc-sub{font-size:8pt;color:#555;margin-bottom:6px}
+  .pc table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-top:4px}
+  .pc th{text-align:left;background:#f0f0f0;padding:3px 5px;border-bottom:1px solid #bbb;font-size:7.5pt;text-transform:uppercase;letter-spacing:.04em}
+  .pc td{padding:3px 5px;border-bottom:1px solid #eee;vertical-align:top}
+  .pc .r{text-align:right;white-space:nowrap}
+  .pc .c{color:#666;white-space:nowrap}
+  .pc-tot{width:auto!important;min-width:46%;margin-left:auto;margin-top:5px}
+  .pc-tot td{border:0;padding:2px 5px;font-size:9pt}
+  .pc-tot tr.f td{border-top:1px solid #999;font-weight:700;font-size:10pt;padding-top:4px}
+  .pc-obs{font-size:8pt;color:#444;margin:5px 0 0;font-style:italic}
+  .pc-vazio{font-size:8.5pt;color:#666;margin:4px 0}
+  .pc-conf{font-size:8.5pt;margin-top:7px;padding-top:5px;border-top:1px dashed #bbb;color:#222}
+  .pf-fim{margin-top:6px;page-break-inside:avoid}
+  .pf-ass{display:flex;gap:26px;margin-top:26px;font-size:8.5pt;color:#333}
+  .pf-ass>div{flex:1}
+  .pf-ass .ln{border-bottom:1px solid #333;height:22px;margin-bottom:3px}
+  .pf-rod{font-size:7.5pt;color:#777;margin-top:16px;border-top:1px solid #ddd;padding-top:5px}
+}
 @media (min-width:860px){
   main{max-width:920px;padding:22px 20px 28px}
   .grid{grid-template-columns:repeat(4,1fr)}
@@ -123,9 +162,7 @@ html[data-theme="dark"] .tag.adm{color:#E0A23C}
 .btn.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line)}
 .btn.soft{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
 /* grade de ações secundárias: 2 por linha no celular, 4 no computador */
-.acoes{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:9px}
-@media(min-width:620px){.acoes{grid-template-columns:repeat(4,1fr)}}
-@media(min-width:620px){.acoes.tres{grid-template-columns:repeat(3,1fr)}}
+.acoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:9px}
 .acoes .btn{margin:0;padding:11px 6px;font-size:12.5px;font-weight:600;line-height:1.2;
  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:62px}
 .acoes .btn .ic{font-size:18px;line-height:1}
@@ -424,6 +461,7 @@ a{color:var(--teal)}
     <button class="btn soft" onclick="colarOrcamento()"><span class="ic">✍️</span>Colar texto</button>
     <button class="btn soft" onclick="montarConcorrencia()"><span class="ic">⚖</span>Concorrência</button>
     <button class="btn soft" onclick="compraEmLote()"><span class="ic">✔</span>Comprar</button>
+    <button class="btn soft" onclick="abrirImpressaoCot()"><span class="ic">🖨</span>Imprimir</button>
   </div>
   <div class="card" style="margin-top:12px">
     <h3>Previsão de gastos</h3>
@@ -548,6 +586,7 @@ a{color:var(--teal)}
 <datalist id="dlConc"></datalist>
 <div class="sheet" id="sheet"><div class="bg" onclick="fechar()"></div><div class="panel" id="panel"></div></div>
 <div class="toast" id="toast"></div>
+<div id="printArea"></div>
 
 <script>
 /* ---------- Supabase: config, login e sincronização ---------- */
@@ -1423,6 +1462,116 @@ function marcarTodos(el,classe){
     if(c.checked!==el.checked){ c.checked=el.checked; if(c.onchange)c.onchange(); }
   });
 }
+/* ---------- impressão das cotações em aberto (salvar em PDF) ---------- */
+function abrirImpressaoCot(){
+  const abertas=DB.cot.filter(c=>c.status==='aberta')
+    .sort((a,b)=>alfa(a.forn||'zzz',b.forn||'zzz')||alfa(a.item,b.item));
+  if(!abertas.length){toast('Nenhuma cotação aberta.');return}
+  const forns=[...new Set(abertas.map(c=>c.forn||'Sem fornecedor'))].sort((a,b)=>alfa(a,b));
+  abrir(`<h2>Imprimir cotações</h2>
+  <p class="sub">Gera uma folha por fornecedor para conferência, com itens, preços e descontos.</p>
+  ${forns.length>1?`<label>Fornecedor</label>
+  <select id="ip_forn" onchange="filtrarImpressaoForn()">
+    <option value="">Todos (${abertas.length} cotações)</option>
+    ${forns.map(f=>`<option value="${f.replace(/"/g,'&quot;')}">${f}</option>`).join('')}
+  </select>`:''}
+  <label class="selall" style="margin-top:10px"><input type="checkbox" id="ip_all" checked onchange="marcarTodos(this,'ipSel')"> Marcar todas (${abertas.length})</label>
+  <div style="max-height:42vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:6px" id="ip_lista">
+    ${abertas.map(c=>`<label class="ipLinha" data-forn="${(c.forn||'Sem fornecedor').replace(/"/g,'&quot;')}"
+      style="display:flex;gap:9px;align-items:flex-start;padding:9px 6px;border-bottom:1px solid var(--line)">
+      <input type="checkbox" class="ipSel" value="${c.id}" checked style="width:auto;margin-top:3px">
+      <span style="flex:1;min-width:0"><b style="font-size:13.5px">${c.item}</b>
+        <div style="font-size:11.5px;color:var(--ink-2)">${c.forn||'sem fornecedor'} · ${(c.itens||[]).length} item(ns)${c.conc?' · ⚖ '+c.conc:''}</div>
+      </span><b class="mono" style="white-space:nowrap">${+c.total>0?brl(c.total):'a cotar'}</b></label>`).join('')}
+  </div>
+  <label class="chkline" style="margin-top:10px;display:flex;align-items:center;gap:8px">
+    <input type="checkbox" id="ip_assina" checked style="width:auto"> Incluir espaço para assinatura do fornecedor
+  </label>
+  <button class="btn" style="margin-top:10px" onclick="gerarImpressaoCot()">🖨 Gerar folha</button>
+  <p class="hint">Na janela de impressão, escolha "Salvar como PDF" para enviar ao fornecedor pelo WhatsApp ou e-mail.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function filtrarImpressaoForn(){
+  const f=val('ip_forn');
+  document.querySelectorAll('.ipLinha').forEach(l=>{
+    const bate=!f||l.dataset.forn===f;
+    l.style.display=bate?'flex':'none';
+    l.querySelector('.ipSel').checked=bate;
+  });
+  const a=document.getElementById('ip_all'); if(a)a.checked=true;
+}
+function gerarImpressaoCot(){
+  const ids=[...document.querySelectorAll('.ipSel')].filter(c=>c.checked&&c.closest('.ipLinha').style.display!=='none')
+    .map(c=>c.value);
+  if(!ids.length){toast('Marque pelo menos uma cotação.');return}
+  const assina=document.getElementById('ip_assina').checked;
+  const cots=ids.map(id=>DB.cot.find(c=>c.id===id)).filter(Boolean);
+
+  const antes=OCULTAR; OCULTAR=false;                    /* na folha os valores sempre aparecem */
+  const dt=new Date().toLocaleDateString('pt-BR');
+  const dtHora=new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+  const porForn={};
+  cots.forEach(c=>{const k=c.forn||'Sem fornecedor';(porForn[k]=porForn[k]||[]).push(c)});
+  const totalGeral=cots.reduce((s,c)=>s+ +c.total,0);
+
+  const bloco=c=>{
+    const its=(c.itens||[]);
+    const sub=somaItens(its), desc=+c.desconto||0;
+    return `<div class="pc">
+      <div class="pc-h">
+        <div><b>${c.item}</b>${c.conc?`<span class="pc-tag">concorrência: ${c.conc}</span>`:''}</div>
+        <div class="pc-v">${brl(c.total)}</div>
+      </div>
+      <div class="pc-sub">Cotação de ${c.data.split('-').reverse().join('/')}${c.validade?` · válida até ${c.validade.split('-').reverse().join('/')}`:''}</div>
+      ${its.length?`<table>
+        <thead><tr><th>Cód.</th><th>Produto</th><th class="r">Qtd</th><th class="r">Vlr unit.</th><th class="r">Total</th></tr></thead>
+        <tbody>${its.map(i=>`<tr>
+          <td class="c">${i.c||''}</td><td>${i.d||''}</td>
+          <td class="r">${(+i.q||0).toLocaleString('pt-BR')}</td>
+          <td class="r">${brl(i.u)}</td>
+          <td class="r">${brl((+i.q||0)*(+i.u||0))}</td></tr>`).join('')}</tbody>
+      </table>`:'<p class="pc-vazio">Sem itens detalhados.</p>'}
+      <table class="pc-tot">
+        ${desc>0?`<tr><td>Soma dos itens</td><td class="r">${brl(sub)}</td></tr>
+        <tr><td>Desconto negociado</td><td class="r">− ${brl(desc)}</td></tr>`:''}
+        <tr class="f"><td>Total${desc>0?' com desconto':''}</td><td class="r">${brl(c.total)}</td></tr>
+      </table>
+      ${c.obs?`<p class="pc-obs">Obs.: ${c.obs}</p>`:''}
+      <div class="pc-conf">Confere? ( &nbsp;&nbsp; ) Sim &nbsp;&nbsp;&nbsp; ( &nbsp;&nbsp; ) Corrigir: ______________________________________________</div>
+    </div>`;
+  };
+
+  document.getElementById('printArea').innerHTML=`
+    <div class="pf">
+      <div class="pf-top">
+        <div><h1>Conferência de cotações</h1>
+          <div class="pf-sub">Obra Bananeiras C08 · Monte das Cerejeiras, Quadra B, Lote 08 · Bananeiras-PB</div></div>
+        <div class="pf-data">Emitido em ${dtHora}</div>
+      </div>
+      ${Object.keys(porForn).sort((a,b)=>alfa(a,b)).map(f=>`
+        <div class="pf-forn">
+          <h2>${f}</h2>
+          <div class="pf-fsub">${porForn[f].length} cotação(ões) · total ${brl(porForn[f].reduce((s,c)=>s+ +c.total,0))}</div>
+          ${porForn[f].map(bloco).join('')}
+        </div>`).join('')}
+      <div class="pf-fim">
+        <table class="pc-tot"><tr class="f"><td>Total geral das cotações</td><td class="r">${brl(totalGeral)}</td></tr></table>
+        ${assina?`<div class="pf-ass">
+          <div><div class="ln"></div>Assinatura do fornecedor</div>
+          <div><div class="ln"></div>Data</div>
+        </div>`:''}
+        <p class="pf-rod">Documento de conferência — não é pedido de compra nem documento fiscal. Gerado em ${dt}.</p>
+      </div>
+    </div>`;
+  OCULTAR=antes;
+  fechar();
+  document.documentElement.classList.add('imprimindo');
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>document.documentElement.classList.remove('imprimindo'),400);
+  },80);
+}
+
 function compraEmLote(){
   const abertas=DB.cot.filter(c=>c.status==='aberta'&&+c.total>0).sort((a,b)=>alfa(a.item,b.item));
   if(!abertas.length){toast('Nenhuma cotação aberta com preço.');return}

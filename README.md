@@ -82,7 +82,7 @@ Os arquivos das notas não entram nesse pacote: ficam no IndexedDB do aparelho e
 
 **Cotações** — cada cotação vale por si e soma na previsão de pagamento. Quando duas ou mais disputam a **mesma** compra, você monta uma **concorrência** entre elas (botão "Montar concorrência", depois de criadas) e só a menor passa a contar na previsão. Dentro de uma concorrência, a comparação é feita **pelo preço unitário de cada item**, recalculando todas para a mesma quantidade — assim um orçamento com quantidade menor não ganha por engano. Mostra ainda quanto custaria comprando cada item no fornecedor mais barato.
 
-A lista vem separada em concorrências, cotações com preço e a cotar. Importa orçamento em PDF ou texto colado, tem campo de desconto negociado rateado entre os itens, validade preenchida com 5 dias por padrão, anexo de vários PDFs (que abrem dentro do sistema) e confirmação de compra **em lote**: marque várias cotações já acertadas e todas viram lançamentos de uma vez.
+A lista vem separada em concorrências, cotações com preço e a cotar. O botão "Imprimir" gera uma folha A4 por fornecedor, com itens, preços, desconto e espaço de conferência — feita para salvar em PDF e mandar ao fornecedor. Importa orçamento em PDF ou texto colado, tem campo de desconto negociado rateado entre os itens, validade preenchida com 5 dias por padrão, anexo de vários PDFs (que abrem dentro do sistema) e confirmação de compra **em lote**: marque várias cotações já acertadas e todas viram lançamentos de uma vez.
 
 **Notas** — arquivo das notas fiscais para o habite-se. O XML da NF-e é lido por completo e sem erro; o PDF do DANFE é lido por texto, com conferência. Os itens da nota podem virar gastos da obra em um toque. Relatório final por nota e por item, em planilha.
 
