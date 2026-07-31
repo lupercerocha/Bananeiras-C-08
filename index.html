@@ -499,6 +499,9 @@ a{color:var(--teal)}
       </select>
     </div>
   </div>
+  <div class="acoes" style="margin-top:0">
+    <button class="btn soft" onclick="abrirPreencherTipos()"><span class="ic">🏷️</span>Preencher tipos</button>
+  </div>
   <div id="itensObra"></div>
 </section>
 
@@ -2080,7 +2083,7 @@ const FAMILIAS_PADRAO=[
   [/telha|cumeeira/i,'Telha'],
   [/prego|parafuso|bucha|arruela|porca|abraçadeira|abracadeira/i,'Fixação'],
   /* ferramentas antes de madeira e elétrico: "peneira de madeira", "enxada com cabo" */
-  [/enxad|\bpa\b|\bpá\b|balde|peneira|talhadeira|carrinho\s*de\s*m|colher\s*de\s*pedreiro|martelo|marreta|trena|prumo|n[ií]vel\b|serrote|broca|ponteiro|desempenadeira|esquadro|linha\s*de\s*pedreiro|vassoura|espátula|espatula/i,'Ferramentas da Obra'],
+  [/enxad|\bpa\b|\bpá\b|balde|peneira|talhadeira|picareta|chibanca|cavadeira|alavanca|foice|machado|enx[óo]|carrinho\s*de\s*m|colher\s*de\s*pedreiro|martelo|marreta|trena|prumo|n[ií]vel\b|serrote|serra\b|broca|ponteiro|desempenadeira|esquadro|r[ée]gua\s*de\s*pedreiro|linha\s*de\s*pedreiro|vassoura|esp[áa]tula|betoneira|andaime|escada|cabo\s*ferramenta|furadeira|esmerilhadeira|lixadeira|maçarico|macarico/i,'Ferramentas da Obra'],
   [/fossa|sumidouro/i,'Fossa'],
   [/vaso\s*sanit|bacia|chuveiro|\bpia\b|cuba|lavat[óo]rio|assento\s*sanit/i,'Louças e metais'],
   [/tubo|joelho|\bluva\b|registro|torneira|caixa\s*d.?[aá]gua|mangueira|veda\s*rosca|adesivo\s*pl|sif[ãa]o|ralo|esgoto|conex[ãa]o|cola\s*pvc/i,'Hidráulica'],
@@ -2112,6 +2115,40 @@ function palpiteFamilia(desc){
   jaUsadas.forEach(f=>{const k=alfa2(f);
     if(k.length>=3&&alvo.includes(k)&&k.length>melhor.length)melhor=f;});
   return melhor;
+}
+/* preenche o tipo dos lançamentos que ficaram sem — inclusive os importados antes desta função existir */
+function tiposFaltando(){
+  return DB.lanc.filter(l=>!String(l.familia||'').trim())
+    .map(l=>({l,palpite:palpiteFamilia(l.desc)}));
+}
+function abrirPreencherTipos(){
+  const faltam=tiposFaltando();
+  if(!faltam.length){toast('Todos os lançamentos já têm tipo.');return}
+  const comPalpite=faltam.filter(x=>x.palpite), sem=faltam.filter(x=>!x.palpite);
+  abrir(`<h2>Preencher tipos de produto</h2>
+  <p class="sub">${faltam.length} lançamento(s) sem tipo. Confira os palpites antes de aplicar.</p>
+  ${comPalpite.length?`<label class="selall" style="margin-top:10px"><input type="checkbox" checked onchange="marcarTodos(this,'tpSel')"> Marcar todos (${comPalpite.length})</label>
+  <div style="max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:6px">
+    ${comPalpite.map(x=>`<label style="display:flex;gap:9px;align-items:flex-start;padding:8px 6px;border-bottom:1px solid var(--line)">
+      <input type="checkbox" class="tpSel" value="${x.l.id}" data-fam="${x.palpite.replace(/"/g,'&quot;')}" checked style="width:auto;margin-top:3px">
+      <span style="flex:1;min-width:0;font-size:13px">${x.l.desc}
+        <div style="font-size:11.5px;color:var(--ink-2)">${x.l.data.split('-').reverse().join('/')}${x.l.forn?' · '+x.l.forn:''}</div>
+      </span><span class="tag" style="white-space:nowrap">${x.palpite}</span></label>`).join('')}
+  </div>
+  <button class="btn" style="margin-top:10px" onclick="aplicarTipos()">Aplicar aos marcados</button>`
+  :'<p class="hint">Não consegui adivinhar o tipo de nenhum deles.</p>'}
+  ${sem.length?`<p class="hint">${sem.length} sem palpite (${sem.slice(0,4).map(x=>x.l.desc).join(', ')}${sem.length>4?'...':''}) — preencha na tela do gasto.</p>`:''}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function aplicarTipos(){
+  const sel=[...document.querySelectorAll('.tpSel')].filter(c=>c.checked);
+  if(!sel.length){toast('Marque pelo menos um.');return}
+  let n=0;
+  sel.forEach(c=>{
+    const l=DB.lanc.find(x=>x.id===c.value);
+    if(l&&!String(l.familia||'').trim()){ l.familia=c.dataset.fam; l.at=Date.now(); n++; }
+  });
+  salvar(); fechar(); render(); toast(n+' lançamento(s) com tipo preenchido');
 }
 function preencherFamilias(itens){
   (itens||[]).forEach(i=>{ if(!String(i.familia||'').trim()) i.familia=palpiteFamilia(i.d); });
@@ -2799,7 +2836,7 @@ function abrirGasto(l){
   abrir(`<h2>${l.id?'Editar gasto':'Lançar gasto'}</h2>
   <p class="sub">O valor entra por inteiro na data do pagamento.</p>
   <label>Data</label><input type="date" id="x_data" value="${l.data}">
-  <div id="descUnica"><label>Descrição</label><input id="x_desc" data-cap="1" list="dlProdutos" value="${l.desc}" placeholder="Ex: 100 sacos de cimento 50kg">
+  <div id="descUnica"><label>Descrição</label><input id="x_desc" data-cap="1" list="dlProdutos" value="${l.desc}" placeholder="Ex: 100 sacos de cimento 50kg" onblur="sugerirTipo()" onchange="sugerirTipo()">
     <label>Tipo de produto (opcional)</label>
     <div class="combo"><input id="x_fam" autocomplete="off"
       oninput="comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
@@ -2930,6 +2967,13 @@ function atualizarResumoRateio(){
   if(n===0){ el.innerHTML='<p class="hint" style="color:var(--red);margin-top:6px">Escolha ao menos uma etapa.</p>'; return; }
   el.innerHTML=n===1?'':`<p class="hint" style="margin-top:6px">Dividido igualmente entre ${n} etapas: ${brl(tot/n)} cada.</p>`;
 }
+/* sugere o tipo assim que a descrição é escrita, sem sobrescrever o que você digitou */
+function sugerirTipo(){
+  const d=document.getElementById('x_desc'), f=document.getElementById('x_fam');
+  if(!d||!f||String(f.value||'').trim())return;
+  const p=palpiteFamilia(d.value);
+  if(p)f.value=p;
+}
 function salvarGasto(id){
   const multiChk=document.getElementById('x_multi');
   const usaMulti=multiChk&&multiChk.checked;
@@ -2940,7 +2984,7 @@ function salvarGasto(id){
     const data=val('x_data'), forn0=val('x_forn').trim(), pag=val('x_pag'), obs=val('x_obs').trim();
     const anexos=ANX_ALVO||[], at=Date.now();
     its.forEach(it=>{
-      DB.lanc.push({id:uid(),at,data,desc:it.d.trim(),familia:(it.familia||'').trim(),cat:garantirCategoria(it.cat,'con'),forn:(it.f&&it.f.trim())||forn0,
+      DB.lanc.push({id:uid(),at,data,desc:capNomes(it.d),familia:capNomes(it.familia||palpiteFamilia(it.d)||''),cat:garantirCategoria(it.cat,'con'),forn:(it.f&&it.f.trim())||forn0,
         qtd:+it.q||1,unit:+it.u||0,total:(+it.q||0)*(+it.u||0),rateio:[],
         pag,nf:'',anexos,obs,ctrl:false,qtdRec:0,baixas:[]});
     });
@@ -2960,7 +3004,7 @@ function salvarGasto(id){
     }
   }
   const g={id:id||uid(),at:Date.now(),
-    data:val('x_data'),desc:val('x_desc').trim(),familia:val('x_fam').trim(),cat:catPrincipal,forn:val('x_forn').trim(),
+    data:val('x_data'),desc:capNomes(val('x_desc')),familia:capNomes(val('x_fam')||palpiteFamilia(val('x_desc'))||''),cat:catPrincipal,forn:capNomes(val('x_forn')),
     qtd:+val('x_qtd')||1,unit:moeda2num(val('x_unit')),total:totalVal,rateio:rat,
     pag:val('x_pag'),nf:val('x_nf').trim(),anexos:ANX_ALVO||[],obs:val('x_obs').trim(),
     ctrl:document.getElementById('x_ctrl').checked,
@@ -3194,6 +3238,7 @@ function delItem(i){panel._its.splice(i,1);pintaItens()}
 
 function salvarCot(id){
   const its=panel._its.filter(i=>String(i.d||'').trim()||+i.u>0);
+  its.forEach(i=>{ i.d=capNomes(i.d); if(!String(i.familia||'').trim())i.familia=palpiteFamilia(i.d); });
   const sub=somaItens(its);
   const desconto=Math.min(Math.max(moeda2num(val('c_desc')),0),sub);
   const c={id:id||uid(),at:Date.now(),data:hoje(),item:capNomes(val('c_item')),forn:capNomes(val('c_forn')),
@@ -3331,7 +3376,7 @@ function confirmarCompra(){
       rateio=it.cats.map((cat,idx)=>({cat,valor:idx<n-1?cada:+(total-cada*(n-1)).toFixed(2)}));
     }
     const novoId=uid(); idsGerados.push(novoId);
-    DB.lanc.push({id:novoId,at:Date.now(),data:nota?nota.data:hoje(),desc:it.d||c.item,familia:(it.familia||'').trim(),cat:it.cats[0],
+    DB.lanc.push({id:novoId,at:Date.now(),data:nota?nota.data:hoje(),desc:capNomes(it.d||c.item),familia:capNomes(it.familia||palpiteFamilia(it.d||c.item)||''),cat:it.cats[0],
       forn:it.f||c.forn,qtd:+it.q||1,unit,total,rateio,
       pag:pago?'Pago':'A pagar',nf:nota?(nota.numero||''):'',anexos:c.anexos||[],obs:c.obs||'',
       ctrl:false,qtdRec:0,baixas:[],notaId:nota?nota.id:''});
