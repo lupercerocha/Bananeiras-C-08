@@ -403,6 +403,7 @@ a{color:var(--teal)}
 <section class="view" id="v-cot">
   <button class="btn" onclick="abrirCot()">+ Nova cotação</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="document.getElementById('pdfCotInput').click()">📄 Importar orçamento em PDF</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="colarOrcamento()">✍️ Colar texto do orçamento</button>
   <div class="card" style="margin-top:12px">
     <h3>Previsão de gastos</h3>
     <div id="cotPrev"></div>
@@ -3122,14 +3123,7 @@ function importar(modo){
   salvar();fechar();render();toast('Bases juntadas');
 }
 /* ---------- importar orçamento em PDF (lido no próprio navegador) ---------- */
-const RE_MOEDA_PDF=/-?\d{1,3}(?:\.\d{3})+,\d{2}|-?\d+,\d{2}/g;
 const UNIDS_PDF=['un','und','unid','uni','pc','pç','pcs','mt','m','m2','m²','m3','m³','kg','g','cx','pct','sc','lt','l','par','jg','barra','bar','rl','fd','dz'];
-function nBR(s){return parseFloat(String(s).replace(/\./g,'').replace(',','.'))||0}
-function acharMoedas(t){
-  const out=[]; RE_MOEDA_PDF.lastIndex=0; let m;
-  while((m=RE_MOEDA_PDF.exec(t))!==null) out.push({s:m[0],i:m.index});
-  return out;
-}
 function limparDescPdf(desc,q){
   let tk=desc.replace(/\s*R\$\s*$/i,'').split(/\s+/).filter(Boolean);
   for(let j=0;j<Math.min(3,tk.length);j++){
@@ -3190,6 +3184,125 @@ function palpiteValidade(linhas){
   return m?`${m[3]}-${m[2]}-${m[1]}`:'';
 }
 let PDF_LIDO=null;
+/* ---------- leitura de orçamento: números, linhas e saídas alternativas ---------- */
+let FMT_NUM='br';
+function detectarFmtNumero(linhas){
+  const t=(linhas||[]).join(' ');
+  const br=(t.match(/\d,\d{2}(?!\d)/g)||[]).length;
+  const us=(t.match(/\d\.\d{2}(?!\d)/g)||[]).length;
+  FMT_NUM = us>br ? 'us' : 'br';
+}
+const RE_BR=/-?\d{1,3}(?:\.\d{3})+,\d{2}(?!\d)|-?\d+,\d{2}(?!\d)/g;
+const RE_US=/-?\d{1,3}(?:,\d{3})+\.\d{2}(?!\d)|-?\d+\.\d{2}(?!\d)/g;
+function nBR(s){
+  const t=String(s).trim();
+  if(FMT_NUM==='us') return parseFloat(t.replace(/,/g,''))||0;
+  return parseFloat(t.replace(/\./g,'').replace(',','.'))||0;
+}
+function acharMoedas(t){
+  const re=FMT_NUM==='us'?RE_US:RE_BR;
+  const out=[]; re.lastIndex=0; let m;
+  while((m=re.exec(t))!==null) out.push({s:m[0],i:m.index});
+  return out;
+}
+/* agrupa os pedaços de texto em linhas de verdade, tolerando pequenas diferenças
+   de altura (a causa mais comum de o orçamento "não ter itens") */
+function juntarEmLinhas(itens){
+  const its=itens.filter(o=>o.s&&o.s.trim());
+  if(!its.length)return [];
+  const alt=its.map(o=>o.h||10).sort((a,b)=>a-b)[Math.floor(its.length/2)]||10;
+  const tol=Math.max(2,alt*0.6);
+  its.sort((a,b)=>b.y-a.y||a.x-b.x);
+  const linhas=[]; let atual=[its[0]];
+  for(let i=1;i<its.length;i++){
+    if(Math.abs(its[i].y-atual[0].y)<=tol) atual.push(its[i]);
+    else { linhas.push(atual); atual=[its[i]]; }
+  }
+  linhas.push(atual);
+  return linhas.map(g=>{
+    g.sort((a,b)=>a.x-b.x);
+    let t='',ultimoFim=null;
+    g.forEach(o=>{
+      if(ultimoFim!==null&&o.x-ultimoFim>1.2)t+=' ';
+      t+=o.s; ultimoFim=o.x+(o.w||0);
+    });
+    return t.replace(/\s+/g,' ').trim();
+  }).filter(Boolean);
+}
+async function linhasDoPdf(file){
+  await carregarPdfJs();
+  const buf=await file.arrayBuffer();
+  const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;
+  const linhas=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const pg=await pdf.getPage(p);
+    const tc=await pg.getTextContent();
+    const its=tc.items.map(it=>({
+      x:it.transform[4], y:it.transform[5],
+      w:it.width||0, h:it.height||Math.abs(it.transform[3])||10, s:it.str
+    }));
+    juntarEmLinhas(its).forEach(t=>linhas.push(t));
+  }
+  detectarFmtNumero(linhas);
+  return linhas;
+}
+/* colar o texto do orçamento (funciona com qualquer PDF, e-mail ou WhatsApp) */
+function colarOrcamento(){
+  abrir(`<h2>Colar texto do orçamento</h2>
+  <p class="sub">Abra o PDF, selecione a tabela de itens, copie e cole aqui. Serve também para orçamento que veio por e-mail ou WhatsApp.</p>
+  <textarea id="oc_txt" style="height:200px;font-family:monospace;font-size:12px" placeholder="4867  CAIBRO MISTO   75  MT   7,50   562,50&#10;2738  CAIXA TRIFASICA   1  UN  124,90  124,90"></textarea>
+  <button class="btn" style="margin-top:10px" onclick="lerTextoColado()">Ler os itens</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function lerTextoColado(){
+  const linhas=val('oc_txt').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  if(!linhas.length){toast('Cole o texto do orçamento.');return}
+  detectarFmtNumero(linhas);
+  processarLinhasOrcamento(linhas,'texto colado');
+}
+/* quando a leitura automática não acha nada: escolher as linhas na mão */
+function escolherLinhasItens(){
+  const p=PDF_LIDO; if(!p)return;
+  abrir(`<h2>Escolher as linhas dos itens</h2>
+  <p class="sub">Marque as linhas que são produtos. O app lê quantidade e valores de cada uma.</p>
+  <div style="max-height:52vh;overflow:auto;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:8px">
+    ${p.linhas.map((t,i)=>{
+      const n=acharMoedas(t).length;
+      return `<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-bottom:1px solid var(--line);font-size:12px;font-family:monospace">
+        <input type="checkbox" class="lnItem" value="${i}" ${n>=1?'checked':''} style="width:auto;margin-top:2px">
+        <span style="flex:1;word-break:break-word;${n>=1?'':'opacity:.5'}">${t.replace(/</g,'&lt;')}</span></label>`;
+    }).join('')}
+  </div>
+  <button class="btn" style="margin-top:10px" onclick="usarLinhasEscolhidas()">Usar essas linhas</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function usarLinhasEscolhidas(){
+  const p=PDF_LIDO; if(!p)return;
+  const idx=[...document.querySelectorAll('.lnItem')].filter(c=>c.checked).map(c=>+c.value);
+  if(!idx.length){toast('Marque pelo menos uma linha.');return}
+  const escolhidas=idx.map(i=>p.linhas[i]);
+  const itens=parseOrcamentoRelaxado(escolhidas);
+  if(!itens.length){toast('Não consegui ler valores nessas linhas.');return}
+  PDF_LIDO={...p,itens,soma:itens.reduce((s,i)=>s+i.q*i.u,0)};
+  usarOrcamentoLido(false);
+}
+/* aceita linha com um único valor (vira quantidade 1) — usado na escolha manual */
+function parseOrcamentoRelaxado(linhas){
+  const itens=parseOrcamento(linhas);
+  if(itens.length)return itens;
+  const out=[];
+  linhas.forEach(t=>{
+    const ms=acharMoedas(t);
+    if(!ms.length)return;
+    const v=nBR(ms[ms.length-1].s);
+    if(!(v>0))return;
+    let desc=t.slice(0,ms[0].i).trim().replace(/^(\d{3,6})\s+/,'');
+    if(desc.replace(/[^A-Za-zÀ-ÿ]/g,'').length<3)return;
+    out.push({c:'',d:desc.replace(/\s{2,}/g,' '),q:1,u:v,f:''});
+  });
+  return out;
+}
+
 function carregarPdfJs(){
   return new Promise((ok,err)=>{
     if(window.pdfjsLib){ok();return}
@@ -3203,60 +3316,49 @@ function carregarPdfJs(){
     document.head.appendChild(s);
   });
 }
-async function linhasDoPdf(file){
-  await carregarPdfJs();
-  const buf=await file.arrayBuffer();
-  const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;
-  const linhas=[];
-  for(let p=1;p<=pdf.numPages;p++){
-    const pg=await pdf.getPage(p);
-    const tc=await pg.getTextContent();
-    const porY={};
-    tc.items.forEach(it=>{
-      if(!it.str||!it.str.trim())return;
-      const y=Math.round(it.transform[5]/2)*2;
-      (porY[y]=porY[y]||[]).push({x:it.transform[4],s:it.str});
-    });
-    Object.keys(porY).map(Number).sort((a,b)=>b-a).forEach(y=>{
-      const t=porY[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(' ').replace(/\s+/g,' ').trim();
-      if(t)linhas.push(t);
-    });
-  }
-  return linhas;
-}
 document.getElementById('pdfCotInput').onchange=async e=>{
   const f=e.target.files[0]; e.target.value=''; if(!f)return;
   toast('Lendo o PDF...');
   let linhas;
   try{ linhas=await linhasDoPdf(f); }
   catch(x){ toast('Não consegui abrir o PDF. Precisa de internet na primeira vez.'); return; }
+  processarLinhasOrcamento(linhas,f.name);
+};
+function processarLinhasOrcamento(linhas,origem){
   const itens=parseOrcamento(linhas), tot=totalDeclarado(linhas);
   const soma=itens.reduce((s,i)=>s+i.q*i.u,0);
-  PDF_LIDO={itens,linhas,tot,soma,nome:f.name,forn:palpiteFornecedor(linhas),val:palpiteValidade(linhas)};
+  PDF_LIDO={itens,linhas,tot,soma,nome:origem,forn:palpiteFornecedor(linhas),val:palpiteValidade(linhas)};
   const dif=tot>0?Math.round((tot-soma)*100)/100:0;
+  const poucoTexto=linhas.join('').replace(/\s/g,'').length<40;
   if(!itens.length){
     abrir(`<h2>Não achei os itens</h2>
-    <p class="sub">Esse PDF pode ser uma foto/scan, ou ter um layout fora do padrão de tabela.</p>
-    <button class="btn ghost mini" onclick="verTextoPdf()">Ver o texto extraído</button>
+    <p class="sub">${poucoTexto
+      ? 'Esse arquivo praticamente não tem texto — deve ser uma foto ou um PDF digitalizado.'
+      : 'O texto foi lido, mas o layout não bateu com o padrão de tabela. Dá para resolver escolhendo as linhas na mão.'}</p>
+    ${poucoTexto?'':'<button class="btn" onclick="escolherLinhasItens()">Escolher as linhas dos itens</button>'}
+    <button class="btn ghost mini" style="margin-top:9px" onclick="colarOrcamento()">Colar o texto do orçamento</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="verTextoPdf()">Ver o texto extraído</button>
     <button class="btn ghost mini" style="margin-top:9px" onclick="abrirCot()">Criar cotação manualmente</button>
-    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>
+    ${poucoTexto?'<p class="hint">Para foto de orçamento, o caminho mais rápido é digitar os itens ou pedir o arquivo em PDF/planilha ao fornecedor.</p>':''}`);
     return;
   }
   abrir(`<h2>Orçamento lido</h2>
-  <p class="sub">${f.name}</p>
+  <p class="sub">${origem}</p>
   <div class="card" style="box-shadow:none;margin-top:10px">
     <div class="stat"><span>Itens encontrados</span><b class="mono">${itens.length}</b></div>
     <div class="stat"><span>Soma dos itens</span><b class="mono">${brl(soma)}</b></div>
-    ${tot>0?`<div class="stat"><span>Total no PDF</span><b class="mono">${brl(tot)}</b></div>`:''}
+    ${tot>0?`<div class="stat"><span>Total no arquivo</span><b class="mono">${brl(tot)}</b></div>`:''}
   </div>
-  ${Math.abs(dif)>=0.01?`<p class="hint">A soma não bate com o total do PDF (diferença de ${brl(dif)}) — normalmente é desconto ou frete.</p>
-  <button class="btn" onclick="usarOrcamentoLido(true)">Conferir, ajustando ao total do PDF</button>
+  ${Math.abs(dif)>=0.01?`<p class="hint">A soma não bate com o total do arquivo (diferença de ${brl(dif)}) — normalmente é desconto ou frete.</p>
+  <button class="btn" onclick="usarOrcamentoLido(true)">Conferir, ajustando ao total</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="usarOrcamentoLido(false)">Conferir sem ajustar</button>`
   :`<button class="btn" onclick="usarOrcamentoLido(false)">Conferir e criar cotação</button>`}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="escolherLinhasItens()">Faltou item? Escolher na mão</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="verTextoPdf()">Ver o texto extraído</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>
   <p class="hint">Nada é salvo agora: a próxima tela é o formulário normal de cotação, já preenchido, para você conferir e corrigir antes de salvar.</p>`);
-};
+}
 function usarOrcamentoLido(ajustar){
   const p=PDF_LIDO; if(!p)return;
   const itens=JSON.parse(JSON.stringify(p.itens));
