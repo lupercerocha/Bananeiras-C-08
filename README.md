@@ -85,7 +85,7 @@ Os arquivos das notas não entram nesse pacote: ficam no IndexedDB do aparelho e
 
 A lista vem separada em concorrências, cotações com preço e a cotar. O botão "Imprimir" gera uma folha A4 por fornecedor, com itens, preços, desconto e espaço de conferência — feita para salvar em PDF e mandar ao fornecedor. Importa orçamento em PDF ou texto colado, tem campo de desconto negociado rateado entre os itens, validade preenchida com 5 dias por padrão, anexo de vários PDFs (que abrem dentro do sistema) e confirmação de compra **em lote**: marque várias cotações já acertadas e todas viram lançamentos de uma vez.
 
-**Notas** — arquivo das notas fiscais para o habite-se. O XML da NF-e é lido por completo e sem erro; o PDF do DANFE é lido por texto, com conferência. Os itens da nota podem virar gastos da obra em um toque. Relatório final por nota e por item, em planilha.
+**Notas** — arquivo das notas fiscais para o habite-se. O XML da NF-e é lido por completo e sem erro — é sempre o melhor caminho. O PDF do DANFE é lido por texto, com conferência. Para cupom fiscal (NFC-e), que não tem PDF com texto, use "Ler QR code": o app extrai a chave de acesso da foto e abre a nota no site oficial, de onde dá para baixar o XML ou copiar o texto e colar. O leitor entende três formatos: orçamento em tabela, pedido com desconto e cupom de duas linhas. Os itens da nota podem virar gastos da obra em um toque. Relatório final por nota e por item, em planilha.
 
 **Itens** — quanto de cada material já entrou na obra, com preço médio pago por unidade.
 

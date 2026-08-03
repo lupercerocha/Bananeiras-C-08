@@ -446,6 +446,8 @@ a{color:var(--teal)}
 <section class="view" id="v-notas">
   <button class="btn" onclick="document.getElementById('notaInput').click()">📎 Enviar nota fiscal</button>
   <div class="acoes tres">
+    <button class="btn soft" onclick="document.getElementById('qrInput').click()"><span class="ic">🔳</span>Ler QR code</button>
+    <button class="btn soft" onclick="colarNota()"><span class="ic">✍️</span>Colar texto</button>
     <button class="btn soft" onclick="abrirNota()"><span class="ic">＋</span>Lançar à mão</button>
     <button class="btn soft" onclick="relatorioNotas()"><span class="ic">📊</span>Relatório</button>
     <button class="btn soft" onclick="exportItensNotasCSV()"><span class="ic">⬇</span>Itens em CSV</button>
@@ -584,6 +586,7 @@ a{color:var(--teal)}
 <input type="file" id="fotoPerfilInput" accept="image/*" hidden>
 <input type="file" id="pdfCotInput" accept="application/pdf,.pdf" hidden>
 <input type="file" id="notaInput" accept=".xml,text/xml,application/xml,application/pdf,.pdf,image/*" multiple hidden>
+<input type="file" id="qrInput" accept="image/*" capture="environment" hidden>
 <datalist id="dlProdutos"></datalist>
 <datalist id="dlCategorias"></datalist>
 <datalist id="dlForn"></datalist>
@@ -1848,6 +1851,100 @@ function comprimirImagem(file,maxLado,qual){
     r.onerror=err; r.readAsDataURL(file);
   });
 }
+/* cupom/nota em texto colado: serve para NFC-e lida pelo QR code
+   ou para o texto copiado de uma foto pelo próprio celular */
+/* ---------- QR code da NFC-e: tira a chave de acesso da foto do cupom ---------- */
+function carregarJsQR(){
+  return new Promise((ok,err)=>{
+    if(window.jsQR){ok();return}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
+    s.onload=()=>ok(); s.onerror=()=>err(new Error('cdn'));
+    document.head.appendChild(s);
+  });
+}
+async function lerQRdaImagem(file){
+  const url=URL.createObjectURL(file);
+  const img=await new Promise((ok,err)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=err;i.src=url;});
+  /* tenta em dois tamanhos: cupom fotografado de longe precisa de mais resolução */
+  for(const lado of [1400,2200]){
+    const s=Math.min(1,lado/Math.max(img.width,img.height));
+    const cv=document.createElement('canvas');
+    cv.width=img.width*s|0; cv.height=img.height*s|0;
+    const cx=cv.getContext('2d');
+    cx.drawImage(img,0,0,cv.width,cv.height);
+    const d=cx.getImageData(0,0,cv.width,cv.height);
+    if(window.BarcodeDetector){
+      try{
+        const det=new BarcodeDetector({formats:['qr_code']});
+        const r=await det.detect(cv);
+        if(r&&r.length){URL.revokeObjectURL(url);return r[0].rawValue;}
+      }catch(e){}
+    }
+    if(window.jsQR){
+      const r=window.jsQR(d.data,cv.width,cv.height,{inversionAttempts:'attemptBoth'});
+      if(r&&r.data){URL.revokeObjectURL(url);return r.data;}
+    }
+  }
+  URL.revokeObjectURL(url);
+  return '';
+}
+function chaveDoTexto(t){
+  const m=String(t||'').replace(/\s/g,'').match(/\d{44}/);
+  return m?m[0]:'';
+}
+document.getElementById('qrInput').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f)return;
+  toast('Lendo o QR code...');
+  try{ await carregarJsQR(); }catch(x){}
+  let bruto='';
+  try{ bruto=await lerQRdaImagem(f); }catch(x){}
+  const chave=chaveDoTexto(bruto);
+  if(!chave){
+    abrir(`<h2>Não li o QR code</h2>
+    <p class="sub">Tente de novo enquadrando só o QR, com boa luz e o papel esticado.</p>
+    ${bruto?`<p class="hint">Li algo, mas sem chave de 44 dígitos: ${bruto.slice(0,120)}</p>`:''}
+    <button class="btn" onclick="document.getElementById('qrInput').click()">Tentar de novo</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="colarNota()">Colar o texto da nota</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="abrirNota()">Lançar à mão</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+    return;
+  }
+  const jaTem=notas().find(n=>n.chave===chave);
+  const uf=chave.slice(0,2), url=bruto.startsWith('http')?bruto:'';
+  QR_TMP={chave,url};
+  abrir(`<h2>Chave encontrada</h2>
+  <p class="sub" style="word-break:break-all;font-family:monospace">${chave.replace(/(\d{4})(?=\d)/g,'$1 ')}</p>
+  ${jaTem?`<p class="hint" style="color:var(--amber)">Esta nota já está cadastrada (${jaTem.emit}).</p>`:''}
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <p style="font-size:13.5px;margin:0">Abra a nota no site da Receita/SEFAZ, copie o texto dos itens e cole aqui — ou baixe o XML, que entra sem precisar conferir nada.</p>
+  </div>
+  ${url?`<a class="btn dark" style="text-decoration:none;display:block;text-align:center;padding:12px;margin-top:10px" href="${url}" target="_blank" rel="noopener">Abrir a nota no site oficial</a>`:''}
+  <a class="btn soft" style="text-decoration:none;display:block;text-align:center;padding:12px;margin-top:9px" href="https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx?tipoConsulta=resumo&tipoConteudo=7PhJ+gAVw2g=&nfe=${chave}" target="_blank" rel="noopener">Consultar no portal nacional</a>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="colarNota(QR_TMP.chave)">Já copiei — colar o texto</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirNota()">Lançar à mão com esta chave</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+  NOTA_TMP={tipo:'manual',chave,numero:'',serie:'',data:hoje(),emit:'',cnpj:'',total:0,itens:[],arquivo:'QR code'};
+};
+let QR_TMP={chave:'',url:''};
+function colarNota(chavePronta){
+  if(chavePronta) QR_TMP={chave:chavePronta,url:(QR_TMP||{}).url||''};
+  abrir(`<h2>Colar texto da nota</h2>
+  <p class="sub">Cupom fiscal (NFC-e) não vem em PDF com texto. Abra o QR code da nota no site da SEFAZ, ou copie o texto direto da foto pelo próprio celular, e cole aqui.</p>
+  <textarea id="nt_txt" style="height:200px;font-family:monospace;font-size:12px" placeholder="001 58313 CABO FLEX. 1.50MM C/100M&#10;1,0000RL x 148,99   148,99&#10;002 736984 QUADRO DIST 04 DISJ&#10;1,0000UN x 34,35   34,35&#10;Valor Total R$: 183,34"></textarea>
+  <button class="btn" style="margin-top:10px" onclick="lerNotaColada()">Ler os itens</button>
+  <p class="hint">No iPhone e no Android dá para segurar o dedo sobre o texto de uma foto e copiar — funciona bem em cupom fiscal.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function lerNotaColada(){
+  const linhas=val('nt_txt').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  if(!linhas.length){toast('Cole o texto da nota.');return}
+  detectarFmtNumero(linhas);
+  const d=lerTextoDanfe(linhas);
+  d.arquivo='texto colado'; d.linhas=linhas;
+  if(!d.chave) d.chave=chaveDoTexto(linhas.join(' '))||(QR_TMP&&QR_TMP.chave)||'';
+  conferirNota(d);
+}
 function conferirNota(d){
   const soma=(d.itens||[]).reduce((s,i)=>s+(+i.t||0),0);
   const dif=+( (+d.total||0)-soma ).toFixed(2);
@@ -2076,27 +2173,27 @@ function lancarItensDaNota(id){
 
 /* ---------- palpite do tipo de produto ---------- */
 const FAMILIAS_PADRAO=[
-  /* a ordem importa: o primeiro que casar vence, então o mais específico vem antes */
-  [/vergalh|ca\s?-?\s?50|ca\s?-?\s?60|\bferro\b|estribo|arame/i,'Ferro'],
-  [/coluna|verga\b|coxim|pre\s?moldad|pré\s?moldad/i,'Pré-moldado'],
-  [/canaleta/i,'Canaleta'],
-  [/bloco|tijolo/i,'Tijolo'],
-  [/cimento|argamassa|rejunte|\bcal\b|massa\s*(unica|única)/i,'Cimento e argamassa'],
-  [/areia|arisco/i,'Areia'],
-  [/brita|seixo|pedra\s*(britada|marroada)/i,'Brita'],
-  [/telha|cumeeira/i,'Telha'],
-  [/prego|parafuso|bucha|arruela|porca|abraçadeira|abracadeira/i,'Fixação'],
+  /* \b evita casar no meio de outra palavra: "nascimento" não é cimento, "ferrolho" não é ferro */
+  [/\bvergalh|\bca\s?-?\s?50\b|\bca\s?-?\s?60\b|\bferros?\b|\bestribo|\barame\b/i,'Ferro'],
+  [/\bcolunas?\b|\bvergas?\b|\bcoxim|\bpr[ée]\s?moldad/i,'Pré-moldado'],
+  [/\bcanaleta/i,'Canaleta'],
+  [/\bblocos?\b|\btijolo/i,'Tijolo'],
+  [/\bcimentos?\b|\bargamassa|\brejunte|\bcal\b|\bmassa\s*(unica|única)\b/i,'Cimento e argamassa'],
+  [/\bareia|\barisco\b/i,'Areia'],
+  [/\bbritas?\b|\bseixo|\bpedra\s*(britada|marroada)/i,'Brita'],
+  [/\btelhas?\b|\bcumeeira/i,'Telha'],
+  [/\bpregos?\b|\bparafuso|\bbuchas?\b|\barruela|\bporcas?\b|\babra[çc]adeira/i,'Fixação'],
   /* ferramentas antes de madeira e elétrico: "peneira de madeira", "enxada com cabo" */
-  [/enxad|\bpa\b|\bpá\b|balde|peneira|talhadeira|picareta|chibanca|cavadeira|alavanca|foice|machado|enx[óo]|carrinho\s*de\s*m|colher\s*de\s*pedreiro|martelo|marreta|trena|prumo|n[ií]vel\b|serrote|serra\b|broca|ponteiro|desempenadeira|esquadro|r[ée]gua\s*de\s*pedreiro|linha\s*de\s*pedreiro|vassoura|esp[áa]tula|betoneira|andaime|escada|cabo\s*ferramenta|furadeira|esmerilhadeira|lixadeira|maçarico|macarico/i,'Ferramentas da Obra'],
-  [/fossa|sumidouro/i,'Fossa'],
-  [/vaso\s*sanit|bacia|chuveiro|\bpia\b|cuba|lavat[óo]rio|assento\s*sanit/i,'Louças e metais'],
-  [/tubo|joelho|\bluva\b|registro|torneira|caixa\s*d.?[aá]gua|mangueira|veda\s*rosca|adesivo\s*pl|sif[ãa]o|ralo|esgoto|conex[ãa]o|cola\s*pvc/i,'Hidráulica'],
-  [/cabo\s*(semi|flex|pp|de\s*cobre|r[íi]gido)|\bcabo\s*\d|\bfio\b|disjuntor|eletroduto|tomada|interruptor|l[âa]mpada|lumin[áa]ria|energisa|aterramento|cantoneira\s*rex|cabe[çc]ote|quadro\s*de\s*distrib|padr[ãa]o\s*de\s*energia/i,'Material elétrico'],
-  [/caibro|madeira|ripa|t[áa]bua|sarrafo|compensad|forma\s*de\s*madeira/i,'Madeira'],
-  [/porta\b|janela|batente|fechadura|dobradi[çc]a|ferrolho|esquadria/i,'Esquadrias'],
-  [/tinta|selador|verniz|massa\s*corrida|pincel|\blixa\b|rolo\s*de\s*pintura/i,'Pintura'],
-  [/piso|porcelanato|azulejo|revestimento|soleira|rodap[ée]/i,'Revestimento'],
-  [/m[ãa]o\s*de\s*obra|di[áa]ria|pedreiro|servente|ajudante/i,'Mão de obra'],
+  [/\benxad|\bpa\b|\bpá\b|\bbalde|\bpeneira|\btalhadeira|\bpicareta|\bchibanca|\bcavadeira|\balavanca\b|\bfoice\b|\bmachado\b|\benx[óo]\b|\bcarrinho\s*de\s*m|\bcolher\s*de\s*pedreiro|\bmartelo|\bmarreta|\btrena\b|\bprumo\b|\bn[ií]vel\b|\bserrote|\bserra\b|\bbrocas?\b|\bponteiro\b|\bdesempenadeira|\besquadro\b|\br[ée]gua\s*de\s*pedreiro|\blinha\s*de\s*pedreiro|\bvassoura|\besp[áa]tula|\bbetoneira|\bandaime|\bescada\b|\bcabo\s*ferramenta|\bfuradeira|\besmerilhadeira|\blixadeira|\bma[çc]arico/i,'Ferramentas da Obra'],
+  [/\bfossa\b|\bsumidouro/i,'Fossa'],
+  [/\bvaso\s*sanit|\bbacia\b|\bchuveiro|\bpia\b|\bcuba\b|\blavat[óo]rio|\bassento\s*sanit/i,'Louças e metais'],
+  [/\btubos?\b|\btubula|\bjoelho|\bluvas?\b|\bregistro\b|\btorneira|\bcaixa\s*d.?[áa]gua|\bmangueira|\bveda\s*rosca|\badesivo\s*pl|\bsif[ãa]o|\bralo\b|\besgoto\b|\bconex[ãa]o|\bcola\s*pvc|\bdescarga\b|\bengate\b|\bespude\b|\banel\s*p\/|\bflange\b|\bcurva\b/i,'Hidráulica'],
+  [/\bcabo\s*(semi|flex|pp|de\s*cobre|r[íi]gido)|\bcabo\s*\d|\bfio\b|\bdisjuntor|\beletroduto|\btomada\b|\binterruptor|\bl[âa]mpada|\blumin[áa]ria|\benergisa\b|\baterramento\b|\bcantoneira\s*rex|\bcabe[çc]ote\b|\bquadro\s*de\s*distrib|\bpadr[ãa]o\s*de\s*energia/i,'Material elétrico'],
+  [/\bcaibro|\bmadeira\b|\bripas?\b|\bt[áa]buas?\b|\bsarrafo|\bcompensad|\bforma\s*de\s*madeira/i,'Madeira'],
+  [/\bportas?\b|\bjanelas?\b|\bbatente|\bfechadura|\bdobradi[çc]a|\bferrolho|\besquadria/i,'Esquadrias'],
+  [/\btintas?\b|\bselador|\bverniz|\bmassa\s*corrida|\bpinc[ée]l|\blixa\b|\brolo\s*de\s*pintura/i,'Pintura'],
+  [/\bpisos?\b|\bporcelanato|\bazulejo|\brevestimento|\bsoleira|\brodap[ée]/i,'Revestimento'],
+  [/\bm[ãa]o\s*de\s*obra\b|\bdi[áa]rias?\b|\bpedreiro|\bservente|\bajudante/i,'Mão de obra'],
 ];
 function palpiteFamilia(desc){
   const d=String(desc||''); if(!d.trim())return '';
@@ -2510,36 +2607,22 @@ function familiasExistentes(){
   DB.cot.forEach(c=>(c.itens||[]).forEach(i=>anota(i.familia)));
   return Object.values(vistos).sort((a,b)=>alfa(a,b));
 }
+/* conta o uso em TUDO: gastos, itens de cotação e itens de nota */
 function usoTipo(nome){
   const k=alfa2(nome);
-  return DB.lanc.filter(l=>alfa2(l.familia||'')===k).length;
+  let n=0;
+  DB.lanc.forEach(l=>{ if(alfa2(l.familia||'')===k)n++; });
+  DB.cot.forEach(c=>(c.itens||[]).forEach(i=>{ if(alfa2(i.familia||'')===k)n++; }));
+  (DB.notas||[]).forEach(x=>(x.itens||[]).forEach(i=>{ if(alfa2(i.familia||'')===k)n++; }));
+  return n;
 }
-function verTipos(){
-  const lista=familiasExistentes();
-  abrir(`<h2>Tipos de produto</h2>
-  <p class="sub">Agrupam produtos parecidos com descrições diferentes — todas as bitolas de ferro em "Ferro", por exemplo.</p>
-  <button class="btn" style="margin-top:10px" onclick="editarTipo()">+ Novo tipo</button>
-  <div class="card" style="box-shadow:none;margin-top:12px">
-    ${lista.length?lista.map(t=>{
-      const u=usoTipo(t), esc=t.replace(/'/g,"\\\\'").replace(/"/g,'&quot;');
-      return `<div class="stat" style="align-items:center">
-      <span style="flex:1;min-width:0">${t}
-        <div style="font-size:11.5px;color:var(--ink-2)">${u?u+' lançamento'+(u>1?'s':''):'sem uso'}</div></span>
-      <button class="iconbtn" style="background:var(--surface-2);width:30px;height:30px;font-size:13px" onclick="editarTipo('${esc}')" title="Renomear">✎</button>
-      <button class="iconbtn" style="background:var(--surface-2);color:var(--red);width:30px;height:30px;margin-left:6px" onclick="excluirTipo('${esc}')" title="Excluir">×</button>
-    </div>`}).join(''):'<div class="empty"><b>Nenhum tipo ainda</b><p>Eles nascem sozinhos ao lançar gastos, ou crie um aqui.</p></div>'}
-  </div>
-  <p class="hint">Renomear atualiza todos os lançamentos, cotações e notas que usam o tipo.</p>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
-}
-function editarTipo(atual){
-  const esc=String(atual||'').replace(/'/g,"\\\\'").replace(/"/g,'&quot;');
-  abrir(`<h2>${atual?'Renomear tipo':'Novo tipo de produto'}</h2>
-  ${atual?`<p class="sub">Usado em ${usoTipo(atual)} lançamento(s).</p>`:''}
-  <label>Nome</label><input id="tp_n" data-cap="1" value="${esc}" placeholder="Ex: Hidráulica">
-  <div style="height:14px"></div>
-  <button class="btn" onclick="salvarTipo('${esc}')">Salvar</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="verTipos()">Voltar</button>`);
+function usoTipoDetalhe(nome){
+  const k=alfa2(nome);
+  return {
+    lanc:DB.lanc.filter(l=>alfa2(l.familia||'')===k).length,
+    cot:DB.cot.reduce((s,c)=>s+(c.itens||[]).filter(i=>alfa2(i.familia||'')===k).length,0),
+    nota:(DB.notas||[]).reduce((s,x)=>s+(x.itens||[]).filter(i=>alfa2(i.familia||'')===k).length,0)
+  };
 }
 function trocarTipoEmTudo(de,para){
   const k=alfa2(de);
@@ -2547,31 +2630,67 @@ function trocarTipoEmTudo(de,para){
   DB.cot.forEach(c=>{ let m=false;
     (c.itens||[]).forEach(i=>{ if(alfa2(i.familia||'')===k){ i.familia=para; m=true; } });
     if(m)c.at=Date.now(); });
-  (DB.notas||[]).forEach(n=>(n.itens||[]).forEach(i=>{ if(alfa2(i.familia||'')===k) i.familia=para; }));
+  (DB.notas||[]).forEach(n=>{ let m=false;
+    (n.itens||[]).forEach(i=>{ if(alfa2(i.familia||'')===k){ i.familia=para; m=true; } });
+    if(m)n.at=Date.now(); });
   DB.tipos=(DB.tipos||[]).filter(t=>alfa2(t)!==k);
 }
-function salvarTipo(atual){
+let TIPOS_LISTA=[];
+function verTipos(){
+  TIPOS_LISTA=familiasExistentes();
+  abrir(`<h2>Tipos de produto</h2>
+  <p class="sub">Agrupam produtos parecidos com descrições diferentes — todas as bitolas de ferro em "Ferro", por exemplo.</p>
+  <button class="btn" style="margin-top:10px" onclick="editarTipo(-1)">+ Novo tipo</button>
+  <div class="card" style="box-shadow:none;margin-top:12px">
+    ${TIPOS_LISTA.length?TIPOS_LISTA.map((t,ix)=>{
+      const d=usoTipoDetalhe(t), u=d.lanc+d.cot+d.nota;
+      const onde=[d.lanc?d.lanc+' gasto'+(d.lanc>1?'s':''):'',d.cot?d.cot+' em cotação':'',d.nota?d.nota+' em nota':'']
+        .filter(Boolean).join(' · ');
+      return `<div class="stat" style="align-items:center">
+      <span style="flex:1;min-width:0">${t}
+        <div style="font-size:11.5px;color:var(--ink-2)">${u?onde:'sem uso'}</div></span>
+      <button class="iconbtn" style="background:var(--surface-2);width:30px;height:30px;font-size:13px" onclick="editarTipo(${ix})" title="Renomear">✎</button>
+      <button class="iconbtn" style="background:var(--surface-2);color:var(--red);width:30px;height:30px;margin-left:6px" onclick="excluirTipo(${ix})" title="Excluir">×</button>
+    </div>`}).join(''):'<div class="empty"><b>Nenhum tipo ainda</b><p>Eles nascem sozinhos ao lançar gastos, ou crie um aqui.</p></div>'}
+  </div>
+  <p class="hint">Renomear atualiza todos os gastos, cotações e notas que usam o tipo.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function editarTipo(ix){
+  const atual=(ix>=0&&TIPOS_LISTA[ix])?TIPOS_LISTA[ix]:'';
+  abrir(`<h2>${atual?'Renomear tipo':'Novo tipo de produto'}</h2>
+  ${atual?`<p class="sub">Usado em ${usoTipo(atual)} registro(s).</p>`:''}
+  <label>Nome</label><input id="tp_n" data-cap="1" value="${atual.replace(/"/g,'&quot;')}" placeholder="Ex: Hidráulica">
+  <div style="height:14px"></div>
+  <button class="btn" onclick="salvarTipo(${ix})">Salvar</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verTipos()">Voltar</button>`);
+  setTimeout(()=>{const el=document.getElementById('tp_n'); if(el)el.focus();},60);
+}
+function salvarTipo(ix){
+  const atual=(ix>=0&&TIPOS_LISTA[ix])?TIPOS_LISTA[ix]:'';
   const novo=capNomes(val('tp_n'));
   if(!novo){toast('Informe o nome.');return}
-  const jaTem=familiasExistentes().find(t=>alfa2(t)===alfa2(novo)&&alfa2(t)!==alfa2(atual||''));
-  if(jaTem){toast('Já existe o tipo "'+jaTem+'".');return}
+  if(alfa2(novo)===alfa2(atual)){ verTipos(); return; }
+  const jaTem=familiasExistentes().find(t=>alfa2(t)===alfa2(novo)&&alfa2(t)!==alfa2(atual));
+  if(jaTem&&!atual){toast('Já existe o tipo "'+jaTem+'".');return}
   DB.tipos=DB.tipos||[];
   if(atual) trocarTipoEmTudo(atual,novo);
   if(!DB.tipos.some(t=>alfa2(t)===alfa2(novo))) DB.tipos.push(novo);
-  salvar(); render(); verTipos(); toast(atual?'Tipo renomeado':'Tipo criado');
+  salvar(); render(); verTipos();
+  toast(atual?(jaTem?'Juntado com "'+jaTem+'"':'Renomeado para "'+novo+'"'):'Tipo criado');
 }
-function excluirTipo(nome){
+function excluirTipo(ix){
+  const nome=TIPOS_LISTA[ix]; if(!nome)return;
   const u=usoTipo(nome);
   if(u>0){
     const destinos=familiasExistentes().filter(t=>alfa2(t)!==alfa2(nome));
-    const esc=String(nome).replace(/'/g,"\\\\'").replace(/"/g,'&quot;');
     abrir(`<h2>Excluir "${nome}"</h2>
-    <p class="sub">Está em ${u} lançamento(s). Escolha o que fazer com eles.</p>
+    <p class="sub">Está em ${u} registro(s). Escolha o que fazer com eles.</p>
     <label>Mover para</label>
     <select id="tp_dest"><option value="">Deixar sem tipo</option>
-      ${destinos.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('')}</select>
+      ${destinos.map((t,j)=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('')}</select>
     <div style="height:14px"></div>
-    <button class="btn danger" onclick="confirmarExclusaoTipo('${esc}')">Aplicar e excluir</button>
+    <button class="btn danger" onclick="confirmarExclusaoTipo(${ix})">Aplicar e excluir</button>
     <button class="btn ghost mini" style="margin-top:9px" onclick="verTipos()">Cancelar</button>`);
     return;
   }
@@ -2580,11 +2699,12 @@ function excluirTipo(nome){
     salvar(); render(); verTipos(); toast('Tipo excluído');
   },true);
 }
-function confirmarExclusaoTipo(nome){
+function confirmarExclusaoTipo(ix){
+  const nome=TIPOS_LISTA[ix]; if(!nome)return;
   const dest=val('tp_dest');
   trocarTipoEmTudo(nome,dest);
   salvar(); render(); verTipos();
-  toast(dest?'Movido para "'+dest+'"':'Tipo removido dos lançamentos');
+  toast(dest?'Movido para "'+dest+'"':'Tipo removido dos registros');
 }
 function comboFamiliaFiltrar(input){
   const wrap=input.closest('.combo'); if(!wrap)return;
@@ -3693,9 +3813,10 @@ function importar(modo){
   salvar();fechar();render();toast('Bases juntadas');
 }
 /* ---------- importar orçamento em PDF (lido no próprio navegador) ---------- */
-const UNIDS_PDF=['un','und','unid','uni','pc','pç','pcs','mt','m','m2','m²','m3','m³','kg','g','cx','pct','sc','lt','l','par','jg','barra','bar','rl','fd','dz'];
+const UNIDS_PDF=['un','und','unid','uni','pc','pç','pcs','mt','m','m2','m²','m3','m³','kg','g','cx','pct','sc','lt','l','par','jg','barra','bar','rl','rolo','fd','dz','vd','sac','cr','cj','fr','gl','tb'];
 function limparDescPdf(desc,q){
   /* tira até 3 sobras de coluna no fim: quantidade e unidade (UN, UND, MT...) */
+  desc=String(desc||'').replace(/\s+[xX]\s*$/,'');            /* separador "x" do cupom */
   let tk=desc.replace(/\s*R\$\s*$/i,'').split(/\s+/).filter(Boolean);
   for(let j=0;j<Math.min(2,tk.length);j++){
     if(/^[\d.,]+$/.test(tk[j])&&Math.abs(nBR(tk[j])-q)<0.001){
@@ -3705,11 +3826,15 @@ function limparDescPdf(desc,q){
       break;
     }
   }
-  for(let p=0;p<3;p++){
+  for(let p=0;p<4;p++){
     if(tk.length<2)break;
     const ult=tk[tk.length-1].toLowerCase().replace(/[.\s]+$/,'');
+    if(ult==='x'){ tk.pop(); continue; }
     if(UNIDS_PDF.includes(ult)){ tk.pop(); continue; }
     if(/^[\d.,]+$/.test(ult)&&Math.abs(nBR(ult)-q)<0.001){ tk.pop(); continue; }
+    /* quantidade colada na unidade, como "1,0000RL" */
+    const m=ult.match(/^([\d.,]+)([a-zç]{1,4})$/);
+    if(m&&UNIDS_PDF.includes(m[2])&&Math.abs(nBR(m[1])-q)<0.001){ tk.pop(); continue; }
     break;
   }
   while(tk.length>1&&/^[.\-–]+$/.test(tk[tk.length-1]))tk.pop();
@@ -3717,19 +3842,42 @@ function limparDescPdf(desc,q){
 }
 function parseOrcamento(linhas){
   const itens=[];
+  let buffer=[];                                   /* linhas de texto sem valor: podem ser a descrição do item seguinte */
+  const ehCabecalho=t=>/c[óo]digo|descri[çc][ãa]o|produto\s*\/?\s*servi|qtd|vl\.?\s*unit|vlr\s*unit|pre[çc]o|total:/i.test(t)
+    && !acharMoedas(t).length;
+  const ehRuido=t=>/^\s*(total|subtotal|desconto|frete|valor a pagar|vlr total|qtd\.?total|forma\s*pagamento|cnpj|telefone|documento auxiliar|consulte|chave de acesso|consumidor)/i.test(t)
+    || /economizou|acr[eé]scimo|total\s*geral|total\s*l[ií]quido|anterior\s*em\s*aberto|saldo\s*anterior/i.test(t);
+
   linhas.forEach(t=>{
-    if(/^\s*(total|subtotal|desconto|frete|valor a pagar|vlr total)/i.test(t))return;
-    if(/economizou|desconto|acr[eé]scimo|total\s*geral|total\s*l[ií]quido|anterior\s*em\s*aberto|saldo\s*anterior/i.test(t))return;
+    if(ehRuido(t)){ buffer=[]; return; }
     const ms=acharMoedas(t);
-    if(ms.length<2)return;
+    if(ms.length<2){
+      if(!ehCabecalho(t) && t.replace(/[^A-Za-zÀ-ÿ]/g,'').length>=3){
+        buffer.push(t); if(buffer.length>3)buffer.shift();
+      }else buffer=[];
+      return;
+    }
     const total=nBR(ms[ms.length-1].s), unit=nBR(ms[ms.length-2].s);
-    if(!(unit>0)||!(total>0))return;
+    if(!(unit>0)||!(total>0)){ buffer=[]; return; }
     const q=Math.round(total/unit*1000)/1000;
-    if(!(q>0)||q>100000)return;
-    let desc=t.slice(0,ms[ms.length-2].i).trim(), cod='';
-    const mc=desc.match(/^(\d{3,14})\s+/);
-    if(mc){cod=mc[1];desc=desc.slice(mc[0].length)}
-    desc=limparDescPdf(desc,q).replace(/\s{2,}/g,' ');
+    if(!(q>0)||q>100000){ buffer=[]; return; }
+
+    const bruto=t.slice(0,ms[ms.length-2].i).trim();
+    const montar=txt=>{
+      let d=txt, c='';
+      let mc=d.match(/^(\d{1,3})\s+(\d{3,14})\s+/);        /* 001 28193 PRODUTO... */
+      if(mc){c=mc[2];d=d.slice(mc[0].length)}
+      else{
+        mc=d.match(/^(\d{3,14})\s+/);
+        if(mc){c=mc[1];d=d.slice(mc[0].length)}
+      }
+      return {c,d:limparDescPdf(d,q).replace(/\s{2,}/g,' ')};
+    };
+    let r=montar(bruto);
+    /* linha só com "1,0000UN X 31,94": a descrição veio nas linhas de cima */
+    if(r.d.replace(/[^A-Za-zÀ-ÿ]/g,'').length<3 && buffer.length) r=montar(buffer.join(' ')+' '+bruto);
+    const cod=r.c; const desc=r.d;
+    buffer=[];
     if(desc.replace(/[^A-Za-zÀ-ÿ]/g,'').length<3)return;
     itens.push({c:cod,d:capNomes(desc),q,u:unit,f:''});
   });
