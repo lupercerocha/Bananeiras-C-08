@@ -435,12 +435,6 @@ a{color:var(--teal)}
     <div id="catList"></div>
   </div>
 
-  <div class="card">
-    <h3>Documentos da obra</h3>
-    <a class="btn dark" style="text-decoration:none;text-align:center" target="_blank"
-       href="https://drive.google.com/drive/u/0/folders/1Bxqn2iva1PC1N_1bO4au8pgsAxNfXjc4">Abrir pasta no Drive</a>
-    <p class="hint">Arquitetura · Engenharia · Documentos · Despesas · Cotações · Fotos</p>
-  </div>
 </section>
 
 <!-- ============ GASTOS ============ -->
@@ -483,6 +477,7 @@ a{color:var(--teal)}
 <!-- ============ NOTAS FISCAIS ============ -->
 <section class="view" id="v-notas">
   <button class="btn" onclick="document.getElementById('notaInput').click()">📎 Enviar nota fiscal</button>
+  <p class="hint" style="margin-top:6px">Aceita XML da NF-e (o melhor: entra completo e sem conferência), PDF do DANFE, foto ou qualquer outro arquivo.</p>
   <div class="acoes tres">
     <button class="btn soft" onclick="document.getElementById('qrInput').click()"><span class="ic">🔳</span>Ler QR code</button>
     <button class="btn soft" onclick="colarNota()"><span class="ic">✍️</span>Colar texto</button>
@@ -623,7 +618,7 @@ a{color:var(--teal)}
 <input type="file" id="anexoInput" accept="image/*,application/pdf,.pdf,.xml,.xlsx,.doc,.docx" multiple hidden>
 <input type="file" id="fotoPerfilInput" accept="image/*" hidden>
 <input type="file" id="pdfCotInput" accept="application/pdf,.pdf" hidden>
-<input type="file" id="notaInput" accept=".xml,text/xml,application/xml,application/pdf,.pdf,image/*" multiple hidden>
+<input type="file" id="notaInput" multiple hidden>
 <input type="file" id="qrInput" accept="image/*" capture="environment" hidden>
 <datalist id="dlProdutos"></datalist>
 <datalist id="dlCategorias"></datalist>
@@ -1867,7 +1862,9 @@ document.getElementById('notaInput').onchange=async e=>{
         conferirNota({tipo:'foto',chave:'',numero:'',serie:'',data:hoje(),emit:'',cnpj:'',
           total:0,itens:[],img,arquivo:f.name,_file:f});
       }else{
-        toast('“'+f.name+'”: envie o XML da NF-e, o PDF do DANFE ou uma foto.');
+        /* tipo desconhecido (o celular às vezes não informa o tipo): guarda o arquivo e pede os dados */
+        conferirNota({tipo:'manual',chave:'',numero:'',serie:'',data:hoje(),emit:'',cnpj:'',
+          total:0,itens:[],arquivo:f.name,_file:f});
       }
     }catch(x){ toast('Não consegui ler “'+f.name+'”.'); }
     break; /* uma por vez: cada nota passa pela tela de conferência */
@@ -1999,7 +1996,8 @@ function conferirNota(d){
   </div>
   ${d.tipo==='xml'?'<p class="hint">Dados vindos do arquivo oficial da nota — não precisam de conferência.</p>'
     :d.tipo==='pdf'?'<p class="hint">Leitura por texto: confira número, total e itens antes de salvar. Se o PDF for digitalizado (foto), pode não vir nada.</p>'
-    :'<p class="hint">Foto guardada. Preencha os dados da nota na próxima tela.</p>'}
+    :d.tipo==='foto'?'<p class="hint">Foto guardada. Preencha os dados da nota na próxima tela.</p>'
+    :'<p class="hint">Arquivo guardado. Não consegui ler os dados dele, então preencha na próxima tela — ele fica anexado à nota do mesmo jeito.</p>'}
   <button class="btn" onclick="abrirNota('',true)">Conferir e salvar</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Descartar</button>`);
 }
@@ -4538,7 +4536,12 @@ function renderIO(){
     <button class="btn soft" onclick="verCategorias()"><span class="ic">🏷️</span>Categorias</button>
     <button class="btn soft" onclick="abrirDuplicados()"><span class="ic">🔍</span>Duplicados</button>
     <button class="btn soft" onclick="verRestauracao()"><span class="ic">⏱</span>Restaurar</button>
-  </div>`;
+  </div>
+  <div class="divider" style="margin:16px 0"></div>
+  <h3>Documentos da obra</h3>
+  <a class="btn dark" style="text-decoration:none;text-align:center;display:block" target="_blank" rel="noopener"
+     href="https://drive.google.com/drive/u/0/folders/1Bxqn2iva1PC1N_1bO4au8pgsAxNfXjc4">Abrir pasta no Drive</a>
+  <p class="hint">Arquitetura · Engenharia · Documentos · Despesas · Cotações · Fotos</p>`;
 }
 
 /* ---------- avatar / conta / manual ---------- */
