@@ -21,11 +21,15 @@
   --ink:#0A1F2E; --ink-2:#4A6373; --line:#DCE4E8;
   --shadow:0 1px 2px rgba(10,31,46,.06),0 8px 24px rgba(10,31,46,.06);
   --r:14px; --safe:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+  --seta:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234A6373' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 html[data-theme="dark"]{
   --bg:#08131C; --surface:#0F2433; --surface-2:#143042;
   --ink:#E4EEF2; --ink-2:#8FA9B8; --line:#1D3D51;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+  color-scheme:dark;
+  --seta:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238FA9B8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--ink);
@@ -180,9 +184,43 @@ html[data-theme="dark"] .tag.adm{color:#E0A23C}
 label{display:block;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
  color:var(--ink-2);margin:12px 0 5px}
 input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
- background:var(--surface-2);color:var(--ink)}
-input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:transparent}
-textarea{min-height:64px;resize:vertical}
+ background:var(--surface-2);color:var(--ink);accent-color:var(--teal);transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--teal);
+ box-shadow:0 0 0 3px rgba(22,163,148,.18)}
+input::placeholder,textarea::placeholder{color:var(--ink-2);opacity:.65}
+input:disabled,select:disabled,textarea:disabled{opacity:.5;cursor:not-allowed}
+textarea{min-height:64px;resize:vertical;line-height:1.45}
+
+/* select com o desenho do sistema, sem a seta padrão do navegador */
+select{
+  appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  padding-right:38px;cursor:pointer;
+  background-image:var(--seta);
+  background-repeat:no-repeat;
+  background-position:right 12px center;
+  background-size:16px 16px;
+  text-overflow:ellipsis;
+}
+select:hover{border-color:var(--ink-2)}
+select:focus{background-image:var(--seta)}
+select option{background:var(--surface);color:var(--ink);padding:10px}
+select option:disabled{color:var(--ink-2)}
+select[multiple],select[size]{background-image:none;padding-right:12px}
+
+/* data e hora: mesmo desenho, com o ícone do calendário na cor do tema */
+input[type=date],input[type=datetime-local],input[type=time]{cursor:pointer;min-height:44px}
+input[type=date]::-webkit-calendar-picker-indicator,
+input[type=datetime-local]::-webkit-calendar-picker-indicator{
+  opacity:.55;cursor:pointer;border-radius:4px;padding:2px}
+input[type=date]::-webkit-calendar-picker-indicator:hover,
+input[type=datetime-local]::-webkit-calendar-picker-indicator:hover{opacity:1}
+
+/* caixas de marcação e números */
+input[type=checkbox],input[type=radio]{width:auto;min-width:19px;min-height:19px;padding:0;
+  border:0;background:none;accent-color:var(--teal);cursor:pointer;flex:none}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 
 /* modal */
 .sheet{position:fixed;inset:0;z-index:60;display:none}
