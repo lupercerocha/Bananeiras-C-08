@@ -3876,7 +3876,12 @@ function limparDescPdf(desc,q){
     break;
   }
   while(tk.length>1&&/^[.\-–]+$/.test(tk[tk.length-1]))tk.pop();
-  return tk.join(' ').trim();
+  let s=tk.join(' ').trim();
+  /* DANFE: tira as colunas fiscais que sobram no fim (NCM CST CFOP) */
+  s=s.replace(/\s+\d{8}\s+\d{2,3}\s+\d{4}\s*$/,'');
+  /* a coluna MARCA costuma repetir a última palavra da descrição */
+  s=s.replace(/\b([A-Za-zÀ-ÿ0-9.\/]{3,})\s+\1\b/gi,'$1');
+  return s.trim();
 }
 function parseOrcamento(linhas){
   const itens=[];
@@ -3888,7 +3893,9 @@ function parseOrcamento(linhas){
 
   linhas.forEach(t=>{
     if(ehRuido(t)){ buffer=[]; return; }
-    const ms=acharMoedas(t);
+    let ms=acharMoedas(t);
+    /* na DANFE a linha termina em colunas de imposto zeradas — o par que vale vem antes */
+    while(ms.length>2 && nBR(ms[ms.length-1].s)===0) ms=ms.slice(0,-1);
     if(ms.length<2){
       if(!ehCabecalho(t) && t.replace(/[^A-Za-zÀ-ÿ]/g,'').length>=3){
         buffer.push(t); if(buffer.length>3)buffer.shift();
@@ -3923,8 +3930,13 @@ function parseOrcamento(linhas){
 }
 /* nos pedidos há vários "totais": o que vale é o líquido, e o "saldo anterior em aberto" não é desta compra */
 function totalDeclarado(linhas){
-  let liquido=0, geral=0;
+  let liquido=0, geral=0, antes='';
   linhas.forEach(t=>{
+    /* DANFE: "VALOR TOTAL DA NOTA" é cabeçalho de coluna; o número vem na linha de baixo */
+    if(/valor\s*total\s*da\s*nota/i.test(antes)&&!/[a-zà-ÿ]/i.test(t)){
+      const mv=acharMoedas(t); if(mv.length)liquido=Math.max(liquido,nBR(mv[mv.length-1].s));
+    }
+    antes=t;
     if(/anterior|em\s*aberto|saldo|limite|cr[eé]dito/i.test(t))return;
     const ms=acharMoedas(t); if(!ms.length)return;
     const v=nBR(ms[ms.length-1].s);
@@ -3939,6 +3951,7 @@ function palpiteFornecedor(linhas){
     if(acharMoedas(s).length)continue;
     if(s.replace(/[^A-Za-zÀ-ÿ]/g,'').length<4)continue;
     if(/or[çc]amento|cnpj|cpf|endere|telefone|fone|data|p[áa]gina|descri/i.test(s))continue;
+    if(/danf|documento\s*aux|nota\s*fiscal|recebemos|identifica|s[ée]rie|entrada|sa[íi]da|natureza|chave\s*de\s*acesso|inscri[çc][ãa]o|destinat|emitente|c[áa]lculo|protocolo|consulta/i.test(s))continue;
     if(s.length>45)continue;
     return s;
   }
