@@ -207,6 +207,40 @@ select option{background:var(--surface);color:var(--ink);padding:10px}
 select option:disabled{color:var(--ink-2)}
 select[multiple],select[size]{background-image:none;padding-right:12px}
 
+/* select próprio: o nativo fica escondido e continua sendo o valor de verdade */
+.selbox{position:relative}
+.selbox>select{position:absolute;inset:0;opacity:0;pointer-events:none;width:100%;height:100%}
+.selbtn{width:100%;display:flex;align-items:center;gap:10px;text-align:left;
+ padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);
+ color:var(--ink);font-size:15px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.selbtn .sellbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.selbtn.vazio .sellbl{color:var(--ink-2)}
+.selbtn .selarw{flex:none;width:9px;height:9px;border-right:2px solid var(--ink-2);
+ border-bottom:2px solid var(--ink-2);transform:rotate(45deg) translate(-2px,-2px);transition:transform .18s}
+.selbtn:hover{border-color:var(--ink-2)}
+.selbtn.aberto{border-color:var(--teal);box-shadow:0 0 0 3px rgba(22,163,148,.18)}
+.selbtn.aberto .selarw{transform:rotate(-135deg) translate(-3px,-3px)}
+.selbtn.off{opacity:.5;cursor:not-allowed}
+.sellist{display:none;position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:90;
+ background:var(--surface);border:1px solid var(--line);border-radius:12px;
+ box-shadow:0 12px 32px rgba(0,0,0,.22);max-height:264px;overflow:auto;padding:5px}
+.sellist.on{display:block}
+.sellist.pcima{top:auto;bottom:calc(100% + 5px)}
+.selopt{padding:10px 11px;border-radius:8px;font-size:14.5px;cursor:pointer;line-height:1.3}
+.selopt:hover{background:var(--surface-2)}
+.selopt.sel{background:var(--teal);color:#fff;font-weight:600}
+
+/* formulários compactos: menos altura, mais campos por linha */
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+@media(max-width:440px){.row3{grid-template-columns:1fr 1fr}.row3>*:first-child{grid-column:1/-1}}
+.sheet label{margin-top:11px;margin-bottom:4px}
+.sheet .row2>div>label,.sheet .row3>div>label{margin-top:0}
+.sheet input,.sheet select,.sheet textarea,.sheet .selbtn{padding:10px 11px}
+.sheet .hint{margin-top:4px;margin-bottom:0;font-size:11.5px;line-height:1.35}
+.sheet textarea{min-height:52px}
+.sheet .divider{margin:12px 0}
+.chkline{display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0}
+
 /* data e hora: mesmo desenho, com o ícone do calendário na cor do tema */
 input[type=date],input[type=datetime-local],input[type=time]{cursor:pointer;min-height:44px}
 input[type=date]::-webkit-calendar-picker-indicator,
@@ -459,6 +493,11 @@ a{color:var(--teal)}
     <div class="row2">
       <input type="date" id="fDataIni">
       <input type="date" id="fDataFim">
+    </div>
+    <div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">
+      <button class="btn ghost mini" id="vwLista" style="width:auto;padding:7px 12px" onclick="trocarVisao('lista')">Lista</button>
+      <button class="btn ghost mini" id="vwForn" style="width:auto;padding:7px 12px" onclick="trocarVisao('forn')">Por fornecedor</button>
+      <button class="btn ghost mini" id="vwCat" style="width:auto;padding:7px 12px" onclick="trocarVisao('cat')">Por categoria</button>
     </div>
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
       <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('mes')">Este mês</button>
@@ -1089,8 +1128,69 @@ document.getElementById('themeBtn').onclick=()=>
 
 /* ---------- sheet ---------- */
 const sheet=document.getElementById('sheet'), panel=document.getElementById('panel');
+/* ---------- select com o desenho do sistema (o nativo não aceita estilo na lista) ---------- */
+function aplicarSelects(root){
+  (root||document).querySelectorAll('select:not([data-sel])').forEach(sel=>{
+    if(sel.multiple||sel.size>1){sel.dataset.sel='1';return}
+    sel.dataset.sel='1';
+    const box=document.createElement('div');
+    box.className='selbox';
+    sel.parentNode.insertBefore(box,sel);
+    box.appendChild(sel);
+    const btn=document.createElement('button');
+    btn.type='button'; btn.className='selbtn';
+    btn.innerHTML='<span class="sellbl"></span><i class="selarw"></i>';
+    const lista=document.createElement('div');
+    lista.className='sellist';
+    box.appendChild(btn); box.appendChild(lista);
+
+    const rotular=()=>{
+      const o=sel.options[sel.selectedIndex];
+      btn.querySelector('.sellbl').textContent=o?o.textContent:'';
+      btn.classList.toggle('vazio',!!o&&o.value==='');
+    };
+    const fechar=()=>{lista.classList.remove('on');btn.classList.remove('aberto')};
+    const abrirL=()=>{
+      document.querySelectorAll('.sellist.on').forEach(l=>{l.classList.remove('on');
+        if(l.previousElementSibling)l.previousElementSibling.classList.remove('aberto')});
+      lista.innerHTML=[...sel.options].map((o,i)=>
+        `<div class="selopt ${i===sel.selectedIndex?'sel':''}" data-i="${i}">${o.textContent}</div>`).join('');
+      lista.classList.add('on'); btn.classList.add('aberto');
+      const at=lista.querySelector('.selopt.sel');
+      if(at)at.scrollIntoView({block:'nearest'});
+      /* se não couber para baixo, abre para cima */
+      const r=lista.getBoundingClientRect();
+      lista.classList.toggle('pcima', r.bottom>window.innerHeight-8 && r.top>240);
+    };
+    btn.onclick=e=>{e.preventDefault();e.stopPropagation();
+      if(sel.disabled)return;
+      lista.classList.contains('on')?fechar():abrirL();};
+    lista.onclick=e=>{
+      const op=e.target.closest('.selopt'); if(!op)return;
+      e.stopPropagation();
+      sel.selectedIndex=+op.dataset.i;
+      rotular(); fechar();
+      sel.dispatchEvent(new Event('change',{bubbles:true}));
+    };
+    sel.addEventListener('change',rotular);
+    box.dataset.rot='1';
+    box._rotular=rotular;
+    rotular();
+    btn.classList.toggle('off',sel.disabled);
+  });
+}
+/* chamada depois de trocar as opções de um select por código */
+function atualizarSelects(root){
+  (root||document).querySelectorAll('.selbox').forEach(b=>{ if(b._rotular)b._rotular(); });
+}
+document.addEventListener('click',()=>{
+  document.querySelectorAll('.sellist.on').forEach(l=>{l.classList.remove('on');
+    if(l.previousElementSibling)l.previousElementSibling.classList.remove('aberto')});
+});
+
 function abrir(html){
   panel.innerHTML='<div class="grab"></div>'+html;
+  aplicarSelects(panel);
   panel.style.transition=''; panel.style.transform='';
   panel.scrollTop=0;
   sheet.classList.add('on');
@@ -1143,6 +1243,8 @@ function rebuildNumeros(){
 }
 function render(){
   refreshDatalists();
+  aplicarSelects(document);
+  atualizarSelects(document);
   rebuildNumeros();
   renderIO();
   renderNotas();
@@ -1285,6 +1387,10 @@ function renderGastos(){
     });
   }
   L=L.sort((a,b)=>b.data.localeCompare(a.data));
+  ['lista','forn','cat'].forEach(v=>{
+    const b=document.getElementById(v==='lista'?'vwLista':v==='forn'?'vwForn':'vwCat');
+    if(b){ b.style.background=VISAO_G===v?'var(--teal)':''; b.style.color=VISAO_G===v?'#fff':''; b.style.borderColor=VISAO_G===v?'var(--teal)':''; }
+  });
   document.getElementById('gTotal').textContent=brl(L.reduce((s,l)=>s+ +l.total,0));
   const fmt=d=>d?d.split('-').reverse().slice(0,2).join('/'):'';
   document.getElementById('gTotalLbl').textContent=
@@ -1293,6 +1399,7 @@ function renderGastos(){
   document.getElementById('gTotalGeral').textContent=brl(geral);
   document.getElementById('gTotalGeralLinha').style.display=
     (semPeriodo||L.length===DB.lanc.length)?'none':'flex';
+  if(VISAO_G!=='lista'){ renderGastosAgrupado(L); return; }
   document.getElementById('gastosList').innerHTML=L.map(l=>{
     const p=dia(l.data), falta=l.ctrl?(+l.qtd - +l.qtdRec):0, ab=!isPago(l), pp=pagoParcial(l);
     return `<div class="item" onclick="verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
@@ -1309,6 +1416,46 @@ document.getElementById('fSit').onchange=renderGastos;
 document.getElementById('fBusca').oninput=renderGastos;
 document.getElementById('fDataIni').onchange=e=>{e.target.dataset.tocado='1';renderGastos()};
 document.getElementById('fDataFim').onchange=e=>{e.target.dataset.tocado='1';renderGastos()};
+let VISAO_G='lista';
+function trocarVisao(v){ VISAO_G=v; renderGastos(); }
+/* agrupa por fornecedor ou por categoria; tocar no grupo abre os lançamentos por data */
+function renderGastosAgrupado(L){
+  const porForn=VISAO_G==='forn';
+  const G={};
+  L.forEach(l=>{
+    const nome=porForn?(String(l.forn||'').trim()||'Sem fornecedor'):cat(l.cat).n;
+    const k=alfa2(nome);
+    (G[k]=G[k]||{nome,itens:[],total:0,aberto:0}).itens.push(l);
+    G[k].total+=+l.total; if(!isPago(l))G[k].aberto+=saldoAPagar(l);
+  });
+  const grupos=Object.values(G).sort((a,b)=>b.total-a.total);
+  const geral=grupos.reduce((s,g)=>s+g.total,0);
+  document.getElementById('gastosList').innerHTML= grupos.length? grupos.map(g=>{
+    const k='g:'+alfa2(g.nome);
+    const ult=g.itens.slice().sort((a,b)=>b.data.localeCompare(a.data));
+    const pc=geral>0?(g.total/geral*100):0;
+    return `<div class="acc ${ACC[k]?'on':''}" style="margin-bottom:8px">
+      <div class="acch" onclick="toggleAcc('${k}')">
+        <div style="flex:1;min-width:0">
+          <b style="font-size:14.5px">${g.nome}</b>
+          <div style="font-size:11.5px;color:var(--ink-2)">${g.itens.length} lançamento${g.itens.length>1?'s':''} · ${pc.toFixed(1)}% do filtro${g.aberto>0?` · <span style="color:var(--red)">${brl(g.aberto)} em aberto</span>`:''}</div>
+        </div>
+        <b class="mono" style="white-space:nowrap">${brl(g.total)}</b>
+        <span class="arw">▼</span>
+      </div>
+      <div class="accb">
+        ${ult.map(l=>{
+          const p=dia(l.data), ab=!isPago(l);
+          return `<div class="item" onclick="event.stopPropagation();verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
+            <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span></div>
+            <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
+              <small>${porForn?cat(l.cat).n:(l.forn||'sem fornecedor')}${(+l.qtd>1)?' · '+(+l.qtd).toLocaleString('pt-BR')+' × '+brl(l.unit):''}</small></div>
+            <div class="val"><span class="mono">${brl(l.total)}</span>
+              ${ab?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`;
+        }).join('')}
+      </div></div>`;
+  }).join('') : '<div class="empty"><b>Nenhum gasto neste filtro</b><p>Ajuste os filtros acima.</p></div>';
+}
 function periodoRapido(qual){
   const ini=document.getElementById('fDataIni'), fim=document.getElementById('fDataFim'),
         sem=document.getElementById('fSemPeriodo');
@@ -3071,38 +3218,35 @@ function abrirGasto(l){
   l=l||{id:'',data:hoje(),desc:'',cat:'c00',forn:'',qtd:1,unit:'',total:'',pag:'Pago',nf:'',link:'',obs:'',ctrl:false,qtdRec:0,baixas:[]};
   abrir(`<h2>${l.id?'Editar gasto':'Lançar gasto'}</h2>
   <p class="sub">O valor entra por inteiro na data do pagamento.</p>
-  <label>Data</label><input type="date" id="x_data" value="${l.data}">
-  <div id="descUnica"><label>Descrição</label><input id="x_desc" data-cap="1" list="dlProdutos" value="${l.desc}" placeholder="Ex: 100 sacos de cimento 50kg" onblur="sugerirTipo()" onchange="sugerirTipo()">
-    <label>Tipo de produto (opcional)</label>
-    <div class="combo"><input id="x_fam" autocomplete="off"
-      oninput="comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
-      value="${(l.familia||'').replace(/"/g,'&quot;')}" placeholder="Ex: Ferro, Cimento, Bloco...">
-      <div class="combo-list"></div></div>
-    <p class="hint">Agrupa produtos parecidos mesmo com descrições diferentes — todas as bitolas de ferro em "Ferro", por exemplo.</p>
+  <div id="descUnica"><label>Descrição</label><input id="x_desc" data-cap="1" list="dlProdutos" value="${l.desc}" placeholder="Ex: 100 sacos de cimento 50kg" onblur="sugerirTipo()" onchange="sugerirTipo()"></div>
+  <div class="row2">
+    <div><label>Data</label><input type="date" id="x_data" value="${l.data}"></div>
+    <div><label>Fornecedor</label><input id="x_forn" data-cap="1" value="${l.forn}" placeholder="Ex: Lumar Bananeiras"></div>
   </div>
-  <div id="categoriaUnica"><label>Categoria</label>
-    <input id="x_cat" list="dlCategorias" value="${(cat(l.cat||'c00').n||'').replace(/"/g,'&quot;')}"
-      placeholder="Escolha ou digite uma nova" ${l.rateio&&l.rateio.length?'style="display:none"':''}>
-    <p class="hint" style="margin-top:5px">Escolha na lista ou digite o nome de uma categoria nova.</p>
+  <div class="row2">
+    <div id="descFam"><label>Tipo de produto</label>
+      <div class="combo"><input id="x_fam" autocomplete="off"
+        oninput="comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
+        value="${(l.familia||'').replace(/"/g,'&quot;')}" placeholder="Ex: Ferro, Cimento...">
+        <div class="combo-list"></div></div></div>
+    <div id="categoriaUnica"><label>Categoria</label>
+      <input id="x_cat" list="dlCategorias" value="${(cat(l.cat||'c00').n||'').replace(/"/g,'&quot;')}"
+        placeholder="Escolha ou digite" ${l.rateio&&l.rateio.length?'style="display:none"':''}></div>
   </div>
   <div id="blocoRateio">
-  <label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0;margin-top:${l.rateio&&l.rateio.length?'0':'6px'}">
-    <input type="checkbox" id="x_rat" ${l.rateio&&l.rateio.length?'checked':''} style="width:20px;height:20px;flex:none">
+  <label class="chkline" style="margin-top:10px">
+    <input type="checkbox" id="x_rat" ${l.rateio&&l.rateio.length?'checked':''}>
     Este material vai para mais de uma etapa</label>
-  <p class="hint">Marque para cimento, ferro e outros que servem à obra toda. Escolha as etapas e o valor é dividido igualmente entre elas.</p>
   <div id="rateioBox" style="display:${l.rateio&&l.rateio.length?'block':'none'}"></div>
   </div>
-  <label>Fornecedor</label><input id="x_forn" data-cap="1" value="${l.forn}" placeholder="Ex: Lumar Bananeiras">
-  ${l.id?'':`<label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0">
-    <input type="checkbox" id="x_multi" style="width:20px;height:20px;flex:none">
-    Mais de um item nesta compra</label>
-  <p class="hint">Marque para lançar vários produtos de uma vez, como um pedido com nota única.</p>`}
+  ${l.id?'':`<label class="chkline" style="margin-top:10px">
+    <input type="checkbox" id="x_multi"> Mais de um item nesta compra</label>`}
   <div id="itemUnico">
-    <div class="row2">
+    <div class="row3">
       <div><label>Quantidade</label><input type="number" step="any" id="x_qtd" value="${l.qtd}"></div>
       <div><label>Valor unitário</label><input ${moedaAttrs(l.unit)} id="x_unit"></div>
+      <div><label>Valor total</label><input ${moedaAttrs(l.total)} id="x_total"></div>
     </div>
-    <label>Valor total</label><input ${moedaAttrs(l.total)} id="x_total">
   </div>
   <div id="itensMultiplos" style="display:none">
     <label style="margin:12px 0 5px">Itens</label>
@@ -3111,23 +3255,23 @@ function abrirGasto(l){
     <div class="stat" style="margin-top:12px;border-top:1px solid var(--line);border-bottom:0;padding-top:11px">
       <span style="font-weight:700">Total da compra</span><b class="mono" id="x_tot_itens" style="font-size:18px"></b></div>
   </div>
-  <label>Pagamento</label><select id="x_pag">
-    ${['A pagar','Pago','Pago adiantado','Parcelado'].map(o=>`<option ${o===l.pag?'selected':''}>${o}</option>`).join('')}</select>
-  <label>Nota fiscal / recibo (número)</label><input id="x_nf" value="${l.nf}" placeholder="Número">
+  <div class="row2">
+    <div><label>Pagamento</label><select id="x_pag">
+      ${['A pagar','Pago','Pago adiantado','Parcelado'].map(o=>`<option ${o===l.pag?'selected':''}>${o}</option>`).join('')}</select></div>
+    <div><label>Nota fiscal / recibo</label><input id="x_nf" value="${l.nf}" placeholder="Número"></div>
+  </div>
   <label>Anexos</label>
   <div id="anexosGasto"></div>
   <div class="divider"></div>
-  <label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0">
-    <input type="checkbox" id="x_ctrl" ${l.ctrl?'checked':''} style="width:20px;height:20px;flex:none">
+  <label class="chkline">
+    <input type="checkbox" id="x_ctrl" ${l.ctrl?'checked':''}>
     Vou receber o material aos poucos</label>
-  <p class="hint">Marque quando pagar tudo agora e o fornecedor entregar em partes, como no cimento.</p>
   <div id="ctrlBox" style="display:${l.ctrl?'block':'none'}">
     <label>Quantidade já recebida</label><input type="number" step="any" id="x_rec" value="${l.qtdRec}">
   </div>
   ${l.id?'':`<div class="divider"></div>
-  <label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0">
-    <input type="checkbox" id="x_rep" style="width:20px;height:20px;flex:none">
-    Repetir todo mês</label>
+  <label class="chkline">
+    <input type="checkbox" id="x_rep"> Repetir todo mês</label>
   <div id="repBox" style="display:none">
     <label>Quantas vezes no total</label><input type="number" min="2" max="60" id="x_repN" value="8">
     <p class="hint">A primeira usa a data acima. As seguintes entram como <b>a pagar</b>, no mesmo dia dos meses seguintes.</p>
@@ -3374,10 +3518,11 @@ function abrirCot(c){
   abrir(`<h2>${c.id?'Editar cotação':'Nova cotação'}</h2>
   <p class="sub">Preço de mercado. Ainda não é gasto.</p>
   <label>Do que se trata</label><input id="c_item" data-cap="1" value="${c.item||''}" placeholder="Ex: Blocos e canaletas de concreto">
-  <p class="hint">Use o mesmo texto ao cotar com outros fornecedores — é o que agrupa as propostas para comparar.</p>
-  <label>Fornecedor</label><input id="c_forn" data-cap="1" value="${c.forn||''}">
-  <label>Validade da proposta</label><input type="date" id="c_val" value="${c.validade||daquiADias(5)}">
-  <p class="hint">Preenchida com 5 dias por padrão — ajuste se o fornecedor der outro prazo.</p>
+  <div class="row2">
+    <div><label>Fornecedor</label><input id="c_forn" data-cap="1" value="${c.forn||''}"></div>
+    <div><label>Validade</label><input type="date" id="c_val" value="${c.validade||daquiADias(5)}"></div>
+  </div>
+  <p class="hint">Validade preenchida com 5 dias por padrão.</p>
   <label>Anexos</label>
   <div id="anexosCot"></div>
   <div class="divider"></div>
@@ -3407,7 +3552,7 @@ let ITENS_DIV='itens', ITENS_TOT='c_tot', ITENS_CAT=false;
 function pintaItens(){
   document.getElementById(ITENS_DIV).innerHTML=panel._its.map((it,i)=>`
    <div class="grp" style="background:var(--surface-2);margin-bottom:8px">
-     <div class="row2">
+     <div class="row3">
        <div><label style="margin-top:0">Qtde</label>
          <input type="number" step="any" value="${it.q}" oninput="chgItem(${i},'q',this.value)"></div>
        <div><label style="margin-top:0">Vlr unitário</label>
