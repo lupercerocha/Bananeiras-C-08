@@ -319,6 +319,20 @@ nav button.on{color:var(--teal)}
 .aviso small{color:var(--ink-2);font-size:12px}
 .grid figure{margin:0;position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--surface-2);cursor:pointer}
 .grid img{width:100%;height:100%;object-fit:cover;display:block}
+/* quadro de proporção fixa: toda foto ocupa o mesmo espaço, independente do formato */
+.seqframe{position:relative;width:100%;aspect-ratio:4/3;background:#07131b;border-radius:12px;
+ overflow:hidden;margin:10px 0;display:grid;place-items:center}
+.seqframe img{width:100%;height:100%;display:block}
+.seqframe.ajustar img{object-fit:contain}
+.seqframe.preencher img{object-fit:cover}
+/* fundo desfocado preenchendo as sobras da foto em pé */
+.seqframe .fundo{position:absolute;inset:0;background-size:cover;background-position:center;
+ filter:blur(26px) brightness(.5);transform:scale(1.15)}
+.seqframe .foto{position:relative;z-index:1}
+.seqframe .modo{position:absolute;right:8px;bottom:8px;z-index:2;background:rgba(0,0,0,.55);
+ color:#fff;border:0;border-radius:9px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;
+ backdrop-filter:blur(4px)}
+@media(min-width:620px){.seqframe{aspect-ratio:16/10}}
 .grid figcaption{position:absolute;left:0;right:0;bottom:0;padding:12px 5px 4px;font-size:9px;color:#fff;
  background:linear-gradient(transparent,rgba(0,0,0,.72));letter-spacing:.02em}
 .monthlbl{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin:14px 0 8px}
@@ -447,6 +461,7 @@ a{color:var(--teal)}
   <div class="card" id="cardPagar" style="display:none">
     <h3>Contas a pagar</h3>
     <div id="pagarList"></div>
+    <p class="hint" id="hParcial"></p>
   </div>
 
   <div class="card" id="cardSaldo" style="display:none">
@@ -720,6 +735,8 @@ async function entrarNoApp(session){
   await sincronizarNaEntrada();
   gravarSnap();
   render();
+  /* passa das fotos antigas para o espaço grande antes que a memória estoure */
+  if(espacoUsado()>3.2e6 && DB.fotos.some(f=>f.img)) setTimeout(()=>migrarFotos(true),1500);
 }
 
 /* funde os dados da nuvem com os locais pelo conteúdo (mesma lógica do "Importar só o que for novo") */
@@ -1074,7 +1091,17 @@ function verAnexoDet(i){
 }
 function salvar(){
   try{localStorage.setItem('obraC08',JSON.stringify(DB))}
-  catch(e){toast('Memória do aparelho cheia. Exporte o backup e apague fotos antigas.')}
+  catch(e){
+    /* estourou o espaço: quase sempre são fotos antigas guardadas junto com os dados */
+    if(DB.fotos.some(f=>f.img)){
+      toast('Memória cheia — liberando espaço das fotos...');
+      migrarFotos(true).then(n=>{
+        try{ localStorage.setItem('obraC08',JSON.stringify(DB));
+          toast(n?'Espaço liberado: '+n+' foto(s) movidas':'Espaço liberado'); }
+        catch(e2){ toast('Memória cheia. Exporte o backup em Configurações.'); }
+      });
+    }else toast('Memória cheia. Exporte o backup em Configurações.');
+  }
   if(SESSAO) sincronizarDepoisDeSalvar();
 }
 /* ---------- confirmação (não usa confirm() nativo — falha em apps instalados na tela inicial) ---------- */
@@ -1094,6 +1121,18 @@ const daquiADias=n=>{const d=new Date();d.setDate(d.getDate()+(+n||0));
 const isPago=l=>l.pag!=='A pagar';
 const pagoParcial=l=>(l.pagamentos||[]).reduce((s,p)=>s+ +p.valor,0);
 const saldoAPagar=l=>isPago(l)?0:Math.max(0,+l.total-pagoParcial(l));
+/* quanto já saiu do bolso neste lançamento: tudo, se está pago; só as parcelas, se está em aberto */
+const valorPago=l=>isPago(l)?(+l.total||0):pagoParcial(l);
+/* as fatias por etapa proporcionais ao que já foi pago */
+function partesPagas(l){
+  const pago=valorPago(l), tot=+l.total||0;
+  if(!(pago>0))return [];
+  const ps=partes(l);
+  if(!(tot>0)||Math.abs(pago-tot)<0.005)return ps;
+  const f=pago/tot;
+  return ps.map(p=>({cat:p.cat,valor:+(p.valor*f).toFixed(2)}));
+}
+const temParcial=l=>!isPago(l)&&pagoParcial(l)>0;
 function partes(l){
   return (l.rateio&&l.rateio.length)?l.rateio.map(r=>({cat:r.cat,valor:+r.valor||0})):[{cat:l.cat,valor:+l.total||0}];
 }
@@ -1252,9 +1291,9 @@ function render(){
   renderNuvem();
   renderAvisos();
   renderEquipe();
-  const pagos=DB.lanc.filter(isPago);
+  const pagos=DB.lanc.filter(l=>valorPago(l)>0);
   let adm=0,con=0;
-  pagos.forEach(l=>partes(l).forEach(p=>{ if(cat(p.cat).g==='adm') adm+=p.valor; else con+=p.valor; }));
+  pagos.forEach(l=>partesPagas(l).forEach(p=>{ if(cat(p.cat).g==='adm') adm+=p.valor; else con+=p.valor; }));
   document.getElementById('hTotal').textContent=brl(adm+con);
   document.getElementById('hAdm').textContent=brl(adm);
   document.getElementById('hCon').textContent=brl(con);
@@ -1264,6 +1303,12 @@ function render(){
   const somaAb=abertos.reduce((s,l)=>s+saldoAPagar(l),0);
   document.getElementById('hAberto').style.display=abertos.length?'flex':'none';
   document.getElementById('hAbertoV').textContent=brl(somaAb);
+  const parciais=abertos.filter(temParcial);
+  const jaPagoParcial=parciais.reduce((s,l)=>s+pagoParcial(l),0);
+  const avisoP=document.getElementById('hParcial');
+  if(avisoP) avisoP.innerHTML = parciais.length
+    ? `${brl(jaPagoParcial)} já pago em ${parciais.length} lançamento(s) parcelado(s) — esse valor já está no total investido.`
+    : '';
   document.getElementById('cardPagar').style.display=abertos.length?'block':'none';
   const hj=hoje();
   document.getElementById('pagarList').innerHTML=abertos.slice(0,12).map(l=>{
@@ -1315,7 +1360,7 @@ function render(){
   const tot=adm+con||1;
   const porCat=CATS_AZ.map(c=>({c,v:0}));
   const idxCat={}; porCat.forEach((x,i)=>idxCat[x.c.id]=i);
-  pagos.forEach(l=>partes(l).forEach(p=>{ if(idxCat[p.cat]!==undefined) porCat[idxCat[p.cat]].v+=p.valor; }));
+  pagos.forEach(l=>partesPagas(l).forEach(p=>{ if(idxCat[p.cat]!==undefined) porCat[idxCat[p.cat]].v+=p.valor; }));
   const porCatF=porCat.filter(x=>x.v>0);
   document.getElementById('catList').innerHTML=porCatF.map(x=>
     `<div class="stat" onclick="verCategoria('${x.c.id}')" style="cursor:pointer">
@@ -1330,8 +1375,8 @@ function render(){
 function verCategoria(catId){
   const c=cat(catId);
   const linhas=[];
-  DB.lanc.filter(isPago).forEach(l=>{
-    partes(l).forEach(p=>{
+  DB.lanc.filter(l=>valorPago(l)>0).forEach(l=>{
+    partesPagas(l).forEach(p=>{
       if(p.cat!==catId)return;
       const totalItem=+l.total||0;
       const nPartes=(l.rateio&&l.rateio.length)?l.rateio.length:1;
@@ -1407,7 +1452,7 @@ function renderGastos(){
       <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
         <small>${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}</small></div>
       <div class="val"><span class="mono">${brl(l.total)}</span>
-        ${ab?`<div><span class="tag pend">${pp>0?'parcial':'a pagar'}</span></div>`:''}</div></div>`;
+        ${ab?`<div><span class="tag pend">${pp>0?'falta '+brl(saldoAPagar(l)):'a pagar'}</span></div>`:''}</div></div>`;
   }).join('')||'<div class="empty"><b>Nenhum gasto neste filtro</b><p>Ajuste os filtros acima.</p></div>';
 }
 document.getElementById('fCat').onchange=renderGastos;
@@ -2619,7 +2664,7 @@ function renderFotos(){
     const [y,m]=k.split('-');
     return `<div class="monthlbl">${MES[+m-1]} ${y} · ${g[k].length} foto${g[k].length>1?'s':''}</div>
     <div class="grid">`+g[k].map(f=>
-      `<figure onclick="verFoto('${f.id}')"><img src="${f.img}" alt="${f.leg||''}">
+      `<figure onclick="verFoto('${f.id}')"><img src="${f.thumb||f.img||''}" alt="${f.leg||''}" loading="lazy">
        <figcaption>${f.dh.slice(8,10)}/${f.dh.slice(5,7)} ${f.dh.slice(11,16)}</figcaption></figure>`).join('')+'</div>';
   }).join('');
 }
@@ -2944,10 +2989,10 @@ function verMes(m){
 }
 
 function renderRel(){
-  const c=cfg(), pagos=DB.lanc.filter(isPago), hj=hoje();
+  const c=cfg(), pagos=DB.lanc.filter(l=>valorPago(l)>0), hj=hoje();
   const con=pagos.filter(l=>cat(l.cat).g==='con'), adm=pagos.filter(l=>cat(l.cat).g==='adm');
   let totCon=0,totAdm=0;
-  pagos.forEach(l=>partes(l).forEach(p=>{ if(cat(p.cat).g==='con') totCon+=p.valor; else totAdm+=p.valor; }));
+  pagos.forEach(l=>partesPagas(l).forEach(p=>{ if(cat(p.cat).g==='con') totCon+=p.valor; else totAdm+=p.valor; }));
   const inicio=c.inicio || (con.length?con.map(l=>l.data).sort()[0]:'');
 
   /* --- prazo --- */
@@ -2983,7 +3028,7 @@ function renderRel(){
     <p class="hint">A projeção não é orçamento — é só o seu próprio ritmo esticado até o fim do prazo. Serve para antecipar surpresa, não para prever o custo final.</p>`;
 
   /* --- gráfico mensal --- */
-  const byM={}; pagos.forEach(l=>byM[l.data.slice(0,7)]=(byM[l.data.slice(0,7)]||0)+ +l.total);
+  const byM={}; pagos.forEach(l=>byM[l.data.slice(0,7)]=(byM[l.data.slice(0,7)]||0)+valorPago(l));
   const ms=Object.keys(byM).sort();
   if(!ms.length){document.getElementById('iChart').innerHTML='<div class="empty">Sem lançamentos</div>'}
   else{
@@ -3030,7 +3075,7 @@ function renderRel(){
         <span class="nm">${k}<div class="bg" style="width:${v/arr[0][1]*100}%"></div></span>
         <span class="vl mono">${brl(v)}</span></div>`).join(''):'<div class="empty">Sem dados</div>');
   const catT={},fornT={};
-  pagos.forEach(l=>{partes(l).forEach(p=>{catT[cat(p.cat).n]=(catT[cat(p.cat).n]||0)+p.valor});
+  pagos.forEach(l=>{partesPagas(l).forEach(p=>{catT[cat(p.cat).n]=(catT[cat(p.cat).n]||0)+p.valor});
                     fornT[l.forn||'—']=(fornT[l.forn||'—']||0)+ +l.total});
   const catR=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
   const fornR=Object.entries(fornT).sort((a,b)=>b[1]-a[1]);
@@ -3040,7 +3085,7 @@ function renderRel(){
 
   /* --- gasto por categoria, lista completa --- */
   const catTAdm={},catTCon={};
-  pagos.forEach(l=>partes(l).forEach(p=>{
+  pagos.forEach(l=>partesPagas(l).forEach(p=>{
     const alvo=cat(p.cat).g==='adm'?catTAdm:catTCon;
     alvo[p.cat]=(alvo[p.cat]||0)+p.valor;
   }));
@@ -3074,7 +3119,7 @@ function renderRel(){
 
   /* --- listas alfabéticas --- */
   const byF={},byMes={};
-  pagos.forEach(l=>{byF[l.forn||'—']=(byF[l.forn||'—']||0)+ +l.total;
+  pagos.forEach(l=>{byF[l.forn||'—']=(byF[l.forn||'—']||0)+valorPago(l);
     byMes[l.data.slice(0,7)]=(byMes[l.data.slice(0,7)]||0)+ +l.total});
   const line=(k,v)=>`<div class="stat"><span>${k}</span><b class="mono">${brl(v)}</b></div>`;
   document.getElementById('relForn').innerHTML=
@@ -3773,6 +3818,72 @@ function confirmarCompra(){
 }
 
 /* ---------- fotos ---------- */
+/* ---------- fotos: miniatura no banco, imagem cheia fora do localStorage ---------- */
+function reduzirImagem(src,lado,qual){
+  return new Promise((ok,err)=>{
+    const im=new Image();
+    im.onload=()=>{
+      const s=Math.min(1,lado/Math.max(im.width,im.height));
+      const cv=document.createElement('canvas');
+      cv.width=im.width*s|0; cv.height=im.height*s|0;
+      cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+      ok(cv.toDataURL('image/jpeg',qual));
+    };
+    im.onerror=err; im.src=src;
+  });
+}
+function dataUrlParaBlob(d){
+  const [cab,b64]=String(d).split(',');
+  const mime=(cab.match(/:(.*?);/)||[,'image/jpeg'])[1];
+  const bin=atob(b64), arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+/* guarda a imagem cheia no aparelho (fora do localStorage) e na nuvem */
+async function guardarImagemFoto(f,dataUrl){
+  const blob=dataUrlParaBlob(dataUrl);
+  try{ await idbPut('foto:'+f.id,blob); f.imgLocal=true; }catch(e){ f.imgLocal=false; }
+  if(SESSAO){
+    try{
+      const path=SESSAO.user.id+'/fotos/'+f.id+'.jpg';
+      const {error}=await supa.storage.from('notas').upload(path,blob,{upsert:true,contentType:'image/jpeg'});
+      if(!error) f.imgPath=path;
+    }catch(e){}
+  }
+}
+async function urlDaFoto(f){
+  if(!f)return '';
+  try{ const b=await idbGet('foto:'+f.id); if(b)return URL.createObjectURL(b); }catch(e){}
+  if(f.imgPath&&SESSAO){
+    try{
+      const {data,error}=await supa.storage.from('notas').createSignedUrl(f.imgPath,3600);
+      if(!error&&data&&data.signedUrl)return data.signedUrl;
+    }catch(e){}
+  }
+  return f.img||f.thumb||'';         /* fotos antigas ainda guardadas no banco */
+}
+/* move as fotos antigas do localStorage para o armazenamento de imagens */
+async function migrarFotos(silencioso){
+  const antigas=DB.fotos.filter(f=>f.img&&!f.imgLocal&&!f.imgPath);
+  if(!antigas.length){ if(!silencioso)toast('Nenhuma foto para liberar.'); return 0; }
+  if(!silencioso)toast('Liberando memória...');
+  let n=0;
+  for(const f of antigas){
+    try{
+      const cheia=f.img;
+      if(!f.thumb) f.thumb=await reduzirImagem(cheia,360,.5);
+      await guardarImagemFoto(f,cheia);
+      if(f.imgLocal||f.imgPath){ delete f.img; f.at=Date.now(); n++; }
+    }catch(e){}
+  }
+  if(n){ salvar(); render(); }
+  if(!silencioso) toast(n+' foto(s) movidas — memória liberada');
+  return n;
+}
+function espacoUsado(){
+  try{ return new Blob([localStorage.getItem('obraC08')||'']).size; }catch(e){ return 0; }
+}
+
 function processarFoto(e){
   const f=e.target.files[0]; if(!f)return;
   const r=new FileReader();
@@ -3801,11 +3912,20 @@ function formFoto(img){
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Descartar</button>`);
   panel._img=img;
 }
-function salvarFoto(){
-  DB.fotos.push({id:uid(),at:Date.now(),dh:val('f_dh'),cat:val('f_cat'),leg:val('f_leg').trim(),img:panel._img});
+async function salvarFoto(){
+  const cheia=panel._img;
+  const f={id:uid(),at:Date.now(),dh:val('f_dh'),cat:val('f_cat'),leg:capNomes(val('f_leg')),thumb:''};
+  try{ f.thumb=await reduzirImagem(cheia,360,.5); }catch(e){ f.thumb=cheia; }
+  DB.fotos.push(f);
   salvar();fechar();render();toast('Foto salva no álbum');
+  await guardarImagemFoto(f,cheia);
+  salvar();
 }
-let SEQ_FOTOS=[], SEQ_I=0;
+let SEQ_FOTOS=[], SEQ_I=0, SEQ_MODO='ajustar';
+function trocarModoFoto(){
+  SEQ_MODO = SEQ_MODO==='ajustar' ? 'preencher' : 'ajustar';
+  mostrarSeq();
+}
 function verSequencia(){
   if(!DB.fotos.length){toast('Álbum vazio ainda.');return}
   SEQ_FOTOS=DB.fotos.slice().sort((a,b)=>a.dh.localeCompare(b.dh));
@@ -3820,8 +3940,10 @@ function mostrarSeq(){
   const f=SEQ_FOTOS[SEQ_I]; if(!f)return;
   abrir(`<h2>${f.leg||'Sem legenda'}</h2>
   <p class="sub">${f.dh.slice(8,10)}/${f.dh.slice(5,7)}/${f.dh.slice(0,4)} às ${f.dh.slice(11,16)} · ${cat(f.cat).n} · ${SEQ_I+1} de ${SEQ_FOTOS.length}</p>
-  <div style="position:relative" id="seqImgWrap">
-    <img src="${f.img}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
+  <div class="seqframe ${SEQ_MODO}" id="seqImgWrap">
+    <div class="fundo" id="seqFundo" style="background-image:url('${f.thumb||f.img||''}')"></div>
+    <img class="foto" id="seqImg" src="${f.thumb||f.img||''}" alt="">
+    <button class="modo" onclick="event.stopPropagation();trocarModoFoto()">${SEQ_MODO==='ajustar'?'⤢ Preencher':'⤡ Ajustar'}</button>
   </div>
   <div class="row2">
     <button class="btn ghost mini" ${SEQ_I<=0?'disabled style="opacity:.4"':''} onclick="seqNav(-1)">‹ Anterior</button>
@@ -3829,6 +3951,11 @@ function mostrarSeq(){
   </div>
   <button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="excluirFoto('${f.id}')">Excluir foto</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+  urlDaFoto(f).then(u=>{
+    if(!u)return;
+    const im=document.getElementById('seqImg'), fu=document.getElementById('seqFundo');
+    if(im&&SEQ_FOTOS[SEQ_I]&&SEQ_FOTOS[SEQ_I].id===f.id){ im.src=u; if(fu)fu.style.backgroundImage=`url('${u}')`; }
+  });
   const wrap=document.getElementById('seqImgWrap');
   let x0=null;
   wrap.ontouchstart=e=>{x0=e.touches[0].clientX};
@@ -3850,6 +3977,7 @@ document.addEventListener('keydown',e=>{
 });
 function excluirFoto(id){
   confirmar('Excluir foto','Não é possível desfazer.','Excluir',()=>{
+    idbDel('foto:'+id);
     DB.fotos=DB.fotos.filter(f=>f.id!==id);salvar();fechar();render();toast('Foto excluída');
   },true);
 }
@@ -4681,7 +4809,9 @@ function renderIO(){
     <button class="btn soft" onclick="verCategorias()"><span class="ic">🏷️</span>Categorias</button>
     <button class="btn soft" onclick="abrirDuplicados()"><span class="ic">🔍</span>Duplicados</button>
     <button class="btn soft" onclick="verRestauracao()"><span class="ic">⏱</span>Restaurar</button>
+    <button class="btn soft" onclick="migrarFotos()"><span class="ic">🧹</span>Liberar memória</button>
   </div>
+  <p class="hint">"Liberar memória" tira as fotos antigas da área pequena do navegador e as guarda no espaço grande do aparelho e na nuvem. Nenhuma foto é perdida.</p>
   <div class="divider" style="margin:16px 0"></div>
   <h3>Documentos da obra</h3>
   <a class="btn dark" style="text-decoration:none;text-align:center;display:block" target="_blank" rel="noopener"
