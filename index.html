@@ -1129,11 +1129,16 @@ const isPago=l=>l.pag!=='A pagar';
 const pagoParcial=l=>(l.pagamentos||[]).reduce((s,p)=>s+ +p.valor,0);
 const saldoAPagar=l=>isPago(l)?0:Math.max(0,+l.total-pagoParcial(l));
 /* quanto já saiu do bolso neste lançamento: tudo, se está pago; só as parcelas, se está em aberto */
-const valorPago=l=>isPago(l)?(+l.total||0):pagoParcial(l);
+const valorPago=l=>{
+  const t=+l.total||0;
+  if(isPago(l))return t;
+  if(t<0)return t;                       /* desconto ou estorno entra inteiro */
+  return Math.min(pagoParcial(l),t);     /* pago nunca passa do valor do lançamento */
+};
 /* as fatias por etapa proporcionais ao que já foi pago */
 function partesPagas(l){
   const pago=valorPago(l), tot=+l.total||0;
-  if(!(pago>0))return [];
+  if(Math.abs(pago)<0.005)return [];
   const ps=partes(l);
   if(!(tot>0)||Math.abs(pago-tot)<0.005)return ps;
   const f=pago/tot;
@@ -1273,7 +1278,117 @@ function baixaTotalRapida(id){
   salvar(); render(); verPendencia('parado'); toast('Entrega concluída');
 }
 
+/* quanto este lançamento contribui para o total do painel */
+function contribPainel(l){ return +partesPagas(l).reduce((s,p)=>s+p.valor,0).toFixed(2); }
+/* classifica a diferença entre o painel e a lista de gastos, lançamento a lançamento */
+function conciliar(){
+  const linhas=[];
+  DB.lanc.forEach(l=>{
+    const lista=+(+l.total||0).toFixed(2), painel=contribPainel(l);
+    const dif=+(painel-lista).toFixed(2);
+    if(Math.abs(dif)<0.01)return;
+    const pp=pagoParcial(l), somaRat=(l.rateio&&l.rateio.length)?l.rateio.reduce((a,r)=>a+(+r.valor||0),0):null;
+    let motivo,ok=false;
+    if(!isPago(l)&&pp>lista) motivo='pagamentos registrados somam mais que o valor do lançamento';
+    else if(!isPago(l)) { motivo='ainda não pago por inteiro'; ok=true; }
+    else if(somaRat!==null&&Math.abs(somaRat-lista)>=0.01) motivo='divisão entre etapas não fecha com o total';
+    else motivo='diferença de arredondamento';
+    linhas.push({l,lista,painel,dif,motivo,ok,pp,somaRat});
+  });
+  const totalLista=DB.lanc.reduce((s,l)=>s+ +l.total,0);
+  const totalPainel=DB.lanc.reduce((s,l)=>s+contribPainel(l),0);
+  return {linhas,totalLista:+totalLista.toFixed(2),totalPainel:+totalPainel.toFixed(2),
+    dif:+(totalPainel-totalLista).toFixed(2),
+    problemas:linhas.filter(x=>!x.ok)};
+}
 function conferirTotais(){
+  const C=conciliar();
+  const naoPago=C.linhas.filter(x=>x.ok).reduce((s,x)=>s+x.dif,0);
+  const erro=C.problemas.reduce((s,x)=>s+x.dif,0);
+  abrir(`<h2>Conferência de totais</h2>
+  <p class="sub">De onde vem cada diferença entre o Painel e a aba Gastos.</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <div class="stat"><span>Soma de todos os lançamentos (aba Gastos)</span><b class="mono">${brl(C.totalLista)}</b></div>
+    ${Math.abs(naoPago)>=0.01?`<div class="stat"><span>Ainda não pago (não entra no painel)</span><b class="mono">${brl(naoPago)}</b></div>`:''}
+    ${Math.abs(erro)>=0.01?`<div class="stat"><span>Erro nos dados</span><b class="mono" style="color:var(--red)">${erro>0?'+':''}${brl(erro)}</b></div>`:''}
+    <div class="stat" style="border-top:1px solid var(--line);border-bottom:0;padding-top:9px">
+      <span style="font-weight:700">Total investido (Painel)</span><b class="mono" style="font-size:17px">${brl(C.totalPainel)}</b></div>
+  </div>
+  ${C.problemas.length?`<h3 style="margin-top:14px">${C.problemas.length} lançamento(s) com problema</h3>
+  ${C.problemas.map(x=>`<div class="card" style="box-shadow:none;margin-top:9px;border-left:3px solid var(--red)">
+    <b style="font-size:14.5px">#${NUM_LANC[x.l.id]||''} ${x.l.desc}</b>
+    <div style="font-size:11.5px;color:var(--ink-2)">${x.l.data.split('-').reverse().join('/')}${x.l.forn?' · '+x.l.forn:''}</div>
+    <div class="stat" style="border:0;padding:7px 0 0"><span>Valor do lançamento</span><b class="mono">${brl(x.lista)}</b></div>
+    <div class="stat" style="border:0;padding:0"><span>O painel está contando</span>
+      <b class="mono" style="color:var(--red)">${brl(x.painel)}</b></div>
+    <p class="hint" style="margin-top:4px">${x.motivo}${x.somaRat!==null?` · fatias somam ${brl(x.somaRat)}`:''}${x.pp>0?` · pagamentos registrados: ${brl(x.pp)}`:''}</p>
+    <div class="row2" style="margin-top:8px">
+      <button class="btn" onclick="corrigirLanc('${x.l.id}')">Corrigir este</button>
+      <button class="btn ghost mini" onclick="verGasto('${x.l.id}')">Abrir</button>
+    </div>
+  </div>`).join('')}
+  <button class="btn" style="margin-top:12px" onclick="corrigirTudo()">Corrigir todos os ${C.problemas.length}</button>
+  <p class="hint">A correção ajusta a divisão entre etapas e os pagamentos para caberem no valor do lançamento. O valor do gasto não muda.</p>`
+  :'<p class="hint">Nenhum erro nos dados. Se ainda houver diferença entre as telas, é só o que ainda não foi pago.</p>'}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function corrigirLanc(id){
+  const l=DB.lanc.find(x=>x.id===id); if(!l)return;
+  const tot=+l.total||0;
+  if(l.rateio&&l.rateio.length){
+    const s=l.rateio.reduce((a,r)=>a+(+r.valor||0),0);
+    if(s>0&&Math.abs(s-tot)>=0.01){
+      const f=tot/s; let acc=0;
+      l.rateio.forEach((r,i)=>{
+        if(i<l.rateio.length-1){ r.valor=+((+r.valor||0)*f).toFixed(2); acc+=r.valor; }
+        else r.valor=+(tot-acc).toFixed(2);
+      });
+    }
+  }
+  const pp=pagoParcial(l);
+  if(pp>tot+0.005){
+    /* pagamentos somam mais que o lançamento: mantém até o limite e marca como pago */
+    let resto=tot; const novos=[];
+    (l.pagamentos||[]).forEach(p=>{
+      if(resto<=0.005)return;
+      const v=Math.min(+p.valor||0,resto); resto=+(resto-v).toFixed(2);
+      if(v>0)novos.push({...p,valor:v});
+    });
+    l.pagamentos=novos;
+    if(pagoParcial(l)>=tot-0.005)l.pag='Pago';
+  }
+  l.at=Date.now(); salvar(); render(); conferirTotais(); toast('Lançamento corrigido');
+}
+function corrigirTudo(){
+  const ids=conciliar().problemas.map(x=>x.l.id);
+  ids.forEach(id=>{
+    const l=DB.lanc.find(x=>x.id===id); if(!l)return;
+    const tot=+l.total||0;
+    if(l.rateio&&l.rateio.length){
+      const s=l.rateio.reduce((a,r)=>a+(+r.valor||0),0);
+      if(s>0&&Math.abs(s-tot)>=0.01){
+        const f=tot/s; let acc=0;
+        l.rateio.forEach((r,i)=>{
+          if(i<l.rateio.length-1){ r.valor=+((+r.valor||0)*f).toFixed(2); acc+=r.valor; }
+          else r.valor=+(tot-acc).toFixed(2);
+        });
+      }
+    }
+    if(pagoParcial(l)>tot+0.005){
+      let resto=tot; const novos=[];
+      (l.pagamentos||[]).forEach(p=>{
+        if(resto<=0.005)return;
+        const v=Math.min(+p.valor||0,resto); resto=+(resto-v).toFixed(2);
+        if(v>0)novos.push({...p,valor:v});
+      });
+      l.pagamentos=novos;
+      if(pagoParcial(l)>=tot-0.005)l.pag='Pago';
+    }
+    l.at=Date.now();
+  });
+  salvar(); render(); conferirTotais(); toast(ids.length+' lançamento(s) corrigido(s)');
+}
+function conferirTotaisAntigo(){
   const tortos=rateiosTortos();
   const somaLanc=DB.lanc.reduce((s,l)=>s+ +l.total,0);
   const somaPartes=DB.lanc.reduce((s,l)=>s+l.rateio&&l.rateio.length?s+l.rateio.reduce((a,r)=>a+(+r.valor||0),0):s+ +l.total,0);
@@ -1468,7 +1583,7 @@ function render(){
   renderDivergencia();
   renderAvisos();
   renderEquipe();
-  const pagos=DB.lanc.filter(l=>valorPago(l)>0);
+  const pagos=DB.lanc.filter(l=>Math.abs(valorPago(l))>=0.005);
   let adm=0,con=0;
   pagos.forEach(l=>partesPagas(l).forEach(p=>{ if(cat(p.cat).g==='adm') adm+=p.valor; else con+=p.valor; }));
   document.getElementById('hTotal').textContent=brl(adm+con);
@@ -1552,7 +1667,7 @@ function render(){
 function verCategoria(catId){
   const c=cat(catId);
   const linhas=[];
-  DB.lanc.filter(l=>valorPago(l)>0).forEach(l=>{
+  DB.lanc.filter(l=>Math.abs(valorPago(l))>=0.005).forEach(l=>{
     partesPagas(l).forEach(p=>{
       if(p.cat!==catId)return;
       const totalItem=+l.total||0;
@@ -3167,7 +3282,7 @@ function verMes(m){
 }
 
 function renderRel(){
-  const c=cfg(), pagos=DB.lanc.filter(l=>valorPago(l)>0), hj=hoje();
+  const c=cfg(), pagos=DB.lanc.filter(l=>Math.abs(valorPago(l))>=0.005), hj=hoje();
   const con=pagos.filter(l=>cat(l.cat).g==='con'), adm=pagos.filter(l=>cat(l.cat).g==='adm');
   let totCon=0,totAdm=0;
   pagos.forEach(l=>partesPagas(l).forEach(p=>{ if(cat(p.cat).g==='con') totCon+=p.valor; else totAdm+=p.valor; }));
@@ -4623,19 +4738,19 @@ function verTextoPdf(){
    quando um rateio não fecha, os dois discordam — aqui isso vira um aviso com o conserto ao lado */
 function renderDivergencia(){
   const card=document.getElementById('cardDiverg'); if(!card)return;
-  const tortos=rateiosTortos();
-  if(!tortos.length){ card.style.display='none'; return; }
-  const dif=tortos.reduce((s,x)=>s+x.dif,0);
+  const P=conciliar().problemas;
+  if(!P.length){ card.style.display='none'; return; }
+  const dif=P.reduce((s,x)=>s+x.dif,0);
   card.style.display='block';
   document.getElementById('divergMsg').innerHTML=
-    `<p style="font-size:13.5px;margin:0">${tortos.length} lançamento(s) com o valor mal dividido entre as etapas.
-      Isso faz o painel mostrar ${brl(Math.abs(dif))} ${dif>0?'a mais':'a menos'} que a aba Gastos.</p>
-     ${tortos.slice(0,3).map(x=>`<div class="aviso" onclick="verGasto('${x.l.id}')" style="cursor:pointer"><i>⚠</i>
+    `<p style="font-size:13.5px;margin:0">${P.length} lançamento(s) com erro nos dados fazem o painel mostrar
+      ${brl(Math.abs(dif))} ${dif>0?'a mais':'a menos'} que a aba Gastos.</p>
+     ${P.slice(0,3).map(x=>`<div class="aviso" onclick="verGasto('${x.l.id}')" style="cursor:pointer"><i>⚠</i>
         <div style="flex:1;min-width:0"><b>${x.l.desc}</b>
-          <small>lançado ${brl(x.l.total)} · dividido em ${brl(x.soma)}</small></div></div>`).join('')}
-     ${tortos.length>3?`<p class="hint" style="margin-bottom:0">e mais ${tortos.length-3}.</p>`:''}
+          <small>vale ${brl(x.lista)} · o painel conta ${brl(x.painel)} — ${x.motivo}</small></div></div>`).join('')}
+     ${P.length>3?`<p class="hint" style="margin-bottom:0">e mais ${P.length-3}.</p>`:''}
      <div class="row2" style="margin-top:9px">
-       <button class="btn" onclick="corrigirRateios()">Corrigir tudo</button>
+       <button class="btn" onclick="corrigirTudo()">Corrigir tudo</button>
        <button class="btn ghost mini" onclick="conferirTotais()">Ver um a um</button>
      </div>`;
 }
