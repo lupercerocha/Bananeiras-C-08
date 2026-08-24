@@ -346,6 +346,9 @@ nav button.on{color:var(--teal)}
 .kpi{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:10px 11px}
 .kpi small{display:block;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
 .kpi b{display:block;font-size:19px;font-weight:700;letter-spacing:-.02em;margin-top:3px}
+.kpi.clicavel{position:relative;cursor:pointer;transition:border-color .15s}
+.kpi.clicavel:hover{border-color:var(--teal)}
+.kpi .kpi-go{position:absolute;right:9px;top:9px;color:var(--ink-2);font-size:15px}
 .kpi u{display:block;font-size:11px;color:var(--ink-2);text-decoration:none;margin-top:2px;line-height:1.3}
 .kpi.wide{grid-column:1/-1}
 .kpi.alert{background:rgba(196,83,77,.09);border-color:rgba(196,83,77,.3)}
@@ -1133,8 +1136,67 @@ function partesPagas(l){
   return ps.map(p=>({cat:p.cat,valor:+(p.valor*f).toFixed(2)}));
 }
 const temParcial=l=>!isPago(l)&&pagoParcial(l)>0;
+/* fatias por etapa; se o rateio não fechar com o total, ajusta proporcionalmente
+   para o painel nunca somar diferente da lista de gastos */
 function partes(l){
-  return (l.rateio&&l.rateio.length)?l.rateio.map(r=>({cat:r.cat,valor:+r.valor||0})):[{cat:l.cat,valor:+l.total||0}];
+  const tot=+l.total||0;
+  if(!(l.rateio&&l.rateio.length))return [{cat:l.cat,valor:tot}];
+  const ps=l.rateio.map(r=>({cat:r.cat,valor:+r.valor||0}));
+  const s=ps.reduce((a,p)=>a+p.valor,0);
+  if(tot>0&&s>0&&Math.abs(s-tot)>=0.01){
+    const f=tot/s; let acc=0;
+    ps.forEach((p,i)=>{
+      if(i<ps.length-1){ p.valor=+(p.valor*f).toFixed(2); acc+=p.valor; }
+      else p.valor=+(tot-acc).toFixed(2);
+    });
+  }
+  return ps;
+}
+/* lançamentos cujo rateio gravado não bate com o total */
+function rateiosTortos(){
+  return DB.lanc.filter(l=>{
+    if(!(l.rateio&&l.rateio.length))return false;
+    const tot=+l.total||0, s=l.rateio.reduce((a,r)=>a+(+r.valor||0),0);
+    return tot>0&&Math.abs(s-tot)>=0.01;
+  }).map(l=>({l,soma:l.rateio.reduce((a,r)=>a+(+r.valor||0),0),dif:+(l.rateio.reduce((a,r)=>a+(+r.valor||0),0)-(+l.total||0)).toFixed(2)}));
+}
+function conferirTotais(){
+  const tortos=rateiosTortos();
+  const somaLanc=DB.lanc.reduce((s,l)=>s+ +l.total,0);
+  const somaPartes=DB.lanc.reduce((s,l)=>s+l.rateio&&l.rateio.length?s+l.rateio.reduce((a,r)=>a+(+r.valor||0),0):s+ +l.total,0);
+  const difTotal=tortos.reduce((s,x)=>s+x.dif,0);
+  abrir(`<h2>Conferência de totais</h2>
+  <p class="sub">Compara o valor de cada lançamento com a divisão dele entre as etapas.</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <div class="stat"><span>Soma dos lançamentos</span><b class="mono">${brl(somaLanc)}</b></div>
+    <div class="stat"><span>Lançamentos divididos com erro</span><b class="mono" style="color:${tortos.length?'var(--red)':'var(--green)'}">${tortos.length}</b></div>
+    ${tortos.length?`<div class="stat"><span>Diferença que isso causa</span><b class="mono" style="color:var(--red)">${brl(difTotal)}</b></div>`:''}
+  </div>
+  ${tortos.length?tortos.map(x=>`<div class="item" onclick="verGasto('${x.l.id}')">
+    <div class="dt"><b class="mono">${dia(x.l.data).d}</b><span>${dia(x.l.data).m}</span></div>
+    <div class="mid"><b>#${NUM_LANC[x.l.id]||''} ${x.l.desc}</b>
+      <small>lançado ${brl(x.l.total)} · dividido em ${brl(x.soma)} entre ${x.l.rateio.length} etapas
+      · <span style="color:var(--red)">${x.dif>0?'sobra':'falta'} ${brl(Math.abs(x.dif))}</span></small></div>
+    <div class="val mono">${brl(x.l.total)}</div></div>`).join('')
+    +`<button class="btn" style="margin-top:10px" onclick="corrigirRateios()">Corrigir a divisão destes ${tortos.length}</button>
+      <p class="hint">A correção reparte o valor do lançamento entre as mesmas etapas, mantendo a proporção que você definiu. O total do gasto não muda.</p>`
+    :'<p class="hint">Está tudo certo: o painel e a lista de gastos mostram o mesmo valor.</p>'}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function corrigirRateios(){
+  const tortos=rateiosTortos();
+  tortos.forEach(({l})=>{
+    const tot=+l.total||0, s=l.rateio.reduce((a,r)=>a+(+r.valor||0),0);
+    if(!(tot>0&&s>0))return;
+    const f=tot/s; let acc=0;
+    l.rateio.forEach((r,i)=>{
+      if(i<l.rateio.length-1){ r.valor=+((+r.valor||0)*f).toFixed(2); acc+=r.valor; }
+      else r.valor=+(tot-acc).toFixed(2);
+    });
+    l.at=Date.now();
+  });
+  salvar(); render(); conferirTotais();
+  toast(tortos.length+' lançamento(s) corrigido(s)');
 }
 function addMeses(iso,n){
   const [y,m,d]=iso.split('-').map(Number);
@@ -2964,7 +3026,8 @@ function comboFechar(input){
 
 /* indicadores */
 function cfg(){DB.cfg=DB.cfg||{inicio:'',meses:8,area:0};return DB.cfg}
-const kpi=(l,v,u,cls)=>`<div class="kpi ${cls||''}"><small>${l}</small><b class="mono">${v}</b>${u?`<u>${u}</u>`:''}</div>`;
+const kpi=(l,v,u,cls,acao)=>`<div class="kpi ${cls||''}${acao?' clicavel':''}"${acao?` onclick="${acao}"`:''}>
+  <small>${l}</small><b class="mono">${v}</b>${u?`<u>${u}</u>`:''}${acao?'<span class="kpi-go">›</span>':''}</div>`;
 const diasEntre=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
 const curto=n=>{if(OCULTAR)return '••';
   n=+n||0;
@@ -3060,10 +3123,10 @@ function renderRel(){
   const cotAb=DB.cot.filter(x=>x.status==='aberta'), semPreco=cotAb.filter(x=>!(+x.total>0)).length;
   document.getElementById('iComp').innerHTML=`
     <div class="kpis">
-      ${kpi('A pagar em aberto',brl(somaAb),ab.length+' lançamento(s)')}
-      ${kpi('Vencido',brl(somaV),venc.length+' em atraso',somaV>0?'alert':'good')}
-      ${kpi('Parado com fornecedor',brl(parado),'material pago e não entregue',parado>0?'alert':'')}
-      ${kpi('Itens sem preço',semPreco,'de '+cotAb.length+' cotações abertas',semPreco>0?'alert':'good')}
+      ${kpi('A pagar em aberto',brl(somaAb),ab.length+' lançamento(s)','',ab.length?"verPendencia('aberto')":'')}
+      ${kpi('Vencido',brl(somaV),venc.length+' em atraso',somaV>0?'alert':'good',venc.length?"verPendencia('vencido')":'')}
+      ${kpi('Parado com fornecedor',brl(parado),'material pago e não entregue',parado>0?'alert':'',parado>0?"verPendencia('parado')":'')}
+      ${kpi('Itens sem preço',semPreco,'de '+cotAb.length+' cotações abertas',semPreco>0?'alert':'good',semPreco?"verPendencia('sempreco')":'')}
     </div>
     <p class="hint">"Parado com fornecedor" é dinheiro seu que já saiu e ainda não virou material no canteiro.</p>`;
 
@@ -4810,6 +4873,7 @@ function renderIO(){
     <button class="btn soft" onclick="abrirDuplicados()"><span class="ic">🔍</span>Duplicados</button>
     <button class="btn soft" onclick="verRestauracao()"><span class="ic">⏱</span>Restaurar</button>
     <button class="btn soft" onclick="migrarFotos()"><span class="ic">🧹</span>Liberar memória</button>
+    <button class="btn soft" onclick="conferirTotais()"><span class="ic">🧮</span>Conferir totais</button>
   </div>
   <p class="hint">"Liberar memória" tira as fotos antigas da área pequena do navegador e as guarda no espaço grande do aparelho e na nuvem. Nenhuma foto é perdida.</p>
   <div class="divider" style="margin:16px 0"></div>
