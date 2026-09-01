@@ -711,6 +711,7 @@ a{color:var(--teal)}
 <datalist id="dlCategorias"></datalist>
 <datalist id="dlForn"></datalist>
 <datalist id="dlConc"></datalist>
+<datalist id="dlTipos"></datalist>
 <div class="sheet" id="sheet"><div class="bg" onclick="fechar()"></div><div class="panel" id="panel"></div></div>
 <div class="toast" id="toast"></div>
 <div id="printArea"></div>
@@ -2929,11 +2930,16 @@ const FAMILIAS_PADRAO=[
 function palpiteFamilia(desc){
   const d=String(desc||''); if(!d.trim())return '';
   const alvo=alfa2(d);
+  const pal=alvo.split(/[^a-z0-9]+/).filter(Boolean);       /* palavras inteiras */
+  const contemPalavra=k=>{
+    const kp=alfa2(k).split(/[^a-z0-9]+/).filter(Boolean);
+    return kp.length>0 && kp.every(x=>pal.includes(x));
+  };
   const jaUsadas=(typeof familiasExistentes==='function')?familiasExistentes():[];
   /* 1) um tipo que você já usa e que é a PRIMEIRA palavra do produto ("Prego 15x18" -> Prego) */
   let ini='';
   jaUsadas.forEach(f=>{const k=alfa2(f);
-    if(k.length>=3&&alvo.startsWith(k)&&k.length>ini.length)ini=f;});
+    if(k.length>=3&&(alvo===k||alvo.startsWith(k+' '))&&k.length>ini.length)ini=f;});
   if(ini)return ini;
   /* 2) tabela de materiais; se você já tem um tipo equivalente, mantém a sua grafia */
   for(const [re,nome] of FAMILIAS_PADRAO){
@@ -2942,35 +2948,72 @@ function palpiteFamilia(desc){
     const eq=jaUsadas.find(f=>{const a=alfa2(f); return a===k||a.includes(k)||k.includes(a);});
     return eq||nome;
   }
-  /* 3) último recurso: qualquer tipo seu citado na descrição */
+  /* 3) último recurso: um tipo seu citado como palavra inteira na descrição */
   let melhor='';
-  jaUsadas.forEach(f=>{const k=alfa2(f);
-    if(k.length>=3&&alvo.includes(k)&&k.length>melhor.length)melhor=f;});
+  jaUsadas.forEach(f=>{ if(alfa2(f).length>=3&&contemPalavra(f)&&f.length>melhor.length)melhor=f; });
   return melhor;
 }
 /* preenche o tipo dos lançamentos que ficaram sem — inclusive os importados antes desta função existir */
+/* só material de construção precisa de tipo — cartório, terreno e projetos não */
+function precisaTipo(l){
+  if(String(l.familia||'').trim())return false;
+  return (l.rateio&&l.rateio.length)?true:cat(l.cat).g==='con';
+}
 function tiposFaltando(){
-  return DB.lanc.filter(l=>!String(l.familia||'').trim())
+  return DB.lanc.filter(precisaTipo)
+    .sort((a,b)=>b.data.localeCompare(a.data))
     .map(l=>({l,palpite:palpiteFamilia(l.desc)}));
 }
 function abrirPreencherTipos(){
   const faltam=tiposFaltando();
-  if(!faltam.length){toast('Todos os lançamentos já têm tipo.');return}
-  const comPalpite=faltam.filter(x=>x.palpite), sem=faltam.filter(x=>!x.palpite);
-  abrir(`<h2>Preencher tipos de produto</h2>
-  <p class="sub">${faltam.length} lançamento(s) sem tipo. Confira os palpites antes de aplicar.</p>
-  ${comPalpite.length?`<label class="selall" style="margin-top:10px"><input type="checkbox" checked onchange="marcarTodos(this,'tpSel')"> Marcar todos (${comPalpite.length})</label>
-  <div style="max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:6px">
-    ${comPalpite.map(x=>`<label style="display:flex;gap:9px;align-items:flex-start;padding:8px 6px;border-bottom:1px solid var(--line)">
-      <input type="checkbox" class="tpSel" value="${x.l.id}" data-fam="${x.palpite.replace(/"/g,'&quot;')}" checked style="width:auto;margin-top:3px">
-      <span style="flex:1;min-width:0;font-size:13px">${x.l.desc}
-        <div style="font-size:11.5px;color:var(--ink-2)">${x.l.data.split('-').reverse().join('/')}${x.l.forn?' · '+x.l.forn:''}</div>
-      </span><span class="tag" style="white-space:nowrap">${x.palpite}</span></label>`).join('')}
+  if(!faltam.length){
+    abrir(`<h2>Tipos de produto</h2>
+    <p class="sub">Todos os lançamentos já estão com o tipo preenchido.</p>
+    <button class="btn ghost mini" style="margin-top:10px" onclick="verTipos()">Ver o cadastro de tipos</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+    return;
+  }
+  const usados=familiasExistentes();
+  const atalhos=[...new Set(faltam.map(x=>x.palpite).filter(Boolean))].slice(0,6);
+  abrir(`<h2>Lançamentos sem tipo</h2>
+  <p class="sub">${faltam.length} lançamento(s). Escreva o tipo ao lado de cada um e salve tudo de uma vez.</p>
+  ${atalhos.length?`<p class="hint" style="margin-top:8px">Sugestões já preenchidas em cinza — apague ou troque o que não concordar.</p>`:''}
+  <div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:6px;margin-top:8px">
+    ${faltam.map((x,i)=>`<div style="padding:8px 6px;border-bottom:1px solid var(--line)">
+      <div style="font-size:13.5px;font-weight:600;line-height:1.25">${x.l.desc}</div>
+      <div style="font-size:11px;color:var(--ink-2);margin-bottom:5px">
+        ${x.l.data.split('-').reverse().join('/')}${x.l.forn?' · '+x.l.forn:''} · ${cat(x.l.cat).n} · ${brl(x.l.total)}</div>
+      <div style="display:flex;gap:7px;align-items:center">
+        <input class="tpIn" data-id="${x.l.id}" list="dlTipos" data-cap="1"
+          value="${(x.palpite||'').replace(/"/g,'&quot;')}" placeholder="Tipo do produto"
+          style="flex:1;padding:8px 10px;font-size:14px">
+        <button class="btn ghost mini" style="width:auto;padding:8px 11px" onclick="verGasto('${x.l.id}')">Abrir</button>
+      </div>
+    </div>`).join('')}
   </div>
-  <button class="btn" style="margin-top:10px" onclick="aplicarTipos()">Aplicar aos marcados</button>`
-  :'<p class="hint">Não consegui adivinhar o tipo de nenhum deles.</p>'}
-  ${sem.length?`<p class="hint">${sem.length} sem palpite (${sem.slice(0,4).map(x=>x.l.desc).join(', ')}${sem.length>4?'...':''}) — preencha na tela do gasto.</p>`:''}
-  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  <button class="btn" style="margin-top:10px" onclick="salvarTiposLista()">Salvar tipos preenchidos</button>
+  <p class="hint">Quem ficar em branco continua sem tipo e aparece aqui na próxima vez.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function salvarTiposLista(){
+  let n=0;
+  document.querySelectorAll('.tpIn').forEach(inp=>{
+    const v=capNomes(inp.value);
+    if(!v)return;
+    const l=DB.lanc.find(x=>x.id===inp.dataset.id);
+    if(!l)return;
+    /* reaproveita a grafia já usada, para não criar "Ferro" e "FERRO" separados */
+    const igual=familiasExistentes().find(t=>alfa2(t)===alfa2(v));
+    l.familia=igual||v; l.at=Date.now();
+    DB.tipos=DB.tipos||[];
+    if(!DB.tipos.some(t=>alfa2(t)===alfa2(l.familia)))DB.tipos.push(l.familia);
+    n++;
+  });
+  if(!n){toast('Preencha ao menos um tipo.');return}
+  salvar(); render();
+  const faltam=tiposFaltando().length;
+  if(faltam) abrirPreencherTipos(); else fechar();
+  toast(n+' lançamento(s) atualizado(s)'+(faltam?` · faltam ${faltam}`:' · nenhum pendente'));
 }
 function aplicarTipos(){
   const sel=[...document.querySelectorAll('.tpSel')].filter(c=>c.checked);
@@ -3328,6 +3371,8 @@ function refreshDatalists(){
   DB.cot.forEach(c=>{ if(String(c.conc||'').trim()) concs.add(c.conc.trim()); });
   const dlCc=document.getElementById('dlConc');
   if(dlCc) dlCc.innerHTML=[...concs].sort((a,b)=>alfa(a,b)).map(c=>`<option value="${c.replace(/"/g,'&quot;')}">`).join('');
+  const dlT=document.getElementById('dlTipos');
+  if(dlT) dlT.innerHTML=familiasExistentes().map(t=>`<option value="${t.replace(/"/g,'&quot;')}">`).join('');
 }
 /* ---------- combobox de tipo de produto (dropdown próprio, sem estilo nativo do navegador) ---------- */
 function familiasExistentes(){
@@ -4998,6 +5043,9 @@ function renderAvisos(){
     avisos.push({ic:'🟡',t:`${l.desc} — ${brl(saldoAPagar(l))}`,
       s:d===0?'vence hoje':`vence em ${d} dia${d>1?'s':''}`,go:`verGasto('${l.id}')`});
   });
+  const semTipo=tiposFaltando().length;
+  if(semTipo) avisos.push({ic:'🏷️',t:`${semTipo} lançamento(s) sem tipo de produto`,
+    s:'sem isso o resumo por tipo fica incompleto — toque para preencher',go:'abrirPreencherTipos()'});
   DB.cot.filter(c=>c.status==='aberta'&&c.validade).forEach(c=>{
     const d=emDias(c.validade);
     if(d<0) avisos.push({ic:'⚪',t:`${c.item}${c.forn?' · '+c.forn:''}`,
