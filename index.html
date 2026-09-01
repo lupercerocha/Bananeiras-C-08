@@ -106,6 +106,28 @@ main{padding:16px 14px 20px;max-width:760px;margin:0 auto}
   .pf-ass>div{flex:1}
   .pf-ass .ln{border-bottom:1px solid #333;height:22px;margin-bottom:3px}
   .pf-rod{font-size:7.5pt;color:#777;margin-top:16px;border-top:1px solid #ddd;padding-top:5px}
+  /* relatório da obra */
+  .pr-sec{margin-bottom:15px;page-break-inside:auto}
+  .pr-sec>h2{font-size:12.5pt;margin:0 0 7px;color:#0A1F2E;border-bottom:1.5px solid #0A1F2E;padding-bottom:3px}
+  .pr-sec table{width:100%;border-collapse:collapse;font-size:8.5pt}
+  .pr-sec th{text-align:left;background:#eef2f3;padding:4px 5px;border-bottom:1px solid #bbb;
+    font-size:7.5pt;text-transform:uppercase;letter-spacing:.04em}
+  .pr-sec td{padding:3px 5px;border-bottom:1px solid #eee;vertical-align:top}
+  .pr-sec th.r,.pr-sec td.r{text-align:right;white-space:nowrap}
+  .pr-sec td.c{white-space:nowrap;color:#444}
+  .pr-sec tr.tot td{border-top:1.2px solid #999;font-weight:700;font-size:9.5pt;padding-top:5px;background:#fafafa}
+  .pr-sec tr{page-break-inside:avoid}
+  .sub2{font-size:7pt;color:#777;margin-top:1px}
+  .sub2.vermelho{color:#C4534D;font-weight:600}
+  .pr-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px}
+  .pr-kpis>div{border:1px solid #ddd;border-radius:5px;padding:6px 9px}
+  .pr-kpis small{display:block;font-size:7pt;text-transform:uppercase;letter-spacing:.05em;color:#666}
+  .pr-kpis b{display:block;font-size:12pt;margin-top:2px}
+  .pr-nota{font-size:7.5pt;color:#555;margin:5px 0 0;font-style:italic}
+  .pr-grp{margin-bottom:11px;page-break-inside:auto}
+  .pr-grp h3{font-size:10pt;margin:9px 0 4px;background:#f0f4f5;padding:4px 7px;border-radius:4px;
+    display:flex;justify-content:space-between}
+  .pr-grp h3 span{font-weight:700}
 }
 @media (min-width:860px){
   main{max-width:920px;padding:22px 20px 28px}
@@ -496,6 +518,10 @@ a{color:var(--teal)}
 <!-- ============ GASTOS ============ -->
 <section class="view" id="v-gastos">
   <button class="btn" onclick="abrirGasto()">+ Lançar gasto</button>
+  <div class="acoes">
+    <button class="btn soft" onclick="abrirRelatorioObra()"><span class="ic">📊</span>Relatório em PDF</button>
+    <button class="btn soft" onclick="exportCSV()"><span class="ic">⬇</span>Planilha CSV</button>
+  </div>
   <div class="card" style="margin-top:12px">
     <input id="fBusca" placeholder="Buscar por descrição, fornecedor, categoria, nota, valor...">
     <div class="row2" style="margin-top:9px">
@@ -1990,6 +2016,191 @@ function marcarTodos(el,classe){
   });
 }
 /* ---------- impressão das cotações em aberto (salvar em PDF) ---------- */
+/* ---------- relatório completo da obra (imprimir / salvar em PDF) ---------- */
+function abrirRelatorioObra(){
+  abrir(`<h2>Relatório da obra</h2>
+  <p class="sub">Gera uma folha A4 com tudo o que foi gasto, para arquivar ou usar como base na próxima obra.</p>
+  <label>O que entra</label>
+  <select id="rl_escopo">
+    <option value="tudo">Toda a obra, desde o início</option>
+    <option value="filtro">Só o que está filtrado na aba Gastos agora</option>
+  </select>
+  <label style="margin-top:11px">Seções</label>
+  <label class="chkline"><input type="checkbox" class="rlSec" value="resumo" checked> Resumo e indicadores</label>
+  <label class="chkline"><input type="checkbox" class="rlSec" value="etapa" checked> Gasto por etapa</label>
+  <label class="chkline"><input type="checkbox" class="rlSec" value="tipo" checked> Gasto por tipo de produto</label>
+  <label class="chkline"><input type="checkbox" class="rlSec" value="forn" checked> Gasto por fornecedor</label>
+  <label class="chkline"><input type="checkbox" class="rlSec" value="materiais" checked> Materiais: quantidades e preço médio</label>
+  <label class="chkline"><input type="checkbox" class="rlSec" value="mo" checked> Mão de obra</label>
+  <label class="chkline"><input type="checkbox" class="rlSec" value="detalhe" checked> Todos os lançamentos, etapa por etapa</label>
+  <label class="chkline"><input type="checkbox" class="rlSec" value="pend" checked> Pendências (a pagar e material não entregue)</label>
+  <label class="chkline"><input type="checkbox" class="rlSec" value="notas"> Notas fiscais registradas</label>
+  <button class="btn" style="margin-top:12px" onclick="gerarRelatorioObra()">🖨 Gerar relatório</button>
+  <p class="hint">Na janela de impressão, escolha "Salvar como PDF".</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function gerarRelatorioObra(){
+  const escopo=val('rl_escopo');
+  const secs=new Set([...document.querySelectorAll('.rlSec')].filter(c=>c.checked).map(c=>c.value));
+  const antes=OCULTAR; OCULTAR=false;
+
+  let L=DB.lanc.slice();
+  let recorte='Toda a obra, desde o início';
+  if(escopo==='filtro'){
+    const fc=val('fCat'), fg=val('fGrupo'), fs=val('fSit');
+    const sem=document.getElementById('fSemPeriodo').checked;
+    const dIni=val('fDataIni'), dFim=val('fDataFim');
+    const busca=alfa2(val('fBusca'));
+    L=L.filter(l=>(!fc||l.cat===fc)&&(!fg||cat(l.cat).g===fg)
+      &&(!fs||(fs==='pago'?isPago(l):!isPago(l)))
+      &&(sem||((!dIni||l.data>=dIni)&&(!dFim||l.data<=dFim))));
+    if(busca)L=L.filter(l=>alfa2([l.desc,l.forn,l.nf,l.obs,cat(l.cat).n,l.familia].join(' ')).includes(busca));
+    const pd=d=>d?d.split('-').reverse().join('/'):'';
+    recorte=sem?'Todos os períodos':`De ${pd(dIni)} a ${pd(dFim)}`;
+    if(fc)recorte+=' · '+cat(fc).n;
+    if(fs)recorte+=fs==='pago'?' · só pagos':' · só a pagar';
+  }
+  L.sort((a,b)=>a.data.localeCompare(b.data));
+
+  const c=cfg();
+  const total=L.reduce((s,l)=>s+ +l.total,0);
+  const pagoTot=L.reduce((s,l)=>s+valorPago(l),0);
+  const aPagar=L.reduce((s,l)=>s+saldoAPagar(l),0);
+  let admT=0,conT=0;
+  L.forEach(l=>partes(l).forEach(p=>{ if(cat(p.cat).g==='adm')admT+=p.valor; else conT+=p.valor; }));
+  const dt=new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+  const pd=d=>d?d.split('-').reverse().join('/'):'—';
+
+  /* agrupamentos */
+  const porEtapa={};
+  L.forEach(l=>partes(l).forEach(p=>{
+    const n=cat(p.cat).n, g=cat(p.cat).g;
+    (porEtapa[n]=porEtapa[n]||{n,g,v:0,itens:[]}).v+=p.valor;
+  }));
+  L.forEach(l=>partes(l).forEach(p=>{ const n=cat(p.cat).n;
+    porEtapa[n].itens.push({l,valor:p.valor,dividido:(l.rateio&&l.rateio.length>1)}); }));
+  const etapas=Object.values(porEtapa).sort((a,b)=>(a.g===b.g)?alfa(a.n,b.n):(a.g==='con'?-1:1));
+
+  const agrupa=(chave)=>{
+    const G={};
+    L.forEach(l=>{const k=String(chave(l)||'').trim()||'—';
+      (G[k]=G[k]||{n:k,v:0,q:0}).v+=+l.total; G[k].q++;});
+    return Object.values(G).sort((a,b)=>b.v-a.v);
+  };
+  const porTipo=agrupa(l=>l.familia), porForn=agrupa(l=>l.forn);
+
+  const mat={};
+  L.forEach(l=>{
+    if(cat(l.cat).g!=='con'&&!(l.rateio&&l.rateio.length))return;
+    const k=alfa2(l.desc); if(!k)return;
+    const m=mat[k]=mat[k]||{nome:l.desc,fam:l.familia||'',q:0,v:0,n:0,forns:new Set()};
+    m.q+=+l.qtd||0; m.v+=+l.total||0; m.n++; if(l.forn)m.forns.add(l.forn);
+  });
+  const materiais=Object.values(mat).sort((a,b)=>b.v-a.v);
+
+  const moLanc=L.filter(l=>l.trabId||cat(l.cat).n.toLowerCase().includes('mão de obra'));
+  const moTotal=moLanc.reduce((s,l)=>s+ +l.total,0);
+  const moDias=moLanc.reduce((s,l)=>s+(+l.qtd||0),0);
+  const porTrab={};
+  moLanc.forEach(l=>{const k=l.forn||'—';(porTrab[k]=porTrab[k]||{n:k,v:0,d:0}).v+=+l.total; porTrab[k].d+=+l.qtd||0;});
+
+  const abertos=L.filter(l=>!isPago(l));
+  const parados=L.filter(l=>l.ctrl&&(+l.qtd-+l.qtdRec)>0);
+
+  const tab=(cabs,linhas)=>`<table><thead><tr>${cabs.map(x=>`<th class="${x[1]||''}">${x[0]}</th>`).join('')}</tr></thead>
+    <tbody>${linhas}</tbody></table>`;
+  const sec=(t,corpo)=>`<div class="pr-sec"><h2>${t}</h2>${corpo}</div>`;
+
+  document.getElementById('printArea').innerHTML=`
+  <div class="pf">
+    <div class="pf-top">
+      <div><h1>Relatório de gastos da obra</h1>
+        <div class="pf-sub">Obra Bananeiras C08 · Monte das Cerejeiras, Quadra B, Lote 08 · Bananeiras-PB<br>${recorte}</div></div>
+      <div class="pf-data">Emitido em ${dt}<br>${L.length} lançamentos</div>
+    </div>
+
+    ${secs.has('resumo')?sec('Resumo',`
+      <div class="pr-kpis">
+        <div><small>Total lançado</small><b>${brl(total)}</b></div>
+        <div><small>Já pago</small><b>${brl(pagoTot)}</b></div>
+        <div><small>A pagar</small><b>${brl(aPagar)}</b></div>
+        <div><small>Construção</small><b>${brl(conT)}</b></div>
+        <div><small>Administrativas</small><b>${brl(admT)}</b></div>
+        <div><small>Custo por m²</small><b>${c.area>0?brl(conT/c.area):'—'}</b></div>
+      </div>
+      <p class="pr-nota">Início da obra: ${pd(c.inicio)} · prazo de ${c.meses||8} meses · área construída: ${c.area>0?c.area+' m²':'não informada'}.
+      "Construção" exclui terreno, cartório e projetos — é o que se compara com o CUB.</p>`):''}
+
+    ${secs.has('etapa')?sec('Gasto por etapa',
+      tab([['Etapa'],['Tipo'],['Lançamentos','r'],['Valor','r'],['%','r']],
+        etapas.map(e=>`<tr><td>${e.n}</td><td class="c">${e.g==='adm'?'Administrativa':'Construção'}</td>
+          <td class="r">${e.itens.length}</td><td class="r">${brl(e.v)}</td>
+          <td class="r">${(e.v/(total||1)*100).toFixed(1)}%</td></tr>`).join('')
+        +`<tr class="tot"><td colspan="3">Total</td><td class="r">${brl(total)}</td><td class="r">100%</td></tr>`)):''}
+
+    ${secs.has('tipo')?sec('Gasto por tipo de produto',
+      tab([['Tipo'],['Lançamentos','r'],['Valor','r'],['%','r']],
+        porTipo.map(x=>`<tr><td>${x.n}</td><td class="r">${x.q}</td><td class="r">${brl(x.v)}</td>
+          <td class="r">${(x.v/(total||1)*100).toFixed(1)}%</td></tr>`).join(''))):''}
+
+    ${secs.has('forn')?sec('Gasto por fornecedor',
+      tab([['Fornecedor'],['Lançamentos','r'],['Valor','r'],['%','r']],
+        porForn.map(x=>`<tr><td>${x.n}</td><td class="r">${x.q}</td><td class="r">${brl(x.v)}</td>
+          <td class="r">${(x.v/(total||1)*100).toFixed(1)}%</td></tr>`).join(''))):''}
+
+    ${secs.has('materiais')?sec('Materiais comprados',
+      tab([['Material'],['Tipo'],['Qtd','r'],['Preço médio','r'],['Compras','r'],['Total','r']],
+        materiais.map(m=>`<tr><td>${m.nome}${m.forns.size?`<div class="sub2">${[...m.forns].join(', ')}</div>`:''}</td>
+          <td class="c">${m.fam||''}</td><td class="r">${m.q.toLocaleString('pt-BR')}</td>
+          <td class="r">${m.q>0?brl(m.v/m.q):'—'}</td><td class="r">${m.n}</td><td class="r">${brl(m.v)}</td></tr>`).join(''))
+      +'<p class="pr-nota">Quantidade e preço médio pago por unidade — é esta a tabela que serve de referência para orçar a próxima obra.</p>'):''}
+
+    ${secs.has('mo')&&moLanc.length?sec('Mão de obra',
+      tab([['Trabalhador'],['Diárias','r'],['Valor','r'],['Média por diária','r']],
+        Object.values(porTrab).sort((a,b)=>b.v-a.v).map(t=>`<tr><td>${t.n}</td><td class="r">${t.d.toLocaleString('pt-BR')}</td>
+          <td class="r">${brl(t.v)}</td><td class="r">${t.d>0?brl(t.v/t.d):'—'}</td></tr>`).join('')
+        +`<tr class="tot"><td>Total</td><td class="r">${moDias.toLocaleString('pt-BR')}</td><td class="r">${brl(moTotal)}</td>
+          <td class="r">${moDias>0?brl(moTotal/moDias):'—'}</td></tr>`)
+      +`<p class="pr-nota">Mão de obra representa ${(moTotal/(total||1)*100).toFixed(1)}% do gasto no período.</p>`):''}
+
+    ${secs.has('detalhe')?sec('Lançamentos, etapa por etapa',
+      etapas.map(e=>`<div class="pr-grp">
+        <h3>${e.n} <span>${brl(e.v)}</span></h3>
+        ${tab([['Data'],['Descrição'],['Tipo'],['Fornecedor'],['Qtd','r'],['Vlr unit.','r'],['Valor','r']],
+          e.itens.sort((a,b)=>a.l.data.localeCompare(b.l.data)).map(x=>`<tr>
+            <td class="c">${pd(x.l.data)}</td>
+            <td>${x.l.desc}${x.dividido?'<div class="sub2">parte de compra dividida entre etapas</div>':''}${x.l.nf?`<div class="sub2">NF ${x.l.nf}</div>`:''}</td>
+            <td class="c">${x.l.familia||''}</td>
+            <td class="c">${x.l.forn||''}</td>
+            <td class="r">${(+x.l.qtd||0).toLocaleString('pt-BR')}</td>
+            <td class="r">${brl(x.l.unit)}</td>
+            <td class="r">${brl(x.valor)}${isPago(x.l)?'':'<div class="sub2 vermelho">a pagar</div>'}</td></tr>`).join(''))}
+      </div>`).join('')):''}
+
+    ${secs.has('pend')&&(abertos.length||parados.length)?sec('Pendências',`
+      ${abertos.length?`<h3>Contas a pagar</h3>`+tab([['Data'],['Descrição'],['Fornecedor'],['Falta pagar','r']],
+        abertos.map(l=>`<tr><td class="c">${pd(l.data)}</td><td>${l.desc}</td><td class="c">${l.forn||''}</td>
+          <td class="r">${brl(saldoAPagar(l))}</td></tr>`).join('')
+        +`<tr class="tot"><td colspan="3">Total</td><td class="r">${brl(aPagar)}</td></tr>`):''}
+      ${parados.length?`<h3 style="margin-top:10px">Material pago e não entregue</h3>`+tab([['Data'],['Descrição'],['Fornecedor'],['Falta receber','r']],
+        parados.map(l=>`<tr><td class="c">${pd(l.data)}</td><td>${l.desc}</td><td class="c">${l.forn||''}</td>
+          <td class="r">${(+l.qtd-+l.qtdRec).toLocaleString('pt-BR')} de ${(+l.qtd).toLocaleString('pt-BR')}</td></tr>`).join('')):''}`):''}
+
+    ${secs.has('notas')&&(DB.notas||[]).length?sec('Notas fiscais registradas',
+      tab([['Data'],['Emitente'],['Número'],['Itens','r'],['Valor','r']],
+        (DB.notas||[]).slice().sort((a,b)=>a.data.localeCompare(b.data)).map(n=>`<tr>
+          <td class="c">${pd(n.data)}</td><td>${n.emit}</td><td class="c">${n.numero||'—'}</td>
+          <td class="r">${(n.itens||[]).length}</td><td class="r">${brl(n.total)}</td></tr>`).join('')
+        +`<tr class="tot"><td colspan="4">Total</td><td class="r">${brl((DB.notas||[]).reduce((s,n)=>s+ +n.total,0))}</td></tr>`)):''}
+
+    <p class="pf-rod">Relatório gerado pelo sistema de gestão da obra em ${dt}. Documento de controle interno.</p>
+  </div>`;
+  OCULTAR=antes;
+  fechar();
+  document.documentElement.classList.add('imprimindo');
+  setTimeout(()=>{ window.print(); setTimeout(()=>document.documentElement.classList.remove('imprimindo'),400); },80);
+}
+
 function abrirImpressaoCot(){
   const abertas=DB.cot.filter(c=>c.status==='aberta')
     .sort((a,b)=>alfa(a.forn||'zzz',b.forn||'zzz')||alfa(a.item,b.item));
