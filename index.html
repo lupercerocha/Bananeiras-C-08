@@ -564,7 +564,8 @@ a{color:var(--teal)}
 <!-- ============ NOTAS FISCAIS ============ -->
 <section class="view" id="v-notas">
   <button class="btn" onclick="document.getElementById('notaInput').click()">📎 Enviar nota fiscal</button>
-  <p class="hint" style="margin-top:6px">Aceita XML da NF-e (o melhor: entra completo e sem conferência), PDF do DANFE, foto ou qualquer outro arquivo.</p>
+  <p class="hint" style="margin-top:6px">Aceita XML da NF-e (o melhor: entra completo e sem conferência), PDF do DANFE, foto ou qualquer outro arquivo.
+  <b>Esta aba é o arquivo das notas, não a entrada da despesa</b> — o gasto entra pela cotação ou pela aba Gastos, e aqui a nota é vinculada a ele.</p>
   <div class="acoes tres">
     <button class="btn soft" onclick="document.getElementById('qrInput').click()"><span class="ic">🔳</span>Ler QR code</button>
     <button class="btn soft" onclick="colarNota()"><span class="ic">✍️</span>Colar texto</button>
@@ -624,6 +625,7 @@ a{color:var(--teal)}
   <div class="acoes" style="margin-top:0">
     <button class="btn soft" onclick="verTipos()"><span class="ic">🗂️</span>Tipos de produto</button>
     <button class="btn soft" onclick="abrirPreencherTipos()"><span class="ic">🏷️</span>Preencher tipos</button>
+    <button class="btn soft" onclick="abrirOrganizarGenericos()"><span class="ic">🧾</span>Organizar genéricos</button>
   </div>
   <div id="itensObra"></div>
 </section>
@@ -1327,6 +1329,67 @@ function conciliar(){
   return {linhas,totalLista:+totalLista.toFixed(2),totalPainel:+totalPainel.toFixed(2),
     dif:+(totalPainel-totalLista).toFixed(2),
     problemas:linhas.filter(x=>!x.ok)};
+}
+/* procura a mesma compra entrando duas vezes: pela cotação e pela nota, ou repetida em dias diferentes */
+function auditarEntradas(){
+  const grupos={};
+  DB.lanc.forEach(l=>{
+    if(ehDesconto(l))return;
+    const k=alfa2(l.desc)+'|'+(+l.total||0).toFixed(2);
+    (grupos[k]=grupos[k]||[]).push(l);
+  });
+  const repetidos=Object.values(grupos).filter(g=>g.length>1)
+    .map(g=>{g.sort((a,b)=>a.data.localeCompare(b.data));
+      return {g,dias:Math.round(Math.abs((new Date(g[g.length-1].data)-new Date(g[0].data))/864e5))};})
+    .sort((a,b)=>(b.g.length-1)*(+b.g[0].total||0)-(a.g.length-1)*(+a.g[0].total||0));
+  return {repetidos,
+    notasSemVinculo:(DB.notas||[]).filter(n=>!n.lancId&&!(n.lancIds||[]).length),
+    notasQueLancaram:(DB.notas||[]).filter(n=>(n.lancIds||[]).length)};
+}
+function conferirEntradas(){
+  const A=auditarEntradas();
+  const excesso=A.repetidos.reduce((s,x)=>s+(x.g.length-1)*(+x.g[0].total||0),0);
+  abrir(`<h2>Conferir entradas</h2>
+  <p class="sub">A despesa entra uma vez só: pela cotação ou pela aba Gastos. A nota fiscal comprova o gasto — não cria outro.</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <div class="stat"><span>Possível entrada em dobro</span>
+      <b class="mono" style="color:${A.repetidos.length?'var(--red)':'var(--green)'}">${A.repetidos.length} grupo(s)</b></div>
+    ${excesso>0?`<div class="stat"><span>Valor lançado a mais</span><b class="mono" style="color:var(--red)">${brl(excesso)}</b></div>`:''}
+    <div class="stat"><span>Notas que geraram gastos</span><b class="mono">${A.notasQueLancaram.length}</b></div>
+    <div class="stat"><span>Notas sem vínculo com gasto</span><b class="mono">${A.notasSemVinculo.length}</b></div>
+  </div>
+  ${A.repetidos.length?`<h3 style="margin-top:14px">Mesma descrição e mesmo valor</h3>
+  ${A.repetidos.slice(0,25).map(x=>`<div class="card" style="box-shadow:none;margin-top:9px;border-left:3px solid var(--red)">
+    <b style="font-size:14px">${x.g[0].desc}</b>
+    <div style="font-size:11.5px;color:var(--ink-2);margin-bottom:4px">${x.g.length}× ${brl(x.g[0].total)}${x.dias?` · ${x.dias} dia(s) de diferença`:' · mesma data'}</div>
+    ${x.g.map(l=>`<div class="item" onclick="verGasto('${l.id}')" style="padding:6px 0">
+      <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+      <div class="mid"><b style="font-size:13px">${l.forn||'sem fornecedor'}</b><small>${cat(l.cat).n}</small></div>
+      <div class="val mono">${brl(l.total)}</div></div>`).join('')}
+    <button class="btn ghost mini" style="margin-top:7px;color:var(--red)" onclick="apagarExtras('${x.g.map(l=>l.id).join(',')}')">
+      Manter o mais antigo e apagar ${x.g.length-1}</button>
+  </div>`).join('')}
+  ${A.repetidos.length>25?`<p class="hint">Mostrando 25 de ${A.repetidos.length}.</p>`:''}`
+  :'<p class="hint">Nenhuma despesa parece ter entrado duas vezes.</p>'}
+  ${A.notasSemVinculo.length?`<h3 style="margin-top:14px">Notas sem gasto vinculado (${A.notasSemVinculo.length})</h3>
+  <p class="hint" style="margin-top:0">Não é erro — só significa que a nota ainda não foi amarrada à despesa correspondente.</p>
+  ${A.notasSemVinculo.slice(0,15).map(n=>`<div class="item" onclick="verNota('${n.id}')">
+    <div class="dt"><b class="mono">${dia(n.data).d}</b><span>${dia(n.data).m}</span></div>
+    <div class="mid"><b>${n.emit}</b><small>nota ${n.numero||'s/nº'}</small></div>
+    <div class="val mono">${brl(n.total)}</div></div>`).join('')}`:''}
+  <button class="btn ghost mini" style="margin-top:12px" onclick="fechar()">Fechar</button>`);
+}
+function apagarExtras(ids){
+  const arr=String(ids).split(',');
+  const apagar=arr.slice(1);
+  const l0=DB.lanc.find(x=>x.id===arr[0]);
+  confirmar('Apagar cópias',
+    `Mantém o lançamento de ${l0?l0.data.split('-').reverse().join('/'):''} e apaga ${apagar.length}. Não é possível desfazer.`,
+    'Apagar',()=>{
+      apagar.forEach(id=>{const l=DB.lanc.find(x=>x.id===id); if(l)marcarExcluido(l,'lanc');});
+      DB.lanc=DB.lanc.filter(l=>!apagar.includes(l.id));
+      salvar(); render(); conferirEntradas(); toast(apagar.length+' cópia(s) apagada(s)');
+    },true);
 }
 function conferirTotais(){
   const C=conciliar();
@@ -2088,10 +2151,19 @@ function gerarRelatorioObra(){
       (G[k]=G[k]||{n:k,v:0,q:0}).v+=+l.total; G[k].q++;});
     return Object.values(G).sort((a,b)=>b.v-a.v);
   };
-  const porTipo=agrupa(l=>l.familia), porForn=agrupa(l=>l.forn);
+  const porTipo=agrupa(l=>{
+    if(ehDesconto(l))return 'Desconto obtido';
+    const f=String(l.familia||'').trim();
+    if(f)return f;
+    return cat(l.cat).g==='adm'?'Serviços e taxas (sem tipo de produto)':'SEM TIPO — preencher';
+  });
+  const porForn=agrupa(l=>l.forn);
 
+  const descontos=L.filter(ehDesconto);
+  const totDesc=descontos.reduce((s,l)=>s+ +l.total,0);
   const mat={};
   L.forEach(l=>{
+    if(ehDesconto(l))return;                     /* desconto não é material comprado */
     if(cat(l.cat).g!=='con'&&!(l.rateio&&l.rateio.length))return;
     const k=alfa2(l.desc); if(!k)return;
     const m=mat[k]=mat[k]||{nome:l.desc,fam:l.familia||'',q:0,v:0,n:0,forns:new Set()};
@@ -2128,6 +2200,7 @@ function gerarRelatorioObra(){
         <div><small>Construção</small><b>${brl(conT)}</b></div>
         <div><small>Administrativas</small><b>${brl(admT)}</b></div>
         <div><small>Custo por m²</small><b>${c.area>0?brl(conT/c.area):'—'}</b></div>
+        ${totDesc<0?`<div><small>Descontos obtidos</small><b>${brl(-totDesc)}</b></div>`:''}
       </div>
       <p class="pr-nota">Início da obra: ${pd(c.inicio)} · prazo de ${c.meses||8} meses · área construída: ${c.area>0?c.area+' m²':'não informada'}.
       "Construção" exclui terreno, cartório e projetos — é o que se compara com o CUB.</p>`):''}
@@ -2142,7 +2215,8 @@ function gerarRelatorioObra(){
     ${secs.has('tipo')?sec('Gasto por tipo de produto',
       tab([['Tipo'],['Lançamentos','r'],['Valor','r'],['%','r']],
         porTipo.map(x=>`<tr><td>${x.n}</td><td class="r">${x.q}</td><td class="r">${brl(x.v)}</td>
-          <td class="r">${(x.v/(total||1)*100).toFixed(1)}%</td></tr>`).join(''))):''}
+          <td class="r">${(x.v/(total||1)*100).toFixed(1)}%</td></tr>`).join(''))
+      +'<p class="pr-nota">Terreno, cartório, projetos e taxas não têm tipo de produto — são serviços, e por isso aparecem agrupados.</p>'):''}
 
     ${secs.has('forn')?sec('Gasto por fornecedor',
       tab([['Fornecedor'],['Lançamentos','r'],['Valor','r'],['%','r']],
@@ -2154,7 +2228,7 @@ function gerarRelatorioObra(){
         materiais.map(m=>`<tr><td>${m.nome}${m.forns.size?`<div class="sub2">${[...m.forns].join(', ')}</div>`:''}</td>
           <td class="c">${m.fam||''}</td><td class="r">${m.q.toLocaleString('pt-BR')}</td>
           <td class="r">${m.q>0?brl(m.v/m.q):'—'}</td><td class="r">${m.n}</td><td class="r">${brl(m.v)}</td></tr>`).join(''))
-      +'<p class="pr-nota">Quantidade e preço médio pago por unidade — é esta a tabela que serve de referência para orçar a próxima obra.</p>'):''}
+      +`<p class="pr-nota">Quantidade e preço médio pago por unidade — é esta a tabela que serve de referência para orçar a próxima obra.${totDesc<0?` Os ${brl(-totDesc)} de desconto negociado não aparecem aqui: entram como abatimento no total da obra.`:''}</p>`):''}
 
     ${secs.has('mo')&&moLanc.length?sec('Mão de obra',
       tab([['Trabalhador'],['Diárias','r'],['Valor','r'],['Média por diária','r']],
@@ -2791,7 +2865,9 @@ function verNota(id){
     <div class="val mono">${brl(l.total)}</div></div>`:'<p class="hint">Nenhum gasto vinculado a esta nota.</p>'}
   ${n.img?`<img src="${n.img}" style="width:100%;border-radius:12px;margin:10px 0">`:''}
   ${(n.arqLocal||n.arqPath||n.img)?`<button class="btn dark" onclick="verArquivoNota('${n.id}')">📄 Ver arquivo da nota</button>`:''}
-  ${(n.itens||[]).length?`<button class="btn" style="margin-top:9px" onclick="lancarItensDaNota('${n.id}')">Lançar itens como gastos</button>`:''}
+  ${l?'':`<button class="btn" style="margin-top:9px" onclick="vincularNotaAGasto('${n.id}')">Vincular a um gasto já lançado</button>`}
+  ${(n.itens||[]).length?`<button class="btn ghost mini" style="margin-top:9px" onclick="lancarItensDaNota('${n.id}')">Lançar itens como novos gastos</button>
+  <p class="hint">Use isto só quando a compra ainda não foi lançada. Nota fiscal serve para comprovar um gasto — não para criar outro.</p>`:''}
   ${(n.lancIds||[]).filter(x=>DB.lanc.some(l=>l.id===x)).length?`<p class="hint">Esta nota já gerou ${(n.lancIds||[]).filter(x=>DB.lanc.some(l=>l.id===x)).length} lançamento(s) na obra.</p>`:''}
   ${n.link?`<a class="btn ghost mini" style="width:100%;text-align:center;text-decoration:none;display:block;padding:11px;margin-top:9px" href="${n.link}" target="_blank" rel="noopener">Abrir link do Drive</a>`:''}
   ${n.xml?`<button class="btn ghost mini" style="margin-top:9px" onclick="baixarXml('${n.id}')">Baixar o XML</button>`:''}
@@ -2887,10 +2963,65 @@ async function verArquivoNota(id){
   <a class="btn dark" style="margin-top:10px;text-decoration:none;display:block;text-align:center;padding:11px" href="${a.url}" target="_blank" rel="noopener">Abrir em outra aba</a>
   <button class="btn ghost mini" style="margin-top:9px" onclick="verNota('${n.id}')">Voltar para a nota</button>`);
 }
+/* procura gastos que já cobrem esta nota — evita lançar a mesma compra duas vezes */
+function gastosParecidos(n){
+  const tot=+n.total||0, base=new Date(n.data+'T12:00:00');
+  const perto=l=>Math.abs((new Date(l.data+'T12:00:00')-base)/864e5)<=30;
+  const fn=alfa2(n.emit||'');
+  const porTotal=DB.lanc.filter(l=>perto(l)&&Math.abs((+l.total||0)-tot)<0.02);
+  const itens=(n.itens||[]).map(i=>alfa2(i.d));
+  const porItem=DB.lanc.filter(l=>perto(l)&&itens.includes(alfa2(l.desc))
+    &&(!fn||alfa2(l.forn||'').includes(fn.split(' ')[0])||fn.includes(alfa2(l.forn||'').split(' ')[0])));
+  const ids=new Set(), out=[];
+  [...porTotal,...porItem].forEach(l=>{ if(!ids.has(l.id)){ids.add(l.id);out.push(l);} });
+  return out.sort((a,b)=>a.data.localeCompare(b.data));
+}
+function vincularNotaAGasto(id){
+  const n=notas().find(x=>x.id===id); if(!n)return;
+  const cands=gastosParecidos(n);
+  const outros=DB.lanc.filter(l=>!cands.includes(l)).sort((a,b)=>b.data.localeCompare(a.data)).slice(0,80);
+  abrir(`<h2>Vincular a um gasto</h2>
+  <p class="sub">${n.emit} · nota ${n.numero||'s/nº'} · ${brl(n.total)}</p>
+  ${cands.length?`<p class="hint" style="margin-top:8px">Estes gastos parecem ser desta mesma compra:</p>
+  ${cands.map(l=>`<div class="item" onclick="fecharVinculo('${n.id}','${l.id}')" style="cursor:pointer">
+    <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+    <div class="mid"><b>${l.desc}</b><small>${l.forn||''} · ${cat(l.cat).n}</small></div>
+    <div class="val mono">${brl(l.total)}</div></div>`).join('')}`
+  :'<p class="hint">Não achei nenhum gasto parecido com esta nota.</p>'}
+  <label style="margin-top:12px">Ou escolha na lista</label>
+  <select id="vn_l"><option value="">—</option>
+    ${outros.map(l=>`<option value="${l.id}">${l.data.split('-').reverse().join('/')} · ${l.desc} · ${(+l.total).toFixed(2)}</option>`).join('')}</select>
+  <button class="btn" style="margin-top:10px" onclick="fecharVinculo('${n.id}',val('vn_l'))">Vincular</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="verNota('${n.id}')">Voltar</button>`);
+}
+function fecharVinculo(idNota,idLanc){
+  if(!idLanc){toast('Escolha um gasto.');return}
+  const n=notas().find(x=>x.id===idNota), l=DB.lanc.find(x=>x.id===idLanc);
+  if(!n||!l)return;
+  n.lancId=l.id; n.at=Date.now();
+  if(!l.nf){ l.nf=n.numero||('chave '+String(n.chave||'').slice(-8)); l.at=Date.now(); }
+  salvar(); render(); verNota(idNota); toast('Nota vinculada ao gasto');
+}
 function lancarItensDaNota(id){
   const n=notas().find(x=>x.id===id); if(!n)return;
   if(!(n.itens||[]).length){toast('Essa nota não tem itens para lançar.');return}
   const jaLancados=(n.lancIds||[]).filter(x=>DB.lanc.some(l=>l.id===x)).length;
+  const parecidos=gastosParecidos(n);
+  if(parecidos.length&&!jaLancados){
+    const somaP=parecidos.reduce((s,l)=>s+ +l.total,0);
+    abrir(`<h2>Essa compra já está lançada?</h2>
+    <p class="sub">Achei ${parecidos.length} gasto(s) parecido(s) com esta nota, somando ${brl(somaP)}.
+    Lançar de novo criaria despesa em dobro.</p>
+    ${parecidos.slice(0,8).map(l=>`<div class="item" onclick="verGasto('${l.id}')">
+      <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+      <div class="mid"><b>${l.desc}</b><small>${l.forn||''}</small></div>
+      <div class="val mono">${brl(l.total)}</div></div>`).join('')}
+    <button class="btn" style="margin-top:10px" onclick="vincularNotaAGasto('${n.id}')">Vincular a um destes</button>
+    <button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="forcarLancarNota('${n.id}')">
+      Não é a mesma compra — lançar assim mesmo</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="verNota('${n.id}')">Cancelar</button>`);
+    return;
+  }
   const seguir=()=>{
     const its=preencherFamilias(n.itens.map(i=>({c:i.c||'',d:i.d,q:+i.q||1,u:+i.u||0,f:n.emit,familia:'',cat:'c00'})));
     abrirConfirmarCompra({id:'',item:n.emit,forn:n.emit,total:n.total,itens:its,
@@ -2901,6 +3032,12 @@ function lancarItensDaNota(id){
     confirmar('Lançar de novo?',`Esta nota já gerou ${jaLancados} lançamento(s). Lançar outra vez vai duplicar os gastos.`,
       'Lançar mesmo assim',seguir,true);
   }else seguir();
+}
+function forcarLancarNota(id){
+  const n=notas().find(x=>x.id===id); if(!n)return;
+  const its=preencherFamilias(n.itens.map(i=>({c:i.c||'',d:i.d,q:+i.q||1,u:+i.u||0,f:n.emit,familia:'',cat:'c00'})));
+  abrirConfirmarCompra({id:'',item:n.emit,forn:n.emit,total:n.total,itens:its,
+    anexos:[],obs:'NF '+(n.numero||''),desconto:0,_nota:n});
 }
 
 /* ---------- palpite do tipo de produto ---------- */
@@ -2927,8 +3064,10 @@ const FAMILIAS_PADRAO=[
   [/\bpisos?\b|\bporcelanato|\bazulejo|\brevestimento|\bsoleira|\brodap[ée]/i,'Revestimento'],
   [/\bm[ãa]o\s*de\s*obra\b|\bdi[áa]rias?\b|\bpedreiro|\bservente|\bajudante/i,'Mão de obra'],
 ];
+function ehDesconto(l){ return (+l.total||0)<0 || /^\s*desconto/i.test(String(l.desc||'')); }
 function palpiteFamilia(desc){
   const d=String(desc||''); if(!d.trim())return '';
+  if(/^\s*desconto/i.test(d))return 'Desconto';
   const alvo=alfa2(d);
   const pal=alvo.split(/[^a-z0-9]+/).filter(Boolean);       /* palavras inteiras */
   const contemPalavra=k=>{
@@ -2957,12 +3096,63 @@ function palpiteFamilia(desc){
 /* só material de construção precisa de tipo — cartório, terreno e projetos não */
 function precisaTipo(l){
   if(String(l.familia||'').trim())return false;
+  if(ehDesconto(l))return false;                       /* desconto não é produto */
   return (l.rateio&&l.rateio.length)?true:cat(l.cat).g==='con';
+}
+/* marca os descontos e serviços administrativos com um tipo próprio, de uma vez */
+function organizarGenericos(){
+  let nDesc=0,nAdm=0;
+  DB.lanc.forEach(l=>{
+    if(String(l.familia||'').trim())return;
+    if(ehDesconto(l)){ l.familia='Desconto'; l.at=Date.now(); nDesc++; return; }
+    if(cat(l.cat).g==='adm'&&!(l.rateio&&l.rateio.length)){
+      const n=alfa2(cat(l.cat).n);
+      l.familia = n.includes('terreno')?'Terreno'
+        : n.includes('cartorio')?'Cartório e escritura'
+        : n.includes('projeto')?'Projetos e ART/RRT'
+        : n.includes('licen')?'Licenças e taxas'
+        : n.includes('condomin')?'Condomínio'
+        : capNomes(cat(l.cat).n.replace(/^\d+\s*/,''));
+      l.at=Date.now(); nAdm++;
+    }
+  });
+  const tipos=new Set(DB.tipos||[]);
+  DB.lanc.forEach(l=>{ if(String(l.familia||'').trim())tipos.add(l.familia); });
+  DB.tipos=[...tipos];
+  salvar(); render();
+  return {nDesc,nAdm};
 }
 function tiposFaltando(){
   return DB.lanc.filter(precisaTipo)
     .sort((a,b)=>b.data.localeCompare(a.data))
     .map(l=>({l,palpite:palpiteFamilia(l.desc)}));
+}
+function abrirOrganizarGenericos(){
+  const semTipo=DB.lanc.filter(l=>!String(l.familia||'').trim());
+  const desc=semTipo.filter(ehDesconto);
+  const adm=semTipo.filter(l=>!ehDesconto(l)&&cat(l.cat).g==='adm'&&!(l.rateio&&l.rateio.length));
+  const con=semTipo.filter(l=>!ehDesconto(l)&&!adm.includes(l));
+  const soma=a=>a.reduce((s,l)=>s+ +l.total,0);
+  abrir(`<h2>Lançamentos genéricos</h2>
+  <p class="sub">${semTipo.length} sem tipo de produto — no relatório eles aparecem agrupados como "—".</p>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    ${desc.length?`<div class="stat"><span>Descontos negociados</span><b class="mono">${desc.length} · ${brl(soma(desc))}</b></div>`:''}
+    ${adm.length?`<div class="stat"><span>Serviços e taxas (terreno, cartório, projetos)</span><b class="mono">${adm.length} · ${brl(soma(adm))}</b></div>`:''}
+    ${con.length?`<div class="stat"><span>Material sem tipo</span><b class="mono" style="color:var(--amber)">${con.length} · ${brl(soma(con))}</b></div>`:''}
+  </div>
+  ${(desc.length||adm.length)?`<button class="btn" style="margin-top:10px" onclick="aplicarOrganizarGenericos()">
+    Classificar automaticamente os ${desc.length+adm.length}</button>
+  <p class="hint">Descontos viram o tipo "Desconto"; terreno, cartório, projetos, condomínio e taxas recebem o nome da própria categoria. Nenhum valor muda.</p>`:''}
+  ${con.length?`<button class="btn ghost mini" style="margin-top:9px" onclick="abrirPreencherTipos()">
+    Preencher à mão os ${con.length} de material</button>
+  <p class="hint">Material precisa de tipo escolhido por você — é o que alimenta o resumo por produto.</p>`:''}
+  ${!semTipo.length?'<p class="hint">Tudo classificado.</p>':''}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function aplicarOrganizarGenericos(){
+  const r=organizarGenericos();
+  abrirOrganizarGenericos();
+  toast(`${r.nDesc} desconto(s) e ${r.nAdm} serviço(s) classificados`);
 }
 function abrirPreencherTipos(){
   const faltam=tiposFaltando();
@@ -3677,6 +3867,10 @@ function renderRel(){
     Object.entries(byMes).sort().reverse().map(([k,v])=>line(MES[+k.slice(5)-1]+'/'+k.slice(0,4),v)).join('')||'<div class="empty">Sem dados</div>';
 }
 
+function chaveDupSemData(o,tipo){
+  if(tipo==='lanc') return String(o.desc||'').trim().toLowerCase()+'|'+String(o.forn||'').trim().toLowerCase()+'|'+(+o.total).toFixed(2);
+  return String(o.item||'').trim().toLowerCase()+'|'+String(o.forn||'').trim().toLowerCase()+'|'+(+o.total).toFixed(2);
+}
 function chaveDup(o,tipo){
   if(tipo==='lanc') return o.data+'|'+String(o.desc||'').trim().toLowerCase()+'|'+(+o.total).toFixed(2);
   return String(o.item||'').trim().toLowerCase()+'|'+String(o.forn||'').trim().toLowerCase()+'|'+(+o.total).toFixed(2);
@@ -3701,26 +3895,39 @@ function aplicarExclusoes(){
   DB.lanc=DB.lanc.filter(l=>!set.has('lanc|'+chaveDup(l,'lanc')));
   DB.cot=DB.cot.filter(c=>!set.has('cot|'+chaveDup(c,'cot')));
 }
+let DUP_SEM_DATA=false;
 function acharDuplicados(tipo){
   const arr=tipo==='lanc'?DB.lanc:DB.cot, groups={};
-  arr.forEach(o=>{const k=chaveDup(o,tipo);(groups[k]=groups[k]||[]).push(o)});
+  const fn=DUP_SEM_DATA?chaveDupSemData:chaveDup;
+  arr.forEach(o=>{const k=fn(o,tipo);(groups[k]=groups[k]||[]).push(o)});
   return Object.values(groups).filter(g=>g.length>1);
 }
+function trocarModoDup(){ DUP_SEM_DATA=!DUP_SEM_DATA; abrirDuplicados(); }
 function abrirDuplicados(){
   const dL=acharDuplicados('lanc'), dC=acharDuplicados('cot');
   const nL=dL.reduce((s,g)=>s+g.length-1,0), nC=dC.reduce((s,g)=>s+g.length-1,0);
+  const alterna=`<button class="btn ghost mini" style="margin-top:9px" onclick="trocarModoDup()">
+    ${DUP_SEM_DATA?'Voltar a comparar com a data':'Procurar também em datas diferentes'}</button>`;
   if(!nL&&!nC){
-    abrir(`<h2>Sem duplicados</h2><p class="sub">Não encontrei lançamentos ou cotações repetidos.</p>
-    <button class="btn ghost mini" onclick="fechar()">Fechar</button>`);return;
+    abrir(`<h2>Sem duplicados</h2>
+    <p class="sub">${DUP_SEM_DATA?'Nada repetido, nem ignorando a data.':'Não encontrei repetição com a mesma data.'}</p>
+    ${DUP_SEM_DATA?'':'<p class="hint">Se a mesma nota foi lançada em dias diferentes (uma vez pelo orçamento e outra pela nota fiscal), procure ignorando a data.</p>'}
+    ${alterna}
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);return;
   }
   abrir(`<h2>Duplicados encontrados</h2>
-  <p class="sub">Comparando por data, descrição e valor — mesma combinação nas duas contando como cópia.</p>
+  <p class="sub">${DUP_SEM_DATA
+    ? 'Comparando descrição, fornecedor e valor — <b>ignorando a data</b>. Confira antes de remover: compras repetidas de propósito também aparecem aqui.'
+    : 'Comparando data, descrição e valor.'}</p>
   <div class="card" style="box-shadow:none;margin-top:10px">
-    ${dL.map(g=>`<div class="stat"><span>${g[0].desc}<br><small style="color:var(--ink-2)">${g[0].data.split('-').reverse().join('/')}</small></span><b class="mono">${g.length}×</b></div>`).join('')}
+    ${dL.map(g=>`<div class="stat" onclick="verGasto('${g[0].id}')" style="cursor:pointer">
+      <span>${g[0].desc}<br><small style="color:var(--ink-2)">${g.map(x=>x.data.split('-').reverse().slice(0,2).join('/')).join(' · ')}${g[0].forn?' · '+g[0].forn:''}</small></span>
+      <b class="mono">${g.length}× ${brl(g[0].total)}</b></div>`).join('')}
     ${dC.map(g=>`<div class="stat"><span>${g[0].item}<br><small style="color:var(--ink-2)">cotação</small></span><b class="mono">${g.length}×</b></div>`).join('')}
   </div>
   <button class="btn" onclick="removerDuplicados()">Remover ${nL+nC} cópia(s)</button>
   <p class="hint">Mantém, de cada grupo, o lançamento com mais informação preenchida (anexo, nota, rateio).</p>
+  ${alterna}
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
 }
 function removerDuplicados(){
@@ -5383,6 +5590,7 @@ function renderIO(){
     <button class="btn soft" onclick="verRestauracao()"><span class="ic">⏱</span>Restaurar</button>
     <button class="btn soft" onclick="migrarFotos()"><span class="ic">🧹</span>Liberar memória</button>
     <button class="btn soft" onclick="conferirTotais()"><span class="ic">🧮</span>Conferir totais</button>
+    <button class="btn soft" onclick="conferirEntradas()"><span class="ic">🔎</span>Conferir entradas</button>
   </div>
   <p class="hint">"Liberar memória" tira as fotos antigas da área pequena do navegador e as guarda no espaço grande do aparelho e na nuvem. Nenhuma foto é perdida.</p>
   <div class="divider" style="margin:16px 0"></div>
