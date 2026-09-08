@@ -253,7 +253,13 @@ select[multiple],select[size]{background-image:none;padding-right:12px}
 .selopt.sel{background:var(--teal);color:#fff;font-weight:600}
 
 /* grade de pagamentos da equipe */
-.pg-wrap{margin-top:10px;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:52vh}
+.pg-wrap{border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:38vh}
+.pg-bloco{margin-top:10px}
+.pg-tit{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2);
+  margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+.pg-bloco.sel .pg-tit{color:var(--teal)}
+.pg-bloco.sel .pg-wrap{border-color:var(--teal);box-shadow:0 0 0 2px rgba(22,163,148,.12)}
+.pg-bloco.sel.vazio{border:1px dashed var(--line);border-radius:12px;padding:11px;background:var(--surface-2)}
 .pg-tab{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 .pg-tab th,.pg-tab td{padding:7px 5px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
 .pg-tab thead th{position:sticky;top:0;background:var(--surface-2);z-index:2;font-size:10px;
@@ -273,6 +279,11 @@ select[multiple],select[size]{background-image:none;padding-right:12px}
 .pg-novo{margin-top:10px;padding:11px;border:1px dashed var(--line);border-radius:12px;background:var(--surface-2)}
 .pg-edit{flex:none;background:transparent;border:0;color:var(--ink-2);font-size:14px;cursor:pointer;padding:3px 5px;border-radius:6px}
 .pg-edit:hover{background:var(--surface-2);color:var(--teal)}
+.pg-tab button.dia{width:26px;height:26px;border-radius:7px;border:1.5px solid var(--line);
+  background:transparent;color:var(--ink-2);font-size:13px;font-weight:700;cursor:pointer;line-height:1;padding:0}
+.pg-tab button.dia:hover{border-color:var(--teal)}
+.pg-tab button.dia.cheia{background:var(--teal);border-color:var(--teal);color:#fff}
+.pg-tab button.dia.meia{background:var(--amber);border-color:var(--amber);color:#fff}
 
 /* formulários compactos: menos altura, mais campos por linha */
 .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
@@ -5489,11 +5500,15 @@ function gradePg(){
   const eq=equipe();
   eq.forEach(t=>{ PG.linhas[t.id]=PG.linhas[t.id]||{on:false,dias:{},valor:0,manual:false,obs:''}; });
   const cab=dias.map(d=>`<th title="${d.iso}"><span>${d.sem}</span>${d.dia}</th>`).join('');
-  const linhas=eq.map(t=>{
+  const linha=t=>{
     const L=PG.linhas[t.id];
-    const cels=dias.map(d=>`<td><input type="checkbox" class="pgD" data-t="${t.id}" data-d="${d.iso}"
-      ${L.dias[d.iso]?'checked':''} onchange="marcarDiaPg('${t.id}','${d.iso}',this.checked)"></td>`).join('');
-    const n=Object.values(L.dias).filter(Boolean).length;
+    const cels=dias.map(d=>{
+      const v=+L.dias[d.iso]||0;
+      return `<td><button type="button" class="pgD dia${v===1?' cheia':v===.5?' meia':''}"
+        data-t="${t.id}" data-d="${d.iso}" title="${v===1?'diária inteira':v===.5?'meia diária':'não trabalhou'}"
+        onclick="cicloDiaPg('${t.id}','${d.iso}')">${v===1?'✓':v===.5?'½':''}</button></td>`;
+    }).join('');
+    const n=somaDias(L);
     return `<tr class="${L.on?'ativa':''}">
       <td class="pg-nome">
         <label style="display:flex;align-items:center;gap:7px;margin:0">
@@ -5507,12 +5522,23 @@ function gradePg(){
       <td class="pg-val"><input inputmode="numeric" value="${L.valor?num2moeda(L.valor):''}" placeholder="0,00"
         oninput="onMoedaInput(this);valorLinhaPg('${t.id}',this.value)"></td>
     </tr>`;
-  }).join('');
-  return `<div class="pg-wrap">
-    <table class="pg-tab">
-      <thead><tr><th class="pg-nome">Colaborador</th>${cab}${dias.length?'<th class="pg-dias">Dias</th>':''}<th class="pg-val">Valor</th></tr></thead>
-      <tbody>${linhas}</tbody>
-    </table></div>`;
+  };
+  const cabecalho=`<thead><tr><th class="pg-nome">Colaborador</th>${cab}${dias.length?'<th class="pg-dias">Dias</th>':''}<th class="pg-val">Valor</th></tr></thead>`;
+  const sel=eq.filter(t=>PG.linhas[t.id].on);
+  const resto=eq.filter(t=>!PG.linhas[t.id].on);
+  const somaSel=sel.reduce((s,t)=>s+(+PG.linhas[t.id].valor||0),0);
+
+  const bloco=(titulo,lista,classe)=>lista.length
+    ? `<div class="pg-bloco ${classe||''}">
+         <div class="pg-tit">${titulo}</div>
+         <div class="pg-wrap"><table class="pg-tab">${cabecalho}<tbody>${lista.map(linha).join('')}</tbody></table></div>
+       </div>` : '';
+
+  return (sel.length
+      ? bloco(`✓ Vou pagar (${sel.length}) · <b class="mono">${brl(somaSel)}</b>`,sel,'sel')
+      : `<div class="pg-bloco sel vazio"><div class="pg-tit">Ninguém escolhido ainda</div>
+         <p class="hint" style="margin:0">Marque na lista abaixo quem vai receber — cada um sobe para cá.</p></div>`)
+    + bloco(`Colaboradores (${resto.length})`,resto);
 }
 function atualizarGradePg(){
   const el=document.getElementById('pgGrade');
@@ -5538,7 +5564,8 @@ function desenharPagamentos(manterMarcas){
   const nAtivas=Object.values(PG.linhas).filter(l=>l.on&&(+l.valor>0)).length;
 
   abrir(`<h2>Pagamentos da equipe</h2>
-  <p class="sub">Ao marcar um colaborador, a semana inteira (2ª a sábado) vem preenchida — desmarque os dias em que ele não veio. Período de até 30 dias.</p>
+  <p class="sub">Ao marcar um colaborador, a semana inteira (2ª a sábado) vem preenchida. Toque no dia para alternar:
+    <b style="color:var(--teal)">✓ inteira</b> → <b style="color:var(--amber)">½ meia</b> → vazio. Período de até 30 dias.</p>
   <div class="row3">
     <div><label style="margin-top:0">Tipo</label>
       <select id="pg_tipo" onchange="mudarTipoPg()">
@@ -5601,24 +5628,30 @@ function addColabRapido(){
 function ligarLinhaPg(id,on){
   const L=PG.linhas[id]; if(!L)return;
   L.on=on;
-  if(on&&!PG_SEM_DIAS(PG.tipo)&&!Object.values(L.dias).some(Boolean)){
-    diasDoPeriodo(PG.ini,PG.fim).forEach(d=>{ L.dias[d.iso]=true; });
+  if(on)PG_FOCO=id;
+  if(on&&!PG_SEM_DIAS(PG.tipo)&&somaDias(L)===0){
+    diasDoPeriodo(PG.ini,PG.fim).forEach(d=>{ L.dias[d.iso]=1; });
     recalcLinhaPg(id);
   }
   atualizarGradePg();
 }
-function marcarDiaPg(id,iso,on){
+const somaDias=L=>Object.values(L.dias).reduce((s,v)=>s+(+v||0),0);
+/* cada toque no dia alterna: nada → diária inteira → meia diária */
+function cicloDiaPg(id,iso){
   const L=PG.linhas[id]; if(!L)return;
-  L.dias[iso]=on; if(on)L.on=true;
+  const v=+L.dias[iso]||0;
+  L.dias[iso]= v===0?1 : v===1?0.5 : 0;
+  if(L.dias[iso])L.on=true;
   recalcLinhaPg(id);
   atualizarGradePg();
 }
+function marcarDiaPg(id,iso,on){ cicloDiaPg(id,iso); }
 function marcarTodosPg(on){
   const dias=diasDoPeriodo(PG.ini,PG.fim);
   equipe().forEach(t=>{
     const L=PG.linhas[t.id];
     L.on=on;
-    L.dias={}; if(on)dias.forEach(d=>{ L.dias[d.iso]=true; });
+    L.dias={}; if(on)dias.forEach(d=>{ L.dias[d.iso]=1; });
     recalcLinhaPg(t.id);
   });
   atualizarGradePg();
@@ -5626,8 +5659,7 @@ function marcarTodosPg(on){
 function recalcLinhaPg(id){
   const L=PG.linhas[id], t=equipe().find(x=>x.id===id);
   if(!L||!t||L.manual)return;
-  const n=Object.values(L.dias).filter(Boolean).length;
-  L.valor=+(n*(+t.diaria||0)).toFixed(2);
+  L.valor=+(somaDias(L)*(+t.diaria||0)).toFixed(2);
 }
 function valorLinhaPg(id,txt){
   const L=PG.linhas[id]; if(!L)return;
@@ -5651,8 +5683,8 @@ function salvarPagamentos(){
     if(!L||!L.on)return;
     const total=+L.valor||0;
     if(!(total>0))return;
-    const marcados=Object.keys(L.dias).filter(k=>L.dias[k]).sort();
-    const qtd=semDias?1:marcados.length;
+    const marcados=Object.keys(L.dias).filter(k=>+L.dias[k]>0).sort();
+    const qtd=semDias?1:+somaDias(L).toFixed(2);
     if(!semDias&&!qtd)return;
     const dataLanc=semDias?PG.ini:marcados[marcados.length-1];
     const desc=semDias
@@ -5664,7 +5696,7 @@ function salvarPagamentos(){
       data:dataLanc, desc, familia:'Mão de obra', cat:'c07', forn:t.nome,
       qtd, unit:+(total/qtd).toFixed(2), total,
       pag:pago?'Pago':'A pagar', nf:'', anexos:[],
-      obs:semDias?obs:`${marcados.length} dia(s): ${marcados.map(fmt).join(', ')}`,
+      obs:semDias?obs:`${qtd} diária(s) em ${marcados.length} dia(s): ${marcados.map(k=>fmt(k)+(+L.dias[k]===.5?' (½)':'')).join(', ')}`,
       tipoPg:PG.tipo, ctrl:false,qtdRec:0,baixas:[],pagamentos:[]});
     n++; soma+=total;
   });
