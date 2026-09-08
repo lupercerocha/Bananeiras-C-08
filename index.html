@@ -270,6 +270,9 @@ select[multiple],select[size]{background-image:none;padding-right:12px}
 .pg-tab thead th.pg-val{position:sticky;right:0;background:var(--surface-2);z-index:3}
 .pg-tab td.pg-val input{padding:7px 8px;font-size:13.5px;text-align:right}
 .pg-tab input[type=checkbox]{margin:0}
+.pg-novo{margin-top:10px;padding:11px;border:1px dashed var(--line);border-radius:12px;background:var(--surface-2)}
+.pg-edit{flex:none;background:transparent;border:0;color:var(--ink-2);font-size:14px;cursor:pointer;padding:3px 5px;border-radius:6px}
+.pg-edit:hover{background:var(--surface-2);color:var(--teal)}
 
 /* formulários compactos: menos altura, mais campos por linha */
 .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
@@ -657,8 +660,16 @@ a{color:var(--teal)}
     <button class="btn soft" onclick="abrirTrabalhador()"><span class="ic">＋</span>Novo trabalhador</button>
   </div>
   <div class="card" style="margin-top:12px">
-    <h3>Resumo da mão de obra</h3>
-    <div id="equipeResumo"></div>
+    <label style="margin-top:0">Período</label>
+    <div class="row2">
+      <input type="date" id="eqIni"><input type="date" id="eqFim">
+    </div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoEquipe('mes')">Este mês</button>
+      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoEquipe('mespassado')">Mês passado</button>
+      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoEquipe('tudo')">Toda a obra</button>
+    </div>
+    <div id="equipeResumo" style="margin-top:10px"></div>
   </div>
   <div id="equipeList"></div>
 </section>
@@ -736,6 +747,7 @@ a{color:var(--teal)}
 <datalist id="dlForn"></datalist>
 <datalist id="dlConc"></datalist>
 <datalist id="dlTipos"></datalist>
+<datalist id="dlFuncoes"></datalist>
 <div class="sheet" id="sheet"><div class="bg" onclick="fechar()"></div><div class="panel" id="panel"></div></div>
 <div class="toast" id="toast"></div>
 <div id="printArea"></div>
@@ -792,6 +804,7 @@ async function entrarNoApp(session){
   carregar();
   await sincronizarNaEntrada();
   gravarSnap();
+  gerarRecorrentes();
   render();
   /* passa das fotos antigas para o espaço grande antes que a memória estoure */
   if(espacoUsado()>3.2e6 && DB.fotos.some(f=>f.img)) setTimeout(()=>migrarFotos(true),1500);
@@ -2253,12 +2266,23 @@ function gerarRelatorioObra(){
       +`<p class="pr-nota">Quantidade e preço médio pago por unidade — é esta a tabela que serve de referência para orçar a próxima obra.${totDesc<0?` Os ${brl(-totDesc)} de desconto negociado não aparecem aqui: entram como abatimento no total da obra.`:''}</p>`):''}
 
     ${secs.has('mo')&&moLanc.length?sec('Mão de obra',
-      tab([['Trabalhador'],['Diárias','r'],['Valor','r'],['Média por diária','r']],
+      tab([['Trabalhador'],['Diárias','r'],['Valor','r'],['Média por diária','r'],['%','r']],
         Object.values(porTrab).sort((a,b)=>b.v-a.v).map(t=>`<tr><td>${t.n}</td><td class="r">${t.d.toLocaleString('pt-BR')}</td>
-          <td class="r">${brl(t.v)}</td><td class="r">${t.d>0?brl(t.v/t.d):'—'}</td></tr>`).join('')
+          <td class="r">${brl(t.v)}</td><td class="r">${t.d>0?brl(t.v/t.d):'—'}</td>
+          <td class="r">${(t.v/(moTotal||1)*100).toFixed(1)}%</td></tr>`).join('')
         +`<tr class="tot"><td>Total</td><td class="r">${moDias.toLocaleString('pt-BR')}</td><td class="r">${brl(moTotal)}</td>
-          <td class="r">${moDias>0?brl(moTotal/moDias):'—'}</td></tr>`)
-      +`<p class="pr-nota">Mão de obra representa ${(moTotal/(total||1)*100).toFixed(1)}% do gasto no período.</p>`):''}
+          <td class="r">${moDias>0?brl(moTotal/moDias):'—'}</td><td class="r">100%</td></tr>`)
+      +`<p class="pr-nota">Mão de obra representa ${(moTotal/(total||1)*100).toFixed(1)}% do gasto no período.</p>`
+      +Object.keys(porTrab).sort((a,b)=>porTrab[b].v-porTrab[a].v).map(nome=>{
+          const dele=moLanc.filter(l=>(l.forn||'—')===nome).sort((a,b)=>a.data.localeCompare(b.data));
+          return `<div class="pr-grp"><h3>${nome} <span>${brl(porTrab[nome].v)}</span></h3>
+          ${tab([['Data'],['Pagamento'],['Diárias','r'],['Vlr diária','r'],['Valor','r']],
+            dele.map(l=>`<tr><td class="c">${pd(l.data)}</td>
+              <td>${l.desc}${l.obs?`<div class="sub2">${l.obs}</div>`:''}</td>
+              <td class="r">${(+l.qtd||0).toLocaleString('pt-BR')}</td>
+              <td class="r">${brl(l.unit)}</td>
+              <td class="r">${brl(l.total)}${isPago(l)?'':'<div class="sub2 vermelho">a pagar</div>'}</td></tr>`).join(''))}
+          </div>`;}).join('')):''}
 
     ${secs.has('detalhe')?sec('Lançamentos, etapa por etapa',
       etapas.map(e=>`<div class="pr-grp">
@@ -3585,6 +3609,10 @@ function refreshDatalists(){
   if(dlCc) dlCc.innerHTML=[...concs].sort((a,b)=>alfa(a,b)).map(c=>`<option value="${c.replace(/"/g,'&quot;')}">`).join('');
   const dlT=document.getElementById('dlTipos');
   if(dlT) dlT.innerHTML=familiasExistentes().map(t=>`<option value="${t.replace(/"/g,'&quot;')}">`).join('');
+  const fx=[...new Set((DB.equipe||[]).map(t=>String(t.funcao||'').trim()).filter(Boolean))].sort((a,b)=>alfa(a,b));
+  const dlFn=document.getElementById('dlFuncoes');
+  if(dlFn) dlFn.innerHTML=(fx.length?fx:['Pedreiro','Servente','Ajudante','Mestre de obra','Encanador','Eletricista'])
+    .map(f=>`<option value="${f.replace(/"/g,'&quot;')}">`).join('');
 }
 /* ---------- combobox de tipo de produto (dropdown próprio, sem estilo nativo do navegador) ---------- */
 function familiasExistentes(){
@@ -5299,41 +5327,85 @@ function totalPagoTrab(id){
 function diasTrab(id){
   return DB.lanc.filter(l=>l.trabId===id).reduce((s,l)=>s+(+l.qtd||0),0);
 }
+let EQ_INI='',EQ_FIM='';
+function periodoEquipe(qual){
+  const hj=new Date();
+  const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  if(qual==='mes'){ EQ_INI=iso(new Date(hj.getFullYear(),hj.getMonth(),1)); EQ_FIM=iso(hj); }
+  else if(qual==='mespassado'){ EQ_INI=iso(new Date(hj.getFullYear(),hj.getMonth()-1,1));
+    EQ_FIM=iso(new Date(hj.getFullYear(),hj.getMonth(),0)); }
+  else { EQ_INI=''; EQ_FIM=''; }
+  const a=document.getElementById('eqIni'), b=document.getElementById('eqFim');
+  if(a)a.value=EQ_INI; if(b)b.value=EQ_FIM;
+  renderEquipe();
+}
+function pagamentosDe(id){
+  return DB.lanc.filter(l=>l.trabId===id
+    &&(!EQ_INI||l.data>=EQ_INI)&&(!EQ_FIM||l.data<=EQ_FIM))
+    .sort((a,b)=>b.data.localeCompare(a.data));
+}
 function renderEquipe(){
+  const iEl=document.getElementById('eqIni'), fEl=document.getElementById('eqFim');
+  if(iEl&&!iEl.dataset.lig){
+    iEl.dataset.lig='1'; fEl.dataset.lig='1';
+    iEl.onchange=()=>{EQ_INI=iEl.value;renderEquipe()};
+    fEl.onchange=()=>{EQ_FIM=fEl.value;renderEquipe()};
+  }
   const eq=equipe();
-  const semanas=DB.lanc.filter(l=>l.trabId);
-  const totalMO=semanas.reduce((s,l)=>s+ +l.total,0);
-  const aberto=semanas.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
-  document.getElementById('equipeResumo').innerHTML=
-    `<div class="stat"><span>Total em mão de obra</span><b class="mono">${brl(totalMO)}</b></div>
-     <div class="stat"><span>Diárias lançadas</span><b class="mono">${semanas.reduce((s,l)=>s+(+l.qtd||0),0).toLocaleString('pt-BR')}</b></div>
+  const noPer=l=>l.trabId&&(!EQ_INI||l.data>=EQ_INI)&&(!EQ_FIM||l.data<=EQ_FIM);
+  const mo=DB.lanc.filter(noPer);
+  const totalMO=mo.reduce((s,l)=>s+ +l.total,0);
+  const diasMO=mo.reduce((s,l)=>s+(+l.qtd||0),0);
+  const aberto=mo.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
+  const rot=EQ_INI||EQ_FIM
+    ? `${EQ_INI?EQ_INI.split('-').reverse().join('/'):'início'} a ${EQ_FIM?EQ_FIM.split('-').reverse().join('/'):'hoje'}`
+    : 'toda a obra';
+  const el=document.getElementById('equipeResumo');
+  if(el)el.innerHTML=
+    `<div class="stat"><span>Total investido em equipe</span><b class="mono" style="font-size:17px">${brl(totalMO)}</b></div>
+     <div class="stat"><span>Diárias no período</span><b class="mono">${diasMO.toLocaleString('pt-BR')}</b></div>
+     <div class="stat"><span>Média por diária</span><b class="mono">${diasMO>0?brl(totalMO/diasMO):'—'}</b></div>
      ${aberto>0?`<div class="stat"><span>A pagar</span><b class="mono" style="color:var(--red)">${brl(aberto)}</b></div>`:''}
-     <p class="hint">Use "Lançar pagamentos" lá em cima para resolver a equipe inteira de uma vez: escolha o período, marque os dias de cada um e lance tudo numa tela só.</p>`;
+     <p class="hint">Período: ${rot}. Toque num colaborador para ver os pagamentos dele.</p>`;
 
-  document.getElementById('equipeList').innerHTML= eq.length? eq.map(t=>{
-    const sem=DB.lanc.filter(l=>l.trabId===t.id).sort((a,b)=>b.data.localeCompare(a.data));
-    const ab=sem.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
-    return `<div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+  const linhas=eq.map(t=>{
+    const pg=pagamentosDe(t.id);
+    const tot=pg.reduce((s,l)=>s+ +l.total,0);
+    const dd=pg.reduce((s,l)=>s+(+l.qtd||0),0);
+    const ab=pg.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
+    return {t,pg,tot,dd,ab};
+  }).sort((a,b)=>b.tot-a.tot);
+
+  const lista=document.getElementById('equipeList');
+  if(!lista)return;
+  lista.innerHTML= eq.length? linhas.map(({t,pg,tot,dd,ab})=>{
+    const k='eq:'+t.id, pc=totalMO>0?(tot/totalMO*100):0;
+    return `<div class="acc ${ACC[k]?'on':''}" style="margin-bottom:8px">
+      <div class="acch" onclick="toggleAcc('${k}')">
         <div style="flex:1;min-width:0">
-          <h3 style="margin:0">${t.nome}</h3>
-          <div style="font-size:12px;color:var(--ink-2);margin-top:2px">${t.funcao||'—'} · diária ${brl(t.diaria)}</div>
+          <b style="font-size:14.5px">${t.nome}</b>
+          <div style="font-size:11.5px;color:var(--ink-2)">${t.funcao||'—'} · ${t.rec&&t.rec.on?`<span class="tag">🔁 ${brl(t.rec.valor)} ${({semanal:'por semana',quinzenal:'a cada 15 dias',mensal:'por mês',bimestral:'a cada 2 meses',anual:'por ano'})[t.rec.freq]||''}</span>`:`diária ${brl(t.diaria)}`}
+            · ${dd.toLocaleString('pt-BR')} diária(s) no período${pc?` · ${pc.toFixed(1)}%`:''}
+            ${ab>0?` · <span style="color:var(--red)">${brl(ab)} a pagar</span>`:''}</div>
         </div>
-        <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="abrirTrabalhador('${t.id}')">Editar</button>
+        <b class="mono" style="white-space:nowrap">${brl(tot)}</b>
+        <span class="arw">▼</span>
       </div>
-      <div class="stat" style="margin-top:10px"><span>Total pago a ele</span><b class="mono">${brl(totalPagoTrab(t.id))}</b></div>
-      <div class="stat"><span>Diárias trabalhadas</span><b class="mono">${diasTrab(t.id).toLocaleString('pt-BR')}</b></div>
-      ${ab>0?`<div class="stat"><span>Em aberto</span><b class="mono" style="color:var(--red)">${brl(ab)}</b></div>`:''}
-      <button class="btn ghost mini" style="margin-top:10px" onclick="abrirSemana('${t.id}')">+ Lançar semana só dele</button>
-      ${sem.length?`<div style="margin-top:10px">${sem.slice(0,6).map(l=>
-        `<div class="item" onclick="verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
+      <div class="accb">
+        ${pg.length?pg.map(l=>`<div class="item" onclick="event.stopPropagation();verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
           <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
-          <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} diária(s) × ${brl(l.unit)}</small></div>
-          <div class="val mono">${brl(l.total)}${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')}
-        ${sem.length>6?`<p class="hint">Mostrando as 6 semanas mais recentes. As demais estão na aba Gastos.</p>`:''}</div>`
-        :'<p class="hint">Nenhuma semana lançada ainda.</p>'}
-    </div>`;
-  }).join('') : '<div class="card"><div class="empty"><b>Nenhum trabalhador cadastrado</b><p>Cadastre o pedreiro, servente ou ajudante e o valor da diária para controlar a mão de obra.</p></div></div>';
+          <div class="mid"><b>${l.desc}</b>
+            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.tipoPg&&l.tipoPg!=='semanal'?' · '+l.tipoPg:''}${l.obs?' · '+l.obs.slice(0,60):''}</small></div>
+          <div class="val"><span class="mono">${brl(l.total)}</span>
+            ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
+          :'<p class="hint">Nenhum pagamento neste período.</p>'}
+        <div class="row2" style="margin-top:9px">
+          <button class="btn ghost mini" onclick="event.stopPropagation();abrirSemana('${t.id}')">+ Lançar só dele</button>
+          <button class="btn ghost mini" onclick="event.stopPropagation();abrirTrabalhador('${t.id}')">Editar cadastro</button>
+        </div>
+      </div></div>`;
+  }).join('')
+  : '<div class="card"><div class="empty"><b>Nenhum trabalhador cadastrado</b><p>Cadastre o pedreiro, servente ou ajudante e o valor da diária para controlar a mão de obra.</p></div></div>';
 }
 /* ---------- pagamentos da equipe: uma tela, uma linha por colaborador ---------- */
 let PG={tipo:'semanal',ini:'',fim:'',linhas:{}};
@@ -5391,16 +5463,33 @@ function mudarTipoPg(){
   PG.linhas={};
   desenharPagamentos();
 }
-function mudarDatasPg(){ PG.ini=val('pg_ini'); PG.fim=val('pg_fim'); desenharPagamentos(true); }
+const PG_MAX_DIAS=30;
+/* mexe só na grade: redesenhar a tela toda faria o campo de data perder o foco a cada tecla */
+function mudarDatasPg(){
+  const a=document.getElementById('pg_ini'), b=document.getElementById('pg_fim');
+  const ini=a?a.value:'', fim=b?b.value:'';
+  if(!ini)return;
+  PG.ini=ini;
+  if(PG_SEM_DIAS(PG.tipo)){ PG.fim=ini; atualizarGradePg(); return; }
+  if(!fim)return;
+  if(fim<ini){ PG.fim=ini; if(b)b.value=ini; atualizarGradePg(); return; }
+  const dif=Math.round((new Date(fim)-new Date(ini))/864e5);
+  if(dif>PG_MAX_DIAS-1){
+    const lim=new Date(ini+'T12:00:00'); lim.setDate(lim.getDate()+PG_MAX_DIAS-1);
+    PG.fim=new Date(lim.getTime()-lim.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+    if(b)b.value=PG.fim;
+    toast('O período vai até '+PG_MAX_DIAS+' dias');
+  }else PG.fim=fim;
+  atualizarGradePg();
+}
 
-function desenharPagamentos(manterMarcas){
+/* monta só a tabela — usada ao abrir e a cada marcação, sem redesenhar a tela inteira */
+function gradePg(){
   const dias=PG_SEM_DIAS(PG.tipo)?[]:diasDoPeriodo(PG.ini,PG.fim);
   const eq=equipe();
-  if(!manterMarcas)PG.linhas={};
   eq.forEach(t=>{ PG.linhas[t.id]=PG.linhas[t.id]||{on:false,dias:{},valor:0,manual:false,obs:''}; });
-
   const cab=dias.map(d=>`<th title="${d.iso}"><span>${d.sem}</span>${d.dia}</th>`).join('');
-  const linha=t=>{
+  const linhas=eq.map(t=>{
     const L=PG.linhas[t.id];
     const cels=dias.map(d=>`<td><input type="checkbox" class="pgD" data-t="${t.id}" data-d="${d.iso}"
       ${L.dias[d.iso]?'checked':''} onchange="marcarDiaPg('${t.id}','${d.iso}',this.checked)"></td>`).join('');
@@ -5409,19 +5498,47 @@ function desenharPagamentos(manterMarcas){
       <td class="pg-nome">
         <label style="display:flex;align-items:center;gap:7px;margin:0">
           <input type="checkbox" ${L.on?'checked':''} onchange="ligarLinhaPg('${t.id}',this.checked)">
-          <span><b>${t.nome}</b><small>${t.funcao||''}${t.diaria?' · '+brl(t.diaria)+'/dia':''}</small></span>
+          <span style="flex:1;min-width:0"><b>${t.nome}</b><small>${t.funcao||''}${t.diaria?' · '+brl(t.diaria)+'/dia':''}</small></span>
+          <button class="pg-edit" title="Editar cadastro"
+            onclick="event.preventDefault();event.stopPropagation();editarColabDaGrade('${t.id}')">✎</button>
         </label></td>
       ${cels}
       ${dias.length?`<td class="pg-dias mono">${n}</td>`:''}
       <td class="pg-val"><input inputmode="numeric" value="${L.valor?num2moeda(L.valor):''}" placeholder="0,00"
         oninput="onMoedaInput(this);valorLinhaPg('${t.id}',this.value)"></td>
     </tr>`;
-  };
+  }).join('');
+  return `<div class="pg-wrap">
+    <table class="pg-tab">
+      <thead><tr><th class="pg-nome">Colaborador</th>${cab}${dias.length?'<th class="pg-dias">Dias</th>':''}<th class="pg-val">Valor</th></tr></thead>
+      <tbody>${linhas}</tbody>
+    </table></div>`;
+}
+function atualizarGradePg(){
+  const el=document.getElementById('pgGrade');
+  if(!el){ desenharPagamentos(true); return; }
+  el.innerHTML=gradePg();
+  const tot=Object.values(PG.linhas).filter(l=>l.on).reduce((s,l)=>s+(+l.valor||0),0);
+  const n=Object.values(PG.linhas).filter(l=>l.on&&(+l.valor>0)).length;
+  const st=document.getElementById('pgTotal'); if(st)st.textContent=brl(tot);
+  const sn=document.getElementById('pgQtd'); if(sn)sn.textContent=n+' pagamento(s) a lançar';
+  if(PG_FOCO){
+    const alvo=document.querySelector(`.pgD[data-t="${PG_FOCO}"]`);
+    if(alvo&&alvo.closest('tr'))alvo.closest('tr').scrollIntoView({block:'nearest'});
+    PG_FOCO='';
+  }
+}
+function desenharPagamentos(manterMarcas){
+  const dias=PG_SEM_DIAS(PG.tipo)?[]:diasDoPeriodo(PG.ini,PG.fim);
+  const eq=equipe();
+  if(!manterMarcas)PG.linhas={};
+  eq.forEach(t=>{ PG.linhas[t.id]=PG.linhas[t.id]||{on:false,dias:{},valor:0,manual:false,obs:''}; });
+
   const total=Object.values(PG.linhas).filter(l=>l.on).reduce((s,l)=>s+(+l.valor||0),0);
   const nAtivas=Object.values(PG.linhas).filter(l=>l.on&&(+l.valor>0)).length;
 
   abrir(`<h2>Pagamentos da equipe</h2>
-  <p class="sub">Marque quem trabalhou e em quais dias. O valor é calculado pela diária e pode ser ajustado à mão.</p>
+  <p class="sub">Ao marcar um colaborador, a semana inteira (2ª a sábado) vem preenchida — desmarque os dias em que ele não veio. Período de até 30 dias.</p>
   <div class="row3">
     <div><label style="margin-top:0">Tipo</label>
       <select id="pg_tipo" onchange="mudarTipoPg()">
@@ -5440,43 +5557,71 @@ function desenharPagamentos(manterMarcas){
     <button class="btn ghost mini" style="width:auto;padding:7px 11px" onclick="marcarTodosPg(true)">Todos trabalharam</button>
     <button class="btn ghost mini" style="width:auto;padding:7px 11px" onclick="marcarTodosPg(false)">Limpar</button>
   </div>`:''}
-  <div class="pg-wrap">
-    <table class="pg-tab">
-      <thead><tr><th class="pg-nome">Colaborador</th>${cab}${dias.length?'<th class="pg-dias">Dias</th>':''}<th class="pg-val">Valor</th></tr></thead>
-      <tbody>${eq.map(linha).join('')}</tbody>
-    </table>
+  <div id="pgGrade">${gradePg()}</div>
+  <div class="pg-novo">
+    <div class="row3">
+      <div><label style="margin-top:0">Novo colaborador</label>
+        <input id="pgn_nome" data-cap="1" placeholder="Nome" onkeydown="if(event.key==='Enter')addColabRapido()"></div>
+      <div><label style="margin-top:0">Função</label>
+        <input id="pgn_func" data-cap="1" list="dlFuncoes" placeholder="Pedreiro, servente..." onkeydown="if(event.key==='Enter')addColabRapido()"></div>
+      <div><label style="margin-top:0">Diária</label>
+        <input id="pgn_diaria" inputmode="numeric" placeholder="0,00" oninput="onMoedaInput(this)" onkeydown="if(event.key==='Enter')addColabRapido()"></div>
+    </div>
+    <button class="btn ghost mini" style="margin-top:8px" onclick="addColabRapido()">+ Adicionar à lista</button>
+    <p class="hint">Ele entra no fim da tabela e você continua marcando os dias sem sair desta tela.</p>
   </div>
-  <div class="stat" style="margin-top:10px"><span>${nAtivas} pagamento(s) a lançar</span>
-    <b class="mono" style="font-size:17px">${brl(total)}</b></div>
+  <div class="stat" style="margin-top:10px"><span id="pgQtd">${nAtivas} pagamento(s) a lançar</span>
+    <b class="mono" id="pgTotal" style="font-size:17px">${brl(total)}</b></div>
   <label class="chkline"><input type="checkbox" id="pg_pago" checked> Já paguei</label>
   <button class="btn" style="margin-top:9px" onclick="salvarPagamentos()">Lançar pagamentos</button>
   <p class="hint">Cada colaborador marcado vira um lançamento na etapa Mão de obra. Nada do que já foi lançado é alterado.</p>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  if(PG_FOCO){
+    const alvo=document.querySelector(`.pgD[data-t="${PG_FOCO}"]`);
+    if(alvo&&alvo.closest('tr'))alvo.closest('tr').scrollIntoView({block:'nearest'});
+    const cn=document.getElementById('pgn_nome'); if(cn)cn.focus();
+    PG_FOCO='';
+  }
+}
+let PG_FOCO='';
+function addColabRapido(){
+  const nome=capNomes(val('pgn_nome'));
+  if(!nome){toast('Informe o nome.');return}
+  const jaTem=equipe().find(t=>alfa2(t.nome)===alfa2(nome));
+  if(jaTem){toast('"'+jaTem.nome+'" já está na lista.');return}
+  const t={id:uid(),nome,funcao:capNomes(val('pgn_func')),diaria:moeda2num(val('pgn_diaria')),at:Date.now()};
+  equipe().push(t); salvar();
+  PG.linhas[t.id]={on:false,dias:{},valor:0,manual:false,obs:''};
+  PG_FOCO=t.id;
+  atualizarGradePg();
+  const cn=document.getElementById('pgn_nome'), cf=document.getElementById('pgn_func'), cd=document.getElementById('pgn_diaria');
+  if(cn){cn.value='';cn.focus()} if(cf)cf.value=''; if(cd)cd.value='';
+  toast(nome+' entrou na lista');
 }
 function ligarLinhaPg(id,on){
   const L=PG.linhas[id]; if(!L)return;
   L.on=on;
   if(on&&!PG_SEM_DIAS(PG.tipo)&&!Object.values(L.dias).some(Boolean)){
-    diasDoPeriodo(PG.ini,PG.fim).forEach(d=>{ if(d.sem!=='sáb')L.dias[d.iso]=true; });
+    diasDoPeriodo(PG.ini,PG.fim).forEach(d=>{ L.dias[d.iso]=true; });
     recalcLinhaPg(id);
   }
-  desenharPagamentos(true);
+  atualizarGradePg();
 }
 function marcarDiaPg(id,iso,on){
   const L=PG.linhas[id]; if(!L)return;
   L.dias[iso]=on; if(on)L.on=true;
   recalcLinhaPg(id);
-  desenharPagamentos(true);
+  atualizarGradePg();
 }
 function marcarTodosPg(on){
   const dias=diasDoPeriodo(PG.ini,PG.fim);
   equipe().forEach(t=>{
     const L=PG.linhas[t.id];
     L.on=on;
-    L.dias={}; if(on)dias.forEach(d=>{ if(d.sem!=='sáb')L.dias[d.iso]=true; });
+    L.dias={}; if(on)dias.forEach(d=>{ L.dias[d.iso]=true; });
     recalcLinhaPg(t.id);
   });
-  desenharPagamentos(true);
+  atualizarGradePg();
 }
 function recalcLinhaPg(id){
   const L=PG.linhas[id], t=equipe().find(x=>x.id===id);
@@ -5489,8 +5634,9 @@ function valorLinhaPg(id,txt){
   L.valor=moeda2num(txt); L.manual=true; L.on=true;
   const el=document.querySelector('.pg-tab tbody');
   const tot=Object.values(PG.linhas).filter(x=>x.on).reduce((s,x)=>s+(+x.valor||0),0);
-  const st=document.querySelector('.sheet .stat b.mono');
-  if(st)st.textContent=brl(tot);
+  const st=document.getElementById('pgTotal'); if(st)st.textContent=brl(tot);
+  const sn=document.getElementById('pgQtd');
+  if(sn)sn.textContent=Object.values(PG.linhas).filter(x=>x.on&&(+x.valor>0)).length+' pagamento(s) a lançar';
 }
 function salvarPagamentos(){
   const pago=document.getElementById('pg_pago').checked;
@@ -5527,25 +5673,145 @@ function salvarPagamentos(){
   toast(`${n} pagamento(s) lançado(s) · ${brl(soma)}`);
 }
 
+/* ---------- pagamento recorrente (engenheiro, mestre de obra, mensalistas) ---------- */
+const FREQS=[['semanal','Toda semana',7],['quinzenal','A cada 15 dias',14],
+             ['mensal','Todo mês',0],['bimestral','A cada 2 meses',0],['anual','Todo ano',0]];
+function isoDe(d){ return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10); }
+/* datas de uma regra, do início até o limite */
+function datasRecorrentes(rec,limite){
+  const out=[]; if(!rec||!rec.on||!rec.ini)return out;
+  const fim=rec.fim&&rec.fim<limite?rec.fim:limite;
+  const passo=(FREQS.find(f=>f[0]===rec.freq)||[])[2]||0;
+  const base=new Date(rec.ini+'T12:00:00');
+  const diaBase=base.getDate();
+  let d=new Date(base), guarda=0;
+  while(guarda++<400){
+    const iso=isoDe(d);
+    if(iso>fim)break;
+    if(iso>=rec.ini)out.push(iso);
+    if(passo){ d.setDate(d.getDate()+passo); }
+    else{
+      const meses=rec.freq==='mensal'?1:rec.freq==='bimestral'?2:12;
+      const alvo=new Date(d.getFullYear(),d.getMonth()+meses,1);
+      const ult=new Date(alvo.getFullYear(),alvo.getMonth()+1,0).getDate();
+      d=new Date(alvo.getFullYear(),alvo.getMonth(),Math.min(diaBase,ult),12);
+    }
+  }
+  return out;
+}
+function proximasRecorrentes(rec,n){
+  const hj=hoje();
+  const fim=new Date(); fim.setFullYear(fim.getFullYear()+2);
+  return datasRecorrentes(rec,isoDe(fim)).filter(d=>d>=hj).slice(0,n||3);
+}
+/* cria os pagamentos que já venceram e ainda não foram lançados */
+function gerarRecorrentes(){
+  const hj=hoje(); let n=0;
+  (DB.equipe||[]).forEach(t=>{
+    const r=t.rec;
+    if(!r||!r.on||!(+r.valor>0))return;
+    const jaTem=new Set(DB.lanc.filter(l=>l.recId===t.id).map(l=>l.recData));
+    datasRecorrentes(r,hj).forEach(iso=>{
+      if(jaTem.has(iso))return;
+      const rot={semanal:'semana',quinzenal:'quinzena',mensal:'mês',bimestral:'bimestre',anual:'ano'}[r.freq]||r.freq;
+      DB.lanc.push({id:uid(),at:Date.now(),trabId:t.id,recId:t.id,recData:iso,
+        data:iso, desc:`${t.nome} · ${rot} ${iso.split('-').reverse().slice(0,2).join('/')}`,
+        familia:'Mão de obra', cat:r.cat||'c07', forn:t.nome,
+        qtd:1, unit:+r.valor, total:+r.valor,
+        pag:'A pagar', nf:'', anexos:[], obs:r.obs||'Pagamento recorrente',
+        tipoPg:'recorrente', ctrl:false,qtdRec:0,baixas:[],pagamentos:[]});
+      n++;
+    });
+  });
+  if(n){ salvar(); }
+  return n;
+}
+function pintaRec(){
+  const on=document.getElementById('t_rec').checked;
+  const box=document.getElementById('recBox');
+  box.style.display=on?'block':'none';
+  if(on)atualizarPreviaRec();
+}
+function atualizarPreviaRec(){
+  const el=document.getElementById('recPrev'); if(!el)return;
+  const rec={on:true,freq:val('t_freq'),ini:val('t_rini'),fim:val('t_rfim'),valor:moeda2num(val('t_rval'))};
+  const prox=proximasRecorrentes(rec,3);
+  const venc=rec.ini?datasRecorrentes(rec,hoje()).length:0;
+  el.innerHTML= rec.ini
+    ? `${venc?`<b>${venc} pagamento(s) já vencido(s)</b> serão criados como "a pagar".<br>`:''}
+       Próximos: ${prox.length?prox.map(d=>d.split('-').reverse().join('/')).join(' · '):'—'}`
+    : 'Informe a data do primeiro pagamento.';
+}
+
 function abrirTrabalhador(id){
   const t=equipe().find(x=>x.id===id)||{id:'',nome:'',funcao:'',diaria:0};
   abrir(`<h2>${id?'Editar trabalhador':'Novo trabalhador'}</h2>
   <label>Nome</label><input id="t_nome" data-cap="1" value="${t.nome}" placeholder="Ex: João">
   <label>Função</label><input id="t_func" data-cap="1" value="${t.funcao||''}" placeholder="Pedreiro, servente, ajudante...">
   <label>Valor da diária</label><input id="t_diaria" inputmode="numeric" value="${t.diaria?num2moeda(t.diaria):''}" placeholder="0,00" oninput="onMoedaInput(this)">
+  <p class="hint">Deixe em branco para quem é pago por período fixo, e use o pagamento recorrente abaixo.</p>
+  <div class="divider"></div>
+  <label class="chkline"><input type="checkbox" id="t_rec" ${t.rec&&t.rec.on?'checked':''} onchange="pintaRec()">
+    Pagamento recorrente</label>
+  <div id="recBox" style="display:${t.rec&&t.rec.on?'block':'none'}">
+    <div class="row2">
+      <div><label style="margin-top:0">Valor</label>
+        <input id="t_rval" inputmode="numeric" value="${t.rec&&t.rec.valor?num2moeda(t.rec.valor):''}" placeholder="0,00"
+          oninput="onMoedaInput(this);atualizarPreviaRec()"></div>
+      <div><label style="margin-top:0">Se repete</label>
+        <select id="t_freq" onchange="atualizarPreviaRec()">
+          ${FREQS.map(([v,n])=>`<option value="${v}" ${t.rec&&t.rec.freq===v?'selected':''}>${n}</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="row2">
+      <div><label style="margin-top:0">Primeiro pagamento</label>
+        <input type="date" id="t_rini" value="${t.rec&&t.rec.ini?t.rec.ini:hoje()}" onchange="atualizarPreviaRec()"></div>
+      <div><label style="margin-top:0">Até (opcional)</label>
+        <input type="date" id="t_rfim" value="${t.rec&&t.rec.fim?t.rec.fim:''}" onchange="atualizarPreviaRec()"></div>
+    </div>
+    <label>Categoria</label>
+    <select id="t_rcat">${CATS_AZ.map(c=>`<option value="${c.id}" ${((t.rec&&t.rec.cat)||'c07')===c.id?'selected':''}>${c.n}</option>`).join('')}</select>
+    <label>Observação</label>
+    <input id="t_robs" data-cap="1" value="${(t.rec&&t.rec.obs||'').replace(/"/g,'&quot;')}" placeholder="Ex: acompanhamento de obra">
+    <p class="hint" id="recPrev"></p>
+  </div>
   <div style="height:14px"></div>
   <button class="btn" onclick="salvarTrabalhador('${t.id}')">Salvar</button>
   ${id?`<button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="excluirTrabalhador('${t.id}')">Excluir trabalhador</button>`:''}
-  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  <button class="btn ghost mini" style="margin-top:9px" onclick="${PG_ABERTO?'PG_ABERTO=false;desenharPagamentos(true)':'fechar()'}">
+    ${PG_ABERTO?'Voltar aos pagamentos':'Cancelar'}</button>`);
 }
 function salvarTrabalhador(id){
   const nome=val('t_nome').trim();
   if(!nome){toast('Informe o nome.');return}
-  const dados={nome:capNomes(nome),funcao:capNomes(val('t_func')),diaria:moeda2num(val('t_diaria')),at:Date.now()};
-  if(id){Object.assign(equipe().find(x=>x.id===id),dados)}
+  const recOn=document.getElementById('t_rec')&&document.getElementById('t_rec').checked;
+  const dados={nome:capNomes(nome),funcao:capNomes(val('t_func')),diaria:moeda2num(val('t_diaria')),at:Date.now(),
+    rec:recOn?{on:true,valor:moeda2num(val('t_rval')),freq:val('t_freq'),ini:val('t_rini'),
+      fim:val('t_rfim'),cat:val('t_rcat')||'c07',obs:capNomes(val('t_robs'))}:{on:false}};
+  let renomeados=0;
+  if(id){
+    const t=equipe().find(x=>x.id===id);
+    const antigo=String(t.nome||'').trim();
+    Object.assign(t,dados);
+    /* trocar o nome tem que valer para os pagamentos já lançados, senão o relatório fica com o nome velho */
+    if(antigo&&alfa2(antigo)!==alfa2(dados.nome)){
+      DB.lanc.filter(l=>l.trabId===id).forEach(l=>{
+        let m=false;
+        if(alfa2(l.forn||'')===alfa2(antigo)){ l.forn=dados.nome; m=true; }
+        if(String(l.desc||'').includes(antigo)){ l.desc=l.desc.split(antigo).join(dados.nome); m=true; }
+        if(m){ l.at=Date.now(); renomeados++; }
+      });
+    }
+  }
   else{equipe().push({id:uid(),...dados})}
-  salvar();fechar();render();toast('Trabalhador salvo');
+  salvar();
+  const nRec=gerarRecorrentes();
+  if(PG_ABERTO){ PG_ABERTO=false; render(); desenharPagamentos(true); }
+  else { fechar(); render(); }
+  toast('Trabalhador salvo'+(renomeados?` · ${renomeados} renomeado(s)`:'')+(nRec?` · ${nRec} pagamento(s) recorrente(s) criado(s)`:''));
 }
+let PG_ABERTO=false;
+function editarColabDaGrade(id){ PG_ABERTO=true; abrirTrabalhador(id); }
 function excluirTrabalhador(id){
   const temLanc=DB.lanc.some(l=>l.trabId===id);
   confirmar('Excluir trabalhador',
