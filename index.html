@@ -252,6 +252,25 @@ select[multiple],select[size]{background-image:none;padding-right:12px}
 .selopt:hover{background:var(--surface-2)}
 .selopt.sel{background:var(--teal);color:#fff;font-weight:600}
 
+/* grade de pagamentos da equipe */
+.pg-wrap{margin-top:10px;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:52vh}
+.pg-tab{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+.pg-tab th,.pg-tab td{padding:7px 5px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+.pg-tab thead th{position:sticky;top:0;background:var(--surface-2);z-index:2;font-size:10px;
+  text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);font-weight:700}
+.pg-tab thead th span{display:block;font-size:8.5px;opacity:.7}
+.pg-tab th.pg-nome,.pg-tab td.pg-nome{position:sticky;left:0;background:var(--surface);z-index:1;
+  text-align:left;min-width:150px;max-width:180px;white-space:normal}
+.pg-tab thead th.pg-nome{z-index:3;background:var(--surface-2)}
+.pg-tab td.pg-nome b{display:block;font-size:13.5px;line-height:1.2}
+.pg-tab td.pg-nome small{display:block;font-size:10.5px;color:var(--ink-2)}
+.pg-tab tr.ativa td.pg-nome{box-shadow:inset 3px 0 0 var(--teal)}
+.pg-tab td.pg-dias{font-weight:700}
+.pg-tab td.pg-val{position:sticky;right:0;background:var(--surface);min-width:112px}
+.pg-tab thead th.pg-val{position:sticky;right:0;background:var(--surface-2);z-index:3}
+.pg-tab td.pg-val input{padding:7px 8px;font-size:13.5px;text-align:right}
+.pg-tab input[type=checkbox]{margin:0}
+
 /* formulários compactos: menos altura, mais campos por linha */
 .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
 @media(max-width:440px){.row3{grid-template-columns:1fr 1fr}.row3>*:first-child{grid-column:1/-1}}
@@ -633,7 +652,10 @@ a{color:var(--teal)}
 <!-- ============ FOTOS ============ -->
 <!-- ============ EQUIPE / MÃO DE OBRA ============ -->
 <section class="view" id="v-equipe">
-  <button class="btn" onclick="abrirTrabalhador()">+ Novo trabalhador</button>
+  <button class="btn" onclick="abrirPagamentos()">💰 Lançar pagamentos</button>
+  <div class="acoes">
+    <button class="btn soft" onclick="abrirTrabalhador()"><span class="ic">＋</span>Novo trabalhador</button>
+  </div>
   <div class="card" style="margin-top:12px">
     <h3>Resumo da mão de obra</h3>
     <div id="equipeResumo"></div>
@@ -5286,7 +5308,7 @@ function renderEquipe(){
     `<div class="stat"><span>Total em mão de obra</span><b class="mono">${brl(totalMO)}</b></div>
      <div class="stat"><span>Diárias lançadas</span><b class="mono">${semanas.reduce((s,l)=>s+(+l.qtd||0),0).toLocaleString('pt-BR')}</b></div>
      ${aberto>0?`<div class="stat"><span>A pagar</span><b class="mono" style="color:var(--red)">${brl(aberto)}</b></div>`:''}
-     <p class="hint">Cada semana lançada vira um gasto na etapa Mão de obra, entrando no total da obra e nas contas a pagar.</p>`;
+     <p class="hint">Use "Lançar pagamentos" lá em cima para resolver a equipe inteira de uma vez: escolha o período, marque os dias de cada um e lance tudo numa tela só.</p>`;
 
   document.getElementById('equipeList').innerHTML= eq.length? eq.map(t=>{
     const sem=DB.lanc.filter(l=>l.trabId===t.id).sort((a,b)=>b.data.localeCompare(a.data));
@@ -5302,7 +5324,7 @@ function renderEquipe(){
       <div class="stat" style="margin-top:10px"><span>Total pago a ele</span><b class="mono">${brl(totalPagoTrab(t.id))}</b></div>
       <div class="stat"><span>Diárias trabalhadas</span><b class="mono">${diasTrab(t.id).toLocaleString('pt-BR')}</b></div>
       ${ab>0?`<div class="stat"><span>Em aberto</span><b class="mono" style="color:var(--red)">${brl(ab)}</b></div>`:''}
-      <button class="btn" style="margin-top:10px" onclick="abrirSemana('${t.id}')">+ Lançar semana</button>
+      <button class="btn ghost mini" style="margin-top:10px" onclick="abrirSemana('${t.id}')">+ Lançar semana só dele</button>
       ${sem.length?`<div style="margin-top:10px">${sem.slice(0,6).map(l=>
         `<div class="item" onclick="verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
           <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
@@ -5313,6 +5335,198 @@ function renderEquipe(){
     </div>`;
   }).join('') : '<div class="card"><div class="empty"><b>Nenhum trabalhador cadastrado</b><p>Cadastre o pedreiro, servente ou ajudante e o valor da diária para controlar a mão de obra.</p></div></div>';
 }
+/* ---------- pagamentos da equipe: uma tela, uma linha por colaborador ---------- */
+let PG={tipo:'semanal',ini:'',fim:'',linhas:{}};
+const DIA_SEM=['dom','seg','ter','qua','qui','sex','sáb'];
+function diasDoPeriodo(ini,fim){
+  const out=[]; if(!ini||!fim)return out;
+  let d=new Date(ini+'T12:00:00'); const f=new Date(fim+'T12:00:00');
+  let guarda=0;
+  while(d<=f&&guarda++<70){
+    if(d.getDay()!==0) out.push({iso:new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10),
+      dia:d.getDate(),sem:DIA_SEM[d.getDay()]});
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+function periodoPadrao(tipo,base){
+  const hj=base?new Date(base+'T12:00:00'):new Date();
+  const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  if(tipo==='diario')return {ini:iso(hj),fim:iso(hj)};
+  if(tipo==='semanal'){
+    const seg=new Date(hj); seg.setDate(hj.getDate()-((hj.getDay()+6)%7));
+    const sab=new Date(seg); sab.setDate(seg.getDate()+5);
+    return {ini:iso(seg),fim:iso(sab)};
+  }
+  if(tipo==='quinzenal'){
+    const seg=new Date(hj); seg.setDate(hj.getDate()-((hj.getDay()+6)%7)-7);
+    const sab=new Date(seg); sab.setDate(seg.getDate()+12);
+    return {ini:iso(seg),fim:iso(sab)};
+  }
+  if(tipo==='mensal'){
+    const a=new Date(hj.getFullYear(),hj.getMonth(),1), b=new Date(hj.getFullYear(),hj.getMonth()+1,0);
+    return {ini:iso(a),fim:iso(b)};
+  }
+  return {ini:iso(hj),fim:iso(hj)};   /* adiantamento e compra: data única */
+}
+const PG_SEM_DIAS=t=>t==='adiantamento'||t==='compra';
+
+function abrirPagamentos(){
+  if(!equipe().length){
+    abrir(`<h2>Pagamentos da equipe</h2>
+    <p class="sub">Cadastre os colaboradores antes de lançar pagamentos.</p>
+    <button class="btn" style="margin-top:10px" onclick="abrirTrabalhador()">+ Novo trabalhador</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+    return;
+  }
+  const p=periodoPadrao(PG.tipo);
+  if(!PG.ini){PG.ini=p.ini;PG.fim=p.fim}
+  PG.linhas={};
+  desenharPagamentos();
+}
+function mudarTipoPg(){
+  PG.tipo=val('pg_tipo');
+  const p=periodoPadrao(PG.tipo);
+  PG.ini=p.ini; PG.fim=p.fim;
+  PG.linhas={};
+  desenharPagamentos();
+}
+function mudarDatasPg(){ PG.ini=val('pg_ini'); PG.fim=val('pg_fim'); desenharPagamentos(true); }
+
+function desenharPagamentos(manterMarcas){
+  const dias=PG_SEM_DIAS(PG.tipo)?[]:diasDoPeriodo(PG.ini,PG.fim);
+  const eq=equipe();
+  if(!manterMarcas)PG.linhas={};
+  eq.forEach(t=>{ PG.linhas[t.id]=PG.linhas[t.id]||{on:false,dias:{},valor:0,manual:false,obs:''}; });
+
+  const cab=dias.map(d=>`<th title="${d.iso}"><span>${d.sem}</span>${d.dia}</th>`).join('');
+  const linha=t=>{
+    const L=PG.linhas[t.id];
+    const cels=dias.map(d=>`<td><input type="checkbox" class="pgD" data-t="${t.id}" data-d="${d.iso}"
+      ${L.dias[d.iso]?'checked':''} onchange="marcarDiaPg('${t.id}','${d.iso}',this.checked)"></td>`).join('');
+    const n=Object.values(L.dias).filter(Boolean).length;
+    return `<tr class="${L.on?'ativa':''}">
+      <td class="pg-nome">
+        <label style="display:flex;align-items:center;gap:7px;margin:0">
+          <input type="checkbox" ${L.on?'checked':''} onchange="ligarLinhaPg('${t.id}',this.checked)">
+          <span><b>${t.nome}</b><small>${t.funcao||''}${t.diaria?' · '+brl(t.diaria)+'/dia':''}</small></span>
+        </label></td>
+      ${cels}
+      ${dias.length?`<td class="pg-dias mono">${n}</td>`:''}
+      <td class="pg-val"><input inputmode="numeric" value="${L.valor?num2moeda(L.valor):''}" placeholder="0,00"
+        oninput="onMoedaInput(this);valorLinhaPg('${t.id}',this.value)"></td>
+    </tr>`;
+  };
+  const total=Object.values(PG.linhas).filter(l=>l.on).reduce((s,l)=>s+(+l.valor||0),0);
+  const nAtivas=Object.values(PG.linhas).filter(l=>l.on&&(+l.valor>0)).length;
+
+  abrir(`<h2>Pagamentos da equipe</h2>
+  <p class="sub">Marque quem trabalhou e em quais dias. O valor é calculado pela diária e pode ser ajustado à mão.</p>
+  <div class="row3">
+    <div><label style="margin-top:0">Tipo</label>
+      <select id="pg_tipo" onchange="mudarTipoPg()">
+        ${[['diario','Diário'],['semanal','Semanal'],['quinzenal','Quinzenal'],['mensal','Mensal'],
+           ['adiantamento','Adiantamento'],['compra','Pedido de compra']]
+          .map(([v,n])=>`<option value="${v}" ${PG.tipo===v?'selected':''}>${n}</option>`).join('')}
+      </select></div>
+    <div><label style="margin-top:0">${PG_SEM_DIAS(PG.tipo)?'Data':'Início'}</label>
+      <input type="date" id="pg_ini" value="${PG.ini}" onchange="mudarDatasPg()"></div>
+    <div><label style="margin-top:0">${PG_SEM_DIAS(PG.tipo)?'Data':'Fim'}</label>
+      <input type="date" id="pg_fim" value="${PG.fim}" onchange="mudarDatasPg()" ${PG_SEM_DIAS(PG.tipo)?'disabled':''}></div>
+  </div>
+  ${PG_SEM_DIAS(PG.tipo)?`<label>Descrição</label>
+    <input id="pg_obs" placeholder="${PG.tipo==='compra'?'Ex: material que o colaborador vai comprar':'Ex: adiantamento da semana'}" data-cap="1">`:''}
+  ${dias.length?`<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">
+    <button class="btn ghost mini" style="width:auto;padding:7px 11px" onclick="marcarTodosPg(true)">Todos trabalharam</button>
+    <button class="btn ghost mini" style="width:auto;padding:7px 11px" onclick="marcarTodosPg(false)">Limpar</button>
+  </div>`:''}
+  <div class="pg-wrap">
+    <table class="pg-tab">
+      <thead><tr><th class="pg-nome">Colaborador</th>${cab}${dias.length?'<th class="pg-dias">Dias</th>':''}<th class="pg-val">Valor</th></tr></thead>
+      <tbody>${eq.map(linha).join('')}</tbody>
+    </table>
+  </div>
+  <div class="stat" style="margin-top:10px"><span>${nAtivas} pagamento(s) a lançar</span>
+    <b class="mono" style="font-size:17px">${brl(total)}</b></div>
+  <label class="chkline"><input type="checkbox" id="pg_pago" checked> Já paguei</label>
+  <button class="btn" style="margin-top:9px" onclick="salvarPagamentos()">Lançar pagamentos</button>
+  <p class="hint">Cada colaborador marcado vira um lançamento na etapa Mão de obra. Nada do que já foi lançado é alterado.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function ligarLinhaPg(id,on){
+  const L=PG.linhas[id]; if(!L)return;
+  L.on=on;
+  if(on&&!PG_SEM_DIAS(PG.tipo)&&!Object.values(L.dias).some(Boolean)){
+    diasDoPeriodo(PG.ini,PG.fim).forEach(d=>{ if(d.sem!=='sáb')L.dias[d.iso]=true; });
+    recalcLinhaPg(id);
+  }
+  desenharPagamentos(true);
+}
+function marcarDiaPg(id,iso,on){
+  const L=PG.linhas[id]; if(!L)return;
+  L.dias[iso]=on; if(on)L.on=true;
+  recalcLinhaPg(id);
+  desenharPagamentos(true);
+}
+function marcarTodosPg(on){
+  const dias=diasDoPeriodo(PG.ini,PG.fim);
+  equipe().forEach(t=>{
+    const L=PG.linhas[t.id];
+    L.on=on;
+    L.dias={}; if(on)dias.forEach(d=>{ if(d.sem!=='sáb')L.dias[d.iso]=true; });
+    recalcLinhaPg(t.id);
+  });
+  desenharPagamentos(true);
+}
+function recalcLinhaPg(id){
+  const L=PG.linhas[id], t=equipe().find(x=>x.id===id);
+  if(!L||!t||L.manual)return;
+  const n=Object.values(L.dias).filter(Boolean).length;
+  L.valor=+(n*(+t.diaria||0)).toFixed(2);
+}
+function valorLinhaPg(id,txt){
+  const L=PG.linhas[id]; if(!L)return;
+  L.valor=moeda2num(txt); L.manual=true; L.on=true;
+  const el=document.querySelector('.pg-tab tbody');
+  const tot=Object.values(PG.linhas).filter(x=>x.on).reduce((s,x)=>s+(+x.valor||0),0);
+  const st=document.querySelector('.sheet .stat b.mono');
+  if(st)st.textContent=brl(tot);
+}
+function salvarPagamentos(){
+  const pago=document.getElementById('pg_pago').checked;
+  const semDias=PG_SEM_DIAS(PG.tipo);
+  const obs=semDias?capNomes(val('pg_obs')):'';
+  const rot={diario:'diária',semanal:'semana',quinzenal:'quinzena',mensal:'mês',
+    adiantamento:'adiantamento',compra:'pedido de compra'}[PG.tipo];
+  const fmt=d=>d.split('-').reverse().slice(0,2).join('/');
+  let n=0,soma=0;
+  equipe().forEach(t=>{
+    const L=PG.linhas[t.id];
+    if(!L||!L.on)return;
+    const total=+L.valor||0;
+    if(!(total>0))return;
+    const marcados=Object.keys(L.dias).filter(k=>L.dias[k]).sort();
+    const qtd=semDias?1:marcados.length;
+    if(!semDias&&!qtd)return;
+    const dataLanc=semDias?PG.ini:marcados[marcados.length-1];
+    const desc=semDias
+      ? `${t.nome} · ${rot}${obs?' · '+obs:''} ${fmt(PG.ini)}`
+      : (PG.tipo==='diario'
+          ? `${t.nome} · ${rot} ${fmt(marcados[0])}`
+          : `${t.nome} · ${rot} ${fmt(marcados[0])} a ${fmt(marcados[marcados.length-1])}`);
+    DB.lanc.push({id:uid(),at:Date.now(),trabId:t.id,
+      data:dataLanc, desc, familia:'Mão de obra', cat:'c07', forn:t.nome,
+      qtd, unit:+(total/qtd).toFixed(2), total,
+      pag:pago?'Pago':'A pagar', nf:'', anexos:[],
+      obs:semDias?obs:`${marcados.length} dia(s): ${marcados.map(fmt).join(', ')}`,
+      tipoPg:PG.tipo, ctrl:false,qtdRec:0,baixas:[],pagamentos:[]});
+    n++; soma+=total;
+  });
+  if(!n){toast('Marque ao menos um colaborador com valor.');return}
+  salvar(); fechar(); render();
+  toast(`${n} pagamento(s) lançado(s) · ${brl(soma)}`);
+}
+
 function abrirTrabalhador(id){
   const t=equipe().find(x=>x.id===id)||{id:'',nome:'',funcao:'',diaria:0};
   abrir(`<h2>${id?'Editar trabalhador':'Novo trabalhador'}</h2>
