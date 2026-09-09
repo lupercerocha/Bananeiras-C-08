@@ -1836,7 +1836,7 @@ function verCategoria(catId){
     return `<div class="item" onclick="verGasto('${l.id}')">
       <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
       <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-        <small>${l.forn||'sem fornecedor'}${div?` · dividido em ${x.nPartes} etapas · item inteiro ${brl(x.totalItem)}`:''}</small></div>
+        <small>${l.forn||'sem fornecedor'}${div?` · dividido em ${x.nPartes} etapas · item inteiro ${brl(x.totalItem)}`:''}${seloDig(l)}</small></div>
       <div class="val"><span class="mono">${brl(x.valor)}</span>
         ${div?`<div><span class="tag">${x.pct.toFixed(1)}% do item</span></div>`:''}</div></div>`;
   }).join(''):'<div class="empty">Nada lançado nesta categoria</div>'}
@@ -1846,6 +1846,13 @@ function verCategoria(catId){
 /* quando o lançamento foi digitado (cai na data da compra se for registro antigo, sem carimbo) */
 const dataDigitada=l=>(+l.at>0)?new Date(+l.at).toISOString().slice(0,10):l.data;
 const horaDigitada=l=>(+l.at>0)?new Date(+l.at).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—';
+/* selo discreto de quando foi digitado — só aparece quando difere da data do próprio registro */
+function seloDig(o,dataRef){
+  if(!(+o.at>0))return '';
+  const d=dataDigitada(o);
+  if(d===(dataRef||o.data))return '';
+  return ` · <span style="color:var(--ink-2)">digitado ${d.split('-').reverse().slice(0,2).join('/')}</span>`;
+}
 function digitadosEm(diasAtras){
   const d=new Date(); d.setDate(d.getDate()-diasAtras);
   const iso=new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
@@ -1904,7 +1911,7 @@ function renderGastos(){
     return `<div class="item" onclick="verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
       <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span></div>
       <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-        <small>${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}${porDigitacao?` · <span style="color:var(--teal)">compra de ${l.data.split('-').reverse().slice(0,2).join('/')}</span>`:''}</small></div>
+        <small>${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}${porDigitacao?` · <span style="color:var(--teal)">compra de ${l.data.split('-').reverse().slice(0,2).join('/')}</span>`:seloDig(l)}</small></div>
       <div class="val"><span class="mono">${brl(l.total)}</span>
         ${ab?`<div><span class="tag pend">${pp>0?'falta '+brl(saldoAPagar(l)):'a pagar'}</span></div>`:''}</div></div>`;
   }).join('')||'<div class="empty"><b>Nenhum gasto neste filtro</b><p>Ajuste os filtros acima.</p></div>';
@@ -1948,7 +1955,7 @@ function renderGastosAgrupado(L){
           return `<div class="item" onclick="event.stopPropagation();verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
             <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span></div>
             <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-              <small>${porForn?cat(l.cat).n:(l.forn||'sem fornecedor')}${(+l.qtd>1)?' · '+(+l.qtd).toLocaleString('pt-BR')+' × '+brl(l.unit):''}</small></div>
+              <small>${porForn?cat(l.cat).n:(l.forn||'sem fornecedor')}${(+l.qtd>1)?' · '+(+l.qtd).toLocaleString('pt-BR')+' × '+brl(l.unit):''}${seloDig(l)}</small></div>
             <div class="val"><span class="mono">${brl(l.total)}</span>
               ${ab?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`;
         }).join('')}
@@ -2027,7 +2034,7 @@ function renderCot(){
     return dd<0?'<span class="tag pend">vencida</span>':`<span class="tag ${dd<=2?'pend':''}">vence em ${dd}d</span>`;
   };
   const linhaCot=c=>`<div class="item" onclick="verCot('${c.id}')">
-      <div class="mid"><b>${c.item}</b><small>${c.forn||'sem fornecedor'} ${tagVal(c)}</small></div>
+      <div class="mid"><b>${c.item}</b><small>${c.forn||'sem fornecedor'} ${tagVal(c)}${c.conc?` · <span class="tag">${c.conc}</span>`:''}${seloDig(c)}</small></div>
       <div class="val mono">${+c.total>0?brl(c.total):'<span class="tag">a cotar</span>'}</div></div>`;
 
   const blocoConc=g=>{
@@ -2930,7 +2937,7 @@ function verNota(id){
   const l=n.lancId?DB.lanc.find(x=>x.id===n.lancId):null;
   const soma=(n.itens||[]).reduce((s,i)=>s+(+i.t||0),0);
   abrir(`<h2>${n.emit}</h2>
-  <p class="sub">Nota ${n.numero||'s/nº'}${n.serie?' · série '+n.serie:''} · ${n.data.split('-').reverse().join('/')}
+  <p class="sub">Nota ${n.numero||'s/nº'}${n.serie?' · série '+n.serie:''} · ${n.data.split('-').reverse().join('/')}${(+n.at>0)?` · registrada em ${horaDigitada(n)}`:''}
     · <span class="tag">${n.tipo==='xml'?'XML oficial':n.tipo==='pdf'?'lida do PDF':n.tipo==='foto'?'foto':'manual'}</span></p>
   <div class="card" style="box-shadow:none;margin-top:10px">
     ${(n.itens||[]).length?(n.itens||[]).map(i=>`<div class="stat" style="align-items:flex-start">
@@ -3381,7 +3388,7 @@ function renderNotas(){
     ${L.length?L.map(n=>`<div class="item" onclick="verNota('${n.id}')">
       <div class="dt"><b class="mono">${dia(n.data).d}</b><span>${dia(n.data).m}</span></div>
       <div class="mid"><b>${n.emit}</b>
-        <small>nº ${n.numero||'s/nº'} · ${(n.itens||[]).length} item(ns)${n.lancId?'':' · <span style="color:var(--amber)">sem gasto vinculado</span>'}${(n.arqLocal||n.arqPath||n.img)?' · 📄':''}${(!n.link&&!n.img&&!n.xml&&!n.arqPath&&!n.arqLocal)?' · <span style="color:var(--red)">sem arquivo</span>':''}</small></div>
+        <small>nº ${n.numero||'s/nº'} · ${(n.itens||[]).length} item(ns)${seloDig(n)}${n.lancId?'':' · <span style="color:var(--amber)">sem gasto vinculado</span>'}${(n.arqLocal||n.arqPath||n.img)?' · 📄':''}${(!n.link&&!n.img&&!n.xml&&!n.arqPath&&!n.arqLocal)?' · <span style="color:var(--red)">sem arquivo</span>':''}</small></div>
       <div class="val mono">${brl(n.total)}</div></div>`).join('')
       :'<div class="empty"><b>Nenhuma nota guardada</b><p>Envie o XML da NF-e (extração exata), o PDF do DANFE ou uma foto da nota.</p></div>'}
   </div>
@@ -3617,7 +3624,7 @@ function gruposEtapa(fe,busca,ft){
       ${linhas.map(l=>`<div class="item" onclick="verGasto('${l.id}')">
         <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
         <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-          <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.forn?' · '+l.forn:''}${l.dividido?' · <span style="color:var(--amber)">parte de compra dividida</span>':''}</small></div>
+          <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.forn?' · '+l.forn:''}${l.dividido?' · <span style="color:var(--amber)">parte de compra dividida</span>':''}${seloDig(l)}</small></div>
         <div class="val mono">${brl(l.valorEtapa)}</div></div>`).join('')}
       </div>`;
   }).join('') || (etapas.length?'':'<div class="card"><div class="empty">Nenhuma etapa corresponde ao filtro</div></div>');
@@ -3806,7 +3813,7 @@ function verMes(m){
   <div class="card" style="box-shadow:none;margin-top:10px">
     ${L.map(l=>`<div class="item" onclick="verGasto('${l.id}')">
       <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
-      <div class="mid"><b>${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}<small>${cat(l.cat).n}${l.forn?' · '+l.forn:''}</small></div>
+      <div class="mid"><b>${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}<small>${cat(l.cat).n}${l.forn?' · '+l.forn:''}${seloDig(l)}</small></div>
       <div class="val mono">${brl(l.total)}</div></div>`).join('')}
     <div class="stat" style="border-top:1px solid var(--line);border-bottom:0;margin-top:4px;padding-top:9px">
       <span style="font-weight:700">Total do mês</span><b class="mono" style="font-size:17px">${brl(tot)}</b></div>
@@ -4572,7 +4579,7 @@ function abrirConfirmarCompra(c){
   panel._itC=JSON.parse(JSON.stringify(base)).map(i=>({...i,cats:[i.cat||'c00']}));
   panel._cotOrig=c;
   abrir(`<h2>Lançar compra</h2>
-  <p class="sub">${c.conc?`⚖ ${c.conc} · `:''}${c.forn||'Sem fornecedor'} · marque em quais etapas cada item entra</p>
+  <p class="sub">${c.conc?`⚖ ${c.conc} · `:''}${c.forn||'Sem fornecedor'}${(+c.at>0)?` · digitada em ${horaDigitada(c)}`:''} · marque em quais etapas cada item entra</p>
   ${+c.desconto>0?`<p class="hint" style="margin-top:0">Desconto de ${brl(c.desconto)} já dividido entre os itens — a soma dos lançamentos fecha em ${brl(c.total)}.</p>`:''}
   <div id="itensCompra"></div>
   <label style="display:flex;align-items:center;gap:9px;text-transform:none;font-size:14px;letter-spacing:0;margin-top:10px">
@@ -5453,7 +5460,7 @@ function renderEquipe(){
         ${pg.length?pg.map(l=>`<div class="item" data-gasto="${l.id}" ${!isPago(l)?'style="opacity:.72"':''}>
           <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
           <div class="mid"><b>${l.desc}</b>
-            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.obs?' · '+l.obs.slice(0,70):''}</small></div>
+            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${seloDig(l)}${l.obs?' · '+l.obs.slice(0,60):''}</small></div>
           <div class="val"><span class="mono">${brl(l.total)}</span>
             ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
           :'<p class="hint">Nenhum pagamento neste período.</p>'}
@@ -5497,7 +5504,7 @@ function verTodosPagamentos(){
   </div>
   ${L.length?L.map(l=>`<div class="item" onclick="verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
     <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
-    <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.obs?' · '+l.obs.slice(0,70):''}</small></div>
+    <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${seloDig(l)}${l.obs?' · '+l.obs.slice(0,60):''}</small></div>
     <div class="val"><span class="mono">${brl(l.total)}</span>
       ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
    :'<p class="hint">Nenhum pagamento neste filtro.</p>'}
