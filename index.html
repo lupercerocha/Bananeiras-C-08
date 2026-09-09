@@ -570,6 +570,11 @@ a{color:var(--teal)}
       <option value="pago">Só pagos</option>
       <option value="aberto">Só a pagar</option>
     </select>
+    <label style="margin-top:9px">A data do período é</label>
+    <select id="fBase" onchange="renderGastos()">
+      <option value="compra">Data da compra</option>
+      <option value="digitacao">Data em que eu digitei</option>
+    </select>
     <label style="margin-top:9px">Período</label>
     <div class="row2">
       <input type="date" id="fDataIni">
@@ -584,6 +589,8 @@ a{color:var(--teal)}
       <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('mes')">Este mês</button>
       <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('ano')">Este ano</button>
       <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('tudo')">Desde o início</button>
+      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="digitadosEm(0)">Digitei hoje</button>
+      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="digitadosEm(1)">Ontem</button>
     </div>
     <label class="chkline" style="margin-top:8px;display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="fSemPeriodo" style="width:auto"> Todos os períodos
@@ -676,11 +683,14 @@ a{color:var(--teal)}
       <input type="date" id="eqIni"><input type="date" id="eqFim">
     </div>
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoEquipe('mes')">Este mês</button>
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoEquipe('mespassado')">Mês passado</button>
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoEquipe('tudo')">Toda a obra</button>
+      <button class="btn ghost mini" id="eqBmes" style="width:auto;padding:7px 12px" onclick="periodoEquipe('mes')">Este mês</button>
+      <button class="btn ghost mini" id="eqBpas" style="width:auto;padding:7px 12px" onclick="periodoEquipe('mespassado')">Mês passado</button>
+      <button class="btn ghost mini" id="eqBtudo" style="width:auto;padding:7px 12px" onclick="periodoEquipe('tudo')">Toda a obra</button>
     </div>
+    <label style="margin-top:10px">Colaborador</label>
+    <select id="eqQuem"><option value="">Todos</option></select>
     <div id="equipeResumo" style="margin-top:10px"></div>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="verTodosPagamentos()">📋 Ver todos os pagamentos</button>
   </div>
   <div id="equipeList"></div>
 </section>
@@ -1833,6 +1843,19 @@ function verCategoria(catId){
   ${dividos?'<p class="hint">Nas compras divididas, o valor mostrado é só a parte que pertence a esta categoria. Toque no lançamento para ver a divisão completa.</p>':''}
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
+/* quando o lançamento foi digitado (cai na data da compra se for registro antigo, sem carimbo) */
+const dataDigitada=l=>(+l.at>0)?new Date(+l.at).toISOString().slice(0,10):l.data;
+const horaDigitada=l=>(+l.at>0)?new Date(+l.at).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—';
+function digitadosEm(diasAtras){
+  const d=new Date(); d.setDate(d.getDate()-diasAtras);
+  const iso=new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  document.getElementById('fBase').value='digitacao';
+  const a=document.getElementById('fDataIni'), b=document.getElementById('fDataFim'), s=document.getElementById('fSemPeriodo');
+  s.checked=false; a.disabled=b.disabled=false;
+  a.value=iso; b.value=iso; a.dataset.tocado='1'; b.dataset.tocado='1';
+  atualizarSelects(document);
+  renderGastos();
+}
 function renderGastos(){
   const sel=document.getElementById('fCat');
   if(sel.options.length!==CATS_AZ.length+1){
@@ -1848,9 +1871,11 @@ function renderGastos(){
   const fc=sel.value, fg=document.getElementById('fGrupo').value, fs=document.getElementById('fSit').value;
   const busca=alfa2(document.getElementById('fBusca').value);
   const semPeriodo=semEl.checked, dIni=iniEl.value, dFim=fimEl.value;
+  const porDigitacao=(document.getElementById('fBase')||{}).value==='digitacao';
+  const dataFiltro=l=>porDigitacao?dataDigitada(l):l.data;
   let L=DB.lanc.filter(l=>(!fc||l.cat===fc)&&(!fg||cat(l.cat).g===fg)
         &&(!fs||(fs==='pago'?isPago(l):!isPago(l)))
-        &&(semPeriodo||((!dIni||l.data>=dIni)&&(!dFim||l.data<=dFim))));
+        &&(semPeriodo||((!dIni||dataFiltro(l)>=dIni)&&(!dFim||dataFiltro(l)<=dFim))));
   if(busca){
     L=L.filter(l=>{
       const alvo=[l.desc,l.forn,l.nf,l.obs,cat(l.cat).n,l.pag,brl(l.total),l.total,
@@ -1859,7 +1884,7 @@ function renderGastos(){
       return alfa2(alvo).includes(busca);
     });
   }
-  L=L.sort((a,b)=>b.data.localeCompare(a.data));
+  L=L.sort((a,b)=>porDigitacao?(+b.at||0)-(+a.at||0):b.data.localeCompare(a.data));
   ['lista','forn','cat'].forEach(v=>{
     const b=document.getElementById(v==='lista'?'vwLista':v==='forn'?'vwForn':'vwCat');
     if(b){ b.style.background=VISAO_G===v?'var(--teal)':''; b.style.color=VISAO_G===v?'#fff':''; b.style.borderColor=VISAO_G===v?'var(--teal)':''; }
@@ -1867,7 +1892,8 @@ function renderGastos(){
   document.getElementById('gTotal').textContent=brl(L.reduce((s,l)=>s+ +l.total,0));
   const fmt=d=>d?d.split('-').reverse().slice(0,2).join('/'):'';
   document.getElementById('gTotalLbl').textContent=
-    semPeriodo?'Total de todos os períodos':`Total de ${fmt(dIni)||'início'} a ${fmt(dFim)||'hoje'}`;
+    (semPeriodo?'Total de todos os períodos':`Total de ${fmt(dIni)||'início'} a ${fmt(dFim)||'hoje'}`)
+    +(porDigitacao?' (pela digitação)':'');
   const geral=DB.lanc.reduce((s,l)=>s+ +l.total,0);
   document.getElementById('gTotalGeral').textContent=brl(geral);
   document.getElementById('gTotalGeralLinha').style.display=
@@ -1878,7 +1904,7 @@ function renderGastos(){
     return `<div class="item" onclick="verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
       <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span></div>
       <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-        <small>${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}</small></div>
+        <small>${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}${porDigitacao?` · <span style="color:var(--teal)">compra de ${l.data.split('-').reverse().slice(0,2).join('/')}</span>`:''}</small></div>
       <div class="val"><span class="mono">${brl(l.total)}</span>
         ${ab?`<div><span class="tag pend">${pp>0?'falta '+brl(saldoAPagar(l)):'a pagar'}</span></div>`:''}</div></div>`;
   }).join('')||'<div class="empty"><b>Nenhum gasto neste filtro</b><p>Ajuste os filtros acima.</p></div>';
@@ -4309,6 +4335,7 @@ function verGasto(id){
     <div class="stat"><span>Pagamento</span><b>${l.pag}</b></div>
     ${l.nf?`<div class="stat"><span>Nota fiscal</span><b>${l.nf}</b></div>`:''}
     ${l.ctrl?`<div class="stat"><span>Recebido</span><b class="mono">${(+l.qtdRec).toLocaleString('pt-BR')} de ${(+l.qtd).toLocaleString('pt-BR')}</b></div>`:''}
+    <div class="stat"><span>Digitado em</span><b style="font-size:12.5px">${horaDigitada(l)}</b></div>
     ${pp>0?`<div class="stat"><span>Já pago</span><b class="mono">${brl(pp)} de ${brl(l.total)}</b></div>`:''}
   </div>
   ${(l.rateio&&l.rateio.length)?`<div class="card" style="box-shadow:none;margin-top:-4px">
@@ -5338,7 +5365,7 @@ function totalPagoTrab(id){
 function diasTrab(id){
   return DB.lanc.filter(l=>l.trabId===id).reduce((s,l)=>s+(+l.qtd||0),0);
 }
-let EQ_INI='',EQ_FIM='';
+let EQ_INI='',EQ_FIM='',EQ_QUEM='';
 function periodoEquipe(qual){
   const hj=new Date();
   const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
@@ -5346,77 +5373,135 @@ function periodoEquipe(qual){
   else if(qual==='mespassado'){ EQ_INI=iso(new Date(hj.getFullYear(),hj.getMonth()-1,1));
     EQ_FIM=iso(new Date(hj.getFullYear(),hj.getMonth(),0)); }
   else { EQ_INI=''; EQ_FIM=''; }
+  EQ_ATALHO=qual;
   const a=document.getElementById('eqIni'), b=document.getElementById('eqFim');
   if(a)a.value=EQ_INI; if(b)b.value=EQ_FIM;
   renderEquipe();
 }
+let EQ_ATALHO='tudo';
+const noPeriodoEq=l=>!!l.trabId&&(!EQ_INI||l.data>=EQ_INI)&&(!EQ_FIM||l.data<=EQ_FIM);
 function pagamentosDe(id){
-  return DB.lanc.filter(l=>l.trabId===id
-    &&(!EQ_INI||l.data>=EQ_INI)&&(!EQ_FIM||l.data<=EQ_FIM))
+  return DB.lanc.filter(l=>l.trabId===id&&noPeriodoEq(l)).sort((a,b)=>b.data.localeCompare(a.data));
+}
+function pagamentosFiltrados(){
+  return DB.lanc.filter(l=>noPeriodoEq(l)&&(!EQ_QUEM||l.trabId===EQ_QUEM))
     .sort((a,b)=>b.data.localeCompare(a.data));
 }
+function rotuloPeriodoEq(){
+  return (EQ_INI||EQ_FIM)
+    ? `${EQ_INI?EQ_INI.split('-').reverse().join('/'):'início'} a ${EQ_FIM?EQ_FIM.split('-').reverse().join('/'):'hoje'}`
+    : 'toda a obra';
+}
 function renderEquipe(){
-  const iEl=document.getElementById('eqIni'), fEl=document.getElementById('eqFim');
+  const iEl=document.getElementById('eqIni'), fEl=document.getElementById('eqFim'), qEl=document.getElementById('eqQuem');
   if(iEl&&!iEl.dataset.lig){
-    iEl.dataset.lig='1'; fEl.dataset.lig='1';
-    iEl.onchange=()=>{EQ_INI=iEl.value;renderEquipe()};
-    fEl.onchange=()=>{EQ_FIM=fEl.value;renderEquipe()};
+    iEl.dataset.lig='1';
+    iEl.onchange=()=>{EQ_INI=iEl.value;EQ_ATALHO='';renderEquipe()};
+    fEl.onchange=()=>{EQ_FIM=fEl.value;EQ_ATALHO='';renderEquipe()};
   }
   const eq=equipe();
-  const noPer=l=>l.trabId&&(!EQ_INI||l.data>=EQ_INI)&&(!EQ_FIM||l.data<=EQ_FIM);
-  const mo=DB.lanc.filter(noPer);
+  /* o select de colaborador é remontado sempre que a equipe muda */
+  if(qEl&&qEl.options.length!==eq.length+1){
+    const antes=qEl.value;
+    qEl.innerHTML='<option value="">Todos</option>'+eq.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
+    if(eq.some(t=>t.id===antes))qEl.value=antes;
+    qEl.onchange=()=>{EQ_QUEM=qEl.value;renderEquipe()};
+  }
+  if(qEl&&qEl.value!==EQ_QUEM)qEl.value=EQ_QUEM;
+  [['eqBmes','mes'],['eqBpas','mespassado'],['eqBtudo','tudo']].forEach(([id,v])=>{
+    const b=document.getElementById(id); if(!b)return;
+    const on=EQ_ATALHO===v;
+    b.style.background=on?'var(--teal)':''; b.style.color=on?'#fff':''; b.style.borderColor=on?'var(--teal)':'';
+  });
+
+  const mo=pagamentosFiltrados();
   const totalMO=mo.reduce((s,l)=>s+ +l.total,0);
   const diasMO=mo.reduce((s,l)=>s+(+l.qtd||0),0);
   const aberto=mo.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
-  const rot=EQ_INI||EQ_FIM
-    ? `${EQ_INI?EQ_INI.split('-').reverse().join('/'):'início'} a ${EQ_FIM?EQ_FIM.split('-').reverse().join('/'):'hoje'}`
-    : 'toda a obra';
   const el=document.getElementById('equipeResumo');
   if(el)el.innerHTML=
-    `<div class="stat"><span>Total investido em equipe</span><b class="mono" style="font-size:17px">${brl(totalMO)}</b></div>
+    `<div class="stat"><span>${EQ_QUEM?'Pago a '+((eq.find(t=>t.id===EQ_QUEM)||{}).nome||''):'Total investido em equipe'}</span>
+       <b class="mono" style="font-size:17px">${brl(totalMO)}</b></div>
      <div class="stat"><span>Diárias no período</span><b class="mono">${diasMO.toLocaleString('pt-BR')}</b></div>
      <div class="stat"><span>Média por diária</span><b class="mono">${diasMO>0?brl(totalMO/diasMO):'—'}</b></div>
      ${aberto>0?`<div class="stat"><span>A pagar</span><b class="mono" style="color:var(--red)">${brl(aberto)}</b></div>`:''}
-     <p class="hint">Período: ${rot}. Toque num colaborador para ver os pagamentos dele.</p>`;
+     <p class="hint">Período: ${rotuloPeriodoEq()} · ${mo.length} pagamento(s). Toque num colaborador para ver o detalhe.</p>`;
 
-  const linhas=eq.map(t=>{
+  const linhas=eq.filter(t=>!EQ_QUEM||t.id===EQ_QUEM).map(t=>{
     const pg=pagamentosDe(t.id);
-    const tot=pg.reduce((s,l)=>s+ +l.total,0);
-    const dd=pg.reduce((s,l)=>s+(+l.qtd||0),0);
-    const ab=pg.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
-    return {t,pg,tot,dd,ab};
+    return {t,pg,tot:pg.reduce((s,l)=>s+ +l.total,0),dd:pg.reduce((s,l)=>s+(+l.qtd||0),0),
+      ab:pg.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0)};
   }).sort((a,b)=>b.tot-a.tot);
 
   const lista=document.getElementById('equipeList');
   if(!lista)return;
   lista.innerHTML= eq.length? linhas.map(({t,pg,tot,dd,ab})=>{
     const k='eq:'+t.id, pc=totalMO>0?(tot/totalMO*100):0;
-    return `<div class="acc ${ACC[k]?'on':''}" style="margin-bottom:8px">
-      <div class="acch" onclick="toggleAcc('${k}')">
+    return `<div class="acc ${ACC[k]?'on':''}" data-acc="${k}" style="margin-bottom:8px">
+      <div class="acch">
         <div style="flex:1;min-width:0">
           <b style="font-size:14.5px">${t.nome}</b>
-          <div style="font-size:11.5px;color:var(--ink-2)">${t.funcao||'—'} · ${t.rec&&t.rec.on?`<span class="tag">🔁 ${brl(t.rec.valor)} ${({semanal:'por semana',quinzenal:'a cada 15 dias',mensal:'por mês',bimestral:'a cada 2 meses',anual:'por ano'})[t.rec.freq]||''}</span>`:`diária ${brl(t.diaria)}`}
-            · ${dd.toLocaleString('pt-BR')} diária(s) no período${pc?` · ${pc.toFixed(1)}%`:''}
+          <div style="font-size:11.5px;color:var(--ink-2)">${t.funcao||'—'} ·
+            ${t.rec&&t.rec.on?`🔁 ${brl(t.rec.valor)}`:`diária ${brl(t.diaria)}`}
+            · ${dd.toLocaleString('pt-BR')} diária(s)${pc?` · ${pc.toFixed(1)}%`:''}
             ${ab>0?` · <span style="color:var(--red)">${brl(ab)} a pagar</span>`:''}</div>
         </div>
         <b class="mono" style="white-space:nowrap">${brl(tot)}</b>
         <span class="arw">▼</span>
       </div>
       <div class="accb">
-        ${pg.length?pg.map(l=>`<div class="item" onclick="event.stopPropagation();verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
+        ${pg.length?pg.map(l=>`<div class="item" data-gasto="${l.id}" ${!isPago(l)?'style="opacity:.72"':''}>
           <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
           <div class="mid"><b>${l.desc}</b>
-            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.tipoPg&&l.tipoPg!=='semanal'?' · '+l.tipoPg:''}${l.obs?' · '+l.obs.slice(0,60):''}</small></div>
+            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.obs?' · '+l.obs.slice(0,70):''}</small></div>
           <div class="val"><span class="mono">${brl(l.total)}</span>
             ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
           :'<p class="hint">Nenhum pagamento neste período.</p>'}
         <div class="row2" style="margin-top:9px">
-          <button class="btn ghost mini" onclick="event.stopPropagation();abrirSemana('${t.id}')">+ Lançar só dele</button>
-          <button class="btn ghost mini" onclick="event.stopPropagation();abrirTrabalhador('${t.id}')">Editar cadastro</button>
+          <button class="btn ghost mini" data-acao="lancar" data-id="${t.id}">+ Lançar só dele</button>
+          <button class="btn ghost mini" data-acao="editar" data-id="${t.id}">Editar cadastro</button>
         </div>
       </div></div>`;
   }).join('')
   : '<div class="card"><div class="empty"><b>Nenhum trabalhador cadastrado</b><p>Cadastre o pedreiro, servente ou ajudante e o valor da diária para controlar a mão de obra.</p></div></div>';
+
+  /* liga os cliques por código — mais confiável que onclick no HTML */
+  lista.querySelectorAll('.acc').forEach(card=>{
+    const k=card.dataset.acc;
+    card.querySelector('.acch').onclick=()=>{ ACC[k]=!ACC[k]; card.classList.toggle('on',!!ACC[k]); };
+    card.querySelectorAll('[data-gasto]').forEach(it=>it.onclick=e=>{e.stopPropagation();verGasto(it.dataset.gasto)});
+    card.querySelectorAll('[data-acao]').forEach(b=>b.onclick=e=>{
+      e.stopPropagation();
+      if(b.dataset.acao==='lancar')abrirSemana(b.dataset.id); else abrirTrabalhador(b.dataset.id);
+    });
+  });
+}
+/* lista corrida de todos os pagamentos, com os mesmos filtros */
+function verTodosPagamentos(){
+  const L=pagamentosFiltrados();
+  const eq=equipe();
+  const total=L.reduce((s,l)=>s+ +l.total,0);
+  const dd=L.reduce((s,l)=>s+(+l.qtd||0),0);
+  const quem=EQ_QUEM?((eq.find(t=>t.id===EQ_QUEM)||{}).nome||''):'toda a equipe';
+  abrir(`<h2>Pagamentos da equipe</h2>
+  <p class="sub">${quem} · ${rotuloPeriodoEq()} · ${L.length} pagamento(s)</p>
+  <label>Colaborador</label>
+  <select id="tp_quem" onchange="EQ_QUEM=this.value;renderEquipe();verTodosPagamentos()">
+    <option value="">Todos</option>
+    ${eq.map(t=>`<option value="${t.id}" ${EQ_QUEM===t.id?'selected':''}>${t.nome}</option>`).join('')}
+  </select>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <div class="stat"><span>Total</span><b class="mono" style="font-size:17px">${brl(total)}</b></div>
+    <div class="stat"><span>Diárias</span><b class="mono">${dd.toLocaleString('pt-BR')}</b></div>
+    <div class="stat"><span>Média por diária</span><b class="mono">${dd>0?brl(total/dd):'—'}</b></div>
+  </div>
+  ${L.length?L.map(l=>`<div class="item" onclick="verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
+    <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+    <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.obs?' · '+l.obs.slice(0,70):''}</small></div>
+    <div class="val"><span class="mono">${brl(l.total)}</span>
+      ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
+   :'<p class="hint">Nenhum pagamento neste filtro.</p>'}
+  <button class="btn ghost mini" style="margin-top:10px" onclick="fechar()">Fechar</button>`);
 }
 /* ---------- pagamentos da equipe: uma tela, uma linha por colaborador ---------- */
 let PG={tipo:'semanal',ini:'',fim:'',linhas:{}};
