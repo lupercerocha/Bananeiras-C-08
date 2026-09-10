@@ -173,9 +173,12 @@ html[data-theme="dark"] .tag.adm{color:#E0A23C}
 /* lista */
 .item{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .item:last-child{border:0}
-.item .dt{width:44px;flex:none;text-align:center}
+.item .dt{width:50px;flex:none;text-align:center}
 .item .dt b{display:block;font-size:17px;line-height:1;font-weight:700}
 .item .dt span{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+.item .dt u{display:block;margin-top:3px;padding-top:3px;border-top:1px dotted var(--line);
+  font-size:9px;line-height:1.2;color:var(--ink-2);text-decoration:none}
+.item .dt u b{display:block;font-size:10px;font-weight:600;color:var(--ink-2)}
 .item .mid{flex:1;min-width:0}
 .item .mid b{display:block;font-size:14.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item .mid small{color:var(--ink-2);font-size:12px}
@@ -678,7 +681,12 @@ a{color:var(--teal)}
     <button class="btn soft" onclick="abrirTrabalhador()"><span class="ic">＋</span>Novo trabalhador</button>
   </div>
   <div class="card" style="margin-top:12px">
-    <label style="margin-top:0">Período</label>
+    <label style="margin-top:0">A data do período é</label>
+    <select id="eqBase">
+      <option value="pagamento">Data do pagamento</option>
+      <option value="digitacao">Data em que eu digitei</option>
+    </select>
+    <label style="margin-top:9px">Período</label>
     <div class="row2">
       <input type="date" id="eqIni"><input type="date" id="eqFim">
     </div>
@@ -686,9 +694,19 @@ a{color:var(--teal)}
       <button class="btn ghost mini" id="eqBmes" style="width:auto;padding:7px 12px" onclick="periodoEquipe('mes')">Este mês</button>
       <button class="btn ghost mini" id="eqBpas" style="width:auto;padding:7px 12px" onclick="periodoEquipe('mespassado')">Mês passado</button>
       <button class="btn ghost mini" id="eqBtudo" style="width:auto;padding:7px 12px" onclick="periodoEquipe('tudo')">Toda a obra</button>
+      <button class="btn ghost mini" id="eqBhoje" style="width:auto;padding:7px 12px" onclick="digiteiEquipe(0)">Digitei hoje</button>
+      <button class="btn ghost mini" id="eqBont" style="width:auto;padding:7px 12px" onclick="digiteiEquipe(1)">Ontem</button>
     </div>
-    <label style="margin-top:10px">Colaborador</label>
-    <select id="eqQuem"><option value="">Todos</option></select>
+    <div class="row2" style="margin-top:10px">
+      <div><label style="margin-top:0">Colaborador</label>
+        <select id="eqQuem"><option value="">Todos</option></select></div>
+      <div><label style="margin-top:0">Ordenar por</label>
+        <select id="eqOrd">
+          <option value="pag">Data do pagamento</option>
+          <option value="dig">Data de digitação</option>
+          <option value="val">Maior valor</option>
+        </select></div>
+    </div>
     <div id="equipeResumo" style="margin-top:10px"></div>
     <button class="btn ghost mini" style="margin-top:9px" onclick="verTodosPagamentos()">📋 Ver todos os pagamentos</button>
   </div>
@@ -847,9 +865,10 @@ function mesclarLista(local,vindo,tipo,setExc){
       }
       return;
     }
+    if(setExc&&setExc.has('id:'+o.id))return;
     if(tipo){
       const k=chaveDup(o,tipo);
-      if(setExc&&setExc.has(tipo+'|'+k))return;
+      if(setExc&&setExc.has(tipo+'|'+k+'|solo'))return;
       if(porChave[k])return;
       porChave[k]=o;
     }
@@ -860,7 +879,11 @@ function mesclarLista(local,vindo,tipo,setExc){
 function mesclarSeguro(vindo){
   if(!vindo)return;
   mesclarExclusoes(vindo.exc);
-  const setExc=new Set((DB.exc||[]).map(e=>e.k));
+  const setExc=new Set();
+  (DB.exc||[]).forEach(e=>{
+    if(e.id)setExc.add('id:'+e.id);
+    else setExc.add(e.k+'|solo');      /* lápide antiga, sem id: continua valendo por conteúdo */
+  });
   let n=0;
   n+=mesclarLista(DB.lanc,vindo.lanc,'lanc',setExc);
   n+=mesclarLista(DB.cot,vindo.cot,'cot',setExc);
@@ -1752,7 +1775,7 @@ function render(){
   document.getElementById('pagarList').innerHTML=abertos.slice(0,12).map(l=>{
     const p=dia(l.data), atraso=l.data<hj, pp=pagoParcial(l);
     return `<div class="item" onclick="verGasto('${l.id}')">
-      <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span></div>
+      <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span>${dtDig(l)}</div>
       <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
         <small>${cat(l.cat).n}${l.forn?' · '+l.forn:''}${pp>0?' · pago '+brl(pp):''}</small></div>
       <div class="val"><span class="mono">${brl(saldoAPagar(l))}</span>
@@ -1847,6 +1870,12 @@ function verCategoria(catId){
 const dataDigitada=l=>(+l.at>0)?new Date(+l.at).toISOString().slice(0,10):l.data;
 const horaDigitada=l=>(+l.at>0)?new Date(+l.at).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—';
 /* selo discreto de quando foi digitado — só aparece quando difere da data do próprio registro */
+/* data de digitação embaixo da data do registro, na própria coluna */
+function dtDig(o){
+  if(!(+o.at>0))return '';
+  const d=dataDigitada(o);
+  return `<u title="digitado em ${horaDigitada(o)}">dig<b>${d.split('-').reverse().slice(0,2).join('/')}</b></u>`;
+}
 function seloDig(o,dataRef){
   if(!(+o.at>0))return '';
   const d=dataDigitada(o);
@@ -1909,7 +1938,7 @@ function renderGastos(){
   document.getElementById('gastosList').innerHTML=L.map(l=>{
     const p=dia(l.data), falta=l.ctrl?(+l.qtd - +l.qtdRec):0, ab=!isPago(l), pp=pagoParcial(l);
     return `<div class="item" onclick="verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
-      <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span></div>
+      <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span>${dtDig(l)}</div>
       <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
         <small>${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}${porDigitacao?` · <span style="color:var(--teal)">compra de ${l.data.split('-').reverse().slice(0,2).join('/')}</span>`:seloDig(l)}</small></div>
       <div class="val"><span class="mono">${brl(l.total)}</span>
@@ -1953,7 +1982,7 @@ function renderGastosAgrupado(L){
         ${ult.map(l=>{
           const p=dia(l.data), ab=!isPago(l);
           return `<div class="item" onclick="event.stopPropagation();verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
-            <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span></div>
+            <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span>${dtDig(l)}</div>
             <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
               <small>${porForn?cat(l.cat).n:(l.forn||'sem fornecedor')}${(+l.qtd>1)?' · '+(+l.qtd).toLocaleString('pt-BR')+' × '+brl(l.unit):''}${seloDig(l)}</small></div>
             <div class="val"><span class="mono">${brl(l.total)}</span>
@@ -3973,8 +4002,8 @@ function chaveDup(o,tipo){
 function marcarExcluido(o,tipo){
   DB.exc=DB.exc||[];
   const k=tipo+'|'+chaveDup(o,tipo);
-  DB.exc=DB.exc.filter(e=>e.k!==k);
-  DB.exc.push({k,at:Date.now()});
+  DB.exc=DB.exc.filter(e=>!(e.k===k&&e.id===o.id));
+  DB.exc.push({k,id:o.id,at:Date.now()});   /* o id evita apagar um gêmeo legítimo */
 }
 function mesclarExclusoes(vindo){
   DB.exc=DB.exc||[];
@@ -3985,9 +4014,18 @@ function mesclarExclusoes(vindo){
 function aplicarExclusoes(){
   DB.exc=DB.exc||[];
   if(!DB.exc.length)return;
-  const set=new Set(DB.exc.map(e=>e.k));
-  DB.lanc=DB.lanc.filter(l=>!set.has('lanc|'+chaveDup(l,'lanc')));
-  DB.cot=DB.cot.filter(c=>!set.has('cot|'+chaveDup(c,'cot')));
+  const porId=new Set(DB.exc.filter(e=>e.id).map(e=>e.id));
+  /* lápides antigas (sem id) valem por conteúdo, mas apagam só uma cópia por lápide */
+  const semId={};
+  DB.exc.filter(e=>!e.id).forEach(e=>{ semId[e.k]=(semId[e.k]||0)+1; });
+  const filtra=(arr,tipo)=>arr.filter(o=>{
+    if(porId.has(o.id))return false;
+    const k=tipo+'|'+chaveDup(o,tipo);
+    if(semId[k]>0){ semId[k]--; return false; }
+    return true;
+  });
+  DB.lanc=filtra(DB.lanc,'lanc');
+  DB.cot=filtra(DB.cot,'cot');
 }
 let DUP_SEM_DATA=false;
 function acharDuplicados(tipo){
@@ -4333,7 +4371,7 @@ function verGasto(id){
   const l=DB.lanc.find(x=>x.id===id);const falta=l.ctrl?(+l.qtd - +l.qtdRec):0;
   const pp=pagoParcial(l), saldo=saldoAPagar(l);
   abrir(`<h2>#${NUM_LANC[l.id]||''} ${l.desc}</h2>
-  <p class="sub">${l.data.split('-').reverse().join('/')} · ${(l.rateio&&l.rateio.length)?'Dividido entre etapas':cat(l.cat).n}</p>
+  <p class="sub">${l.trabId?'Pagamento em ':'Compra em '}${l.data.split('-').reverse().join('/')} · ${(l.rateio&&l.rateio.length)?'Dividido entre etapas':cat(l.cat).n}</p>
   <div class="card" style="box-shadow:none;margin-top:10px">
     <div class="stat"><span>Valor total</span><b class="mono">${brl(l.total)}</b></div>
     <div class="stat"><span>Quantidade</span><b class="mono">${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}</b></div>
@@ -5386,18 +5424,35 @@ function periodoEquipe(qual){
   renderEquipe();
 }
 let EQ_ATALHO='tudo';
-const noPeriodoEq=l=>!!l.trabId&&(!EQ_INI||l.data>=EQ_INI)&&(!EQ_FIM||l.data<=EQ_FIM);
+let EQ_BASE='pagamento';
+const dataBaseEq=l=>EQ_BASE==='digitacao'?dataDigitada(l):l.data;
+const noPeriodoEq=l=>!!l.trabId&&(!EQ_INI||dataBaseEq(l)>=EQ_INI)&&(!EQ_FIM||dataBaseEq(l)<=EQ_FIM);
+/* mostra o que foi digitado hoje (ou ontem), independentemente do período a que o pagamento se refere */
+function digiteiEquipe(diasAtras){
+  const d=new Date(); d.setDate(d.getDate()-diasAtras);
+  const iso=new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  EQ_BASE='digitacao'; EQ_INI=iso; EQ_FIM=iso; EQ_ATALHO=diasAtras?'ontem':'hoje';
+  const b=document.getElementById('eqBase'); if(b)b.value='digitacao';
+  const a=document.getElementById('eqIni'), f=document.getElementById('eqFim');
+  if(a)a.value=iso; if(f)f.value=iso;
+  atualizarSelects(document);
+  renderEquipe();
+}
+let EQ_ORD='pag';
+const ordenaEq=(a,b)=>EQ_ORD==='dig'?((+b.at||0)-(+a.at||0))
+  :EQ_ORD==='val'?((+b.total||0)-(+a.total||0))
+  :b.data.localeCompare(a.data);
 function pagamentosDe(id){
-  return DB.lanc.filter(l=>l.trabId===id&&noPeriodoEq(l)).sort((a,b)=>b.data.localeCompare(a.data));
+  return DB.lanc.filter(l=>l.trabId===id&&noPeriodoEq(l)).sort(ordenaEq);
 }
 function pagamentosFiltrados(){
-  return DB.lanc.filter(l=>noPeriodoEq(l)&&(!EQ_QUEM||l.trabId===EQ_QUEM))
-    .sort((a,b)=>b.data.localeCompare(a.data));
+  return DB.lanc.filter(l=>noPeriodoEq(l)&&(!EQ_QUEM||l.trabId===EQ_QUEM)).sort(ordenaEq);
 }
 function rotuloPeriodoEq(){
-  return (EQ_INI||EQ_FIM)
+  const p=(EQ_INI||EQ_FIM)
     ? `${EQ_INI?EQ_INI.split('-').reverse().join('/'):'início'} a ${EQ_FIM?EQ_FIM.split('-').reverse().join('/'):'hoje'}`
     : 'toda a obra';
+  return p+(EQ_BASE==='digitacao'?' (pela digitação)':'');
 }
 function renderEquipe(){
   const iEl=document.getElementById('eqIni'), fEl=document.getElementById('eqFim'), qEl=document.getElementById('eqQuem');
@@ -5405,6 +5460,10 @@ function renderEquipe(){
     iEl.dataset.lig='1';
     iEl.onchange=()=>{EQ_INI=iEl.value;EQ_ATALHO='';renderEquipe()};
     fEl.onchange=()=>{EQ_FIM=fEl.value;EQ_ATALHO='';renderEquipe()};
+    const bEl=document.getElementById('eqBase');
+    if(bEl)bEl.onchange=()=>{EQ_BASE=bEl.value;renderEquipe()};
+    const oEl=document.getElementById('eqOrd');
+    if(oEl)oEl.onchange=()=>{EQ_ORD=oEl.value;renderEquipe()};
   }
   const eq=equipe();
   /* o select de colaborador é remontado sempre que a equipe muda */
@@ -5415,7 +5474,7 @@ function renderEquipe(){
     qEl.onchange=()=>{EQ_QUEM=qEl.value;renderEquipe()};
   }
   if(qEl&&qEl.value!==EQ_QUEM)qEl.value=EQ_QUEM;
-  [['eqBmes','mes'],['eqBpas','mespassado'],['eqBtudo','tudo']].forEach(([id,v])=>{
+  [['eqBmes','mes'],['eqBpas','mespassado'],['eqBtudo','tudo'],['eqBhoje','hoje'],['eqBont','ontem']].forEach(([id,v])=>{
     const b=document.getElementById(id); if(!b)return;
     const on=EQ_ATALHO===v;
     b.style.background=on?'var(--teal)':''; b.style.color=on?'#fff':''; b.style.borderColor=on?'var(--teal)':'';
@@ -5458,9 +5517,9 @@ function renderEquipe(){
       </div>
       <div class="accb">
         ${pg.length?pg.map(l=>`<div class="item" data-gasto="${l.id}" ${!isPago(l)?'style="opacity:.72"':''}>
-          <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+          <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span>${dtDig(l)}</div>
           <div class="mid"><b>${l.desc}</b>
-            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${seloDig(l)}${l.obs?' · '+l.obs.slice(0,60):''}</small></div>
+            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.obs?' · '+l.obs.slice(0,70):''}</small></div>
           <div class="val"><span class="mono">${brl(l.total)}</span>
             ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
           :'<p class="hint">Nenhum pagamento neste período.</p>'}
@@ -5503,8 +5562,8 @@ function verTodosPagamentos(){
     <div class="stat"><span>Média por diária</span><b class="mono">${dd>0?brl(total/dd):'—'}</b></div>
   </div>
   ${L.length?L.map(l=>`<div class="item" onclick="verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
-    <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
-    <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${seloDig(l)}${l.obs?' · '+l.obs.slice(0,60):''}</small></div>
+    <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span>${dtDig(l)}</div>
+    <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.obs?' · '+l.obs.slice(0,70):''}</small></div>
     <div class="val"><span class="mono">${brl(l.total)}</span>
       ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
    :'<p class="hint">Nenhum pagamento neste filtro.</p>'}
