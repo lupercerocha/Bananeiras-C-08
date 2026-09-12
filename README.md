@@ -73,13 +73,13 @@ cfg       início, prazo, área construída e foto do perfil
 
 Campos que valem citar: `cot[].conc` é o nome da concorrência (vazio = cotação avulsa) e `cot[].desconto` é o desconto negociado, rateado entre os itens na hora de virar compra.
 
-Os arquivos das notas não entram nesse pacote: ficam no IndexedDB do aparelho e no repositório do Supabase, para não pesar na sincronização.
+Os arquivos das notas não entram nesse pacote: ficam no IndexedDB do aparelho e no repositório do Supabase, para não pesar na sincronização. O mesmo vale para fotos anexadas a gastos e cotações — eram embutidas em base64 dentro do próprio pacote, e um pacote grande demais faz o envio à nuvem falhar sem avisar. Em Configurações → Sincronização dá para ver o tamanho atual e mover fotos antigas que ainda estejam pesadas.
 
 ---
 
 ## O que o sistema faz
 
-**Gastos** — lançamento com fornecedor, categoria, anexo e nota. Divisão de uma compra entre várias etapas, pagamento parcelado, compra recorrente mensal, controle de entrega parcial de material e filtro por período.
+**Gastos** — lançamento com fornecedor, categoria, anexo e nota. O botão "Relatório em PDF" gera o dossiê completo da obra: resumo e custo por m², gasto por etapa, por tipo de produto e por fornecedor, tabela de materiais com quantidade e preço médio pago, mão de obra por trabalhador, todos os lançamentos etapa por etapa, pendências e notas fiscais — com a opção de sair só do recorte filtrado na tela. Divisão de uma compra entre várias etapas, pagamento parcelado, compra recorrente mensal, controle de entrega parcial de material e filtro por período.
 
 **Cotações** — cada cotação vale por si e soma na previsão de pagamento. Quando duas ou mais disputam a **mesma** compra, você monta uma **concorrência** entre elas (botão "Montar concorrência", depois de criadas) e só a menor passa a contar na previsão. Dentro de uma concorrência, a comparação é feita **pelo preço unitário de cada item**, recalculando todas para a mesma quantidade — assim um orçamento com quantidade menor não ganha por engano. Mostra ainda quanto custaria comprando cada item no fornecedor mais barato.
 
