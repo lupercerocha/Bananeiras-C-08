@@ -910,7 +910,11 @@ async function sincronizarNaEntrada(){
   try{
     const {data,error}=await supa.from('obra_dados').select('dados').eq('user_id',SESSAO.user.id).maybeSingle();
     if(error){ SYNC_OK=false; return; }
-    if(data&&data.dados){ mesclarSeguro(data.dados); salvar(); }
+    if(data&&data.dados){
+      mesclarSeguro(data.dados);
+      if(RECUPERANDO && data.dados.lanc && data.dados.lanc.length) RECUPERANDO=false;
+      salvar();
+    }
     await enviarNuvem();
     SYNC_OK=true;
   }catch(e){ SYNC_OK=false; }
@@ -934,14 +938,20 @@ window.addEventListener('focus',()=>ressincronizar());
 setInterval(()=>{ if(!document.hidden) ressincronizar(); },60000);
 async function enviarNuvem(){
   if(!SESSAO)return;
+  if(RECUPERANDO){ SYNC_OK=false; return; }               /* não envia enquanto o local ainda pode estar incompleto */
+  /* freio de segurança: nunca sobrescreve uma nuvem com dados quando o local ficou vazio de repente */
+  const contagemAntes=+(localStorage.getItem('obraC08_contagem')||0);
+  if(DB.lanc.length===0 && contagemAntes>=5){ SYNC_OK=false; return; }
   try{
     const {error}=await supa.from('obra_dados').upsert(
       {user_id:SESSAO.user.id, dados:DB, updated_at:new Date().toISOString()},
       {onConflict:'user_id'});
     SYNC_OK=!error;
+    if(SYNC_OK) localStorage.setItem('obraC08_contagem', DB.lanc.length);
   }catch(e){ SYNC_OK=false; }
 }
 function sincronizarDepoisDeSalvar(){
+  if(RECUPERANDO)return;
   clearTimeout(SYNC_TIMER);
   SYNC_TIMER=setTimeout(enviarNuvem,1200);
 }
@@ -1074,18 +1084,32 @@ const SEED={
 
 /* ---------- estado ---------- */
 let DB;
+let RECUPERANDO=false;
 function carregar(){
-  try{DB=JSON.parse(localStorage.getItem('obraC08')||'null')}catch(e){DB=null}
+  const bruto=localStorage.getItem('obraC08');
+  try{ DB=JSON.parse(bruto||'null'); }
+  catch(e){
+    DB=null;
+    if(bruto){
+      /* dado corrompido (quase sempre por uma gravação que falhou por falta de espaço) —
+         guarda uma cópia do que sobrou e NÃO cria uma base vazia por cima, nem envia nada
+         à nuvem, até a sincronização normal restaurar os dados de lá */
+      try{ localStorage.setItem('obraC08_recuperar_'+Date.now(), bruto); }catch(e2){}
+      RECUPERANDO=true;
+    }
+  }
   if(!DB){
     DB={lanc:[],cot:[],fotos:[],passos:[],cfg:{inicio:'',meses:8,area:0}};
-    SEED.lanc.forEach((x,i)=>DB.lanc.push({id:'sd-l'+i,at:0,data:x.d,desc:x.t,cat:x.c,forn:x.f,qtd:x.q,unit:x.u,
-      total:x.v,pag:'Pago',nf:'',link:'',obs:'',ctrl:false,qtdRec:0,baixas:[]}));
-    SEED.cot.forEach((x,i)=>DB.cot.push({id:'sd-c'+i,at:0,data:hoje(),item:x.t,forn:x.f,
-      itens:x.its.map(v=>({c:v[0],d:v[1],q:v[2],u:v[3],f:v[4]})),
-      total:x.its.reduce((s,v)=>s+v[2]*v[3],0),
-      validade:x.val,obs:x.ob,status:'aberta'}));
-    SEED.passos.forEach((t,i)=>DB.passos.push({id:'sd-p'+i,at:0,n:i+1,txt:t,ok:false,cat:'c00'}));
-    salvar();
+    if(!RECUPERANDO){
+      SEED.lanc.forEach((x,i)=>DB.lanc.push({id:'sd-l'+i,at:0,data:x.d,desc:x.t,cat:x.c,forn:x.f,qtd:x.q,unit:x.u,
+        total:x.v,pag:'Pago',nf:'',link:'',obs:'',ctrl:false,qtdRec:0,baixas:[]}));
+      SEED.cot.forEach((x,i)=>DB.cot.push({id:'sd-c'+i,at:0,data:hoje(),item:x.t,forn:x.f,
+        itens:x.its.map(v=>({c:v[0],d:v[1],q:v[2],u:v[3],f:v[4]})),
+        total:x.its.reduce((s,v)=>s+v[2]*v[3],0),
+        validade:x.val,obs:x.ob,status:'aberta'}));
+      SEED.passos.forEach((t,i)=>DB.passos.push({id:'sd-p'+i,at:0,n:i+1,txt:t,ok:false,cat:'c00'}));
+      salvar();
+    }
   }
   DB.fotos=DB.fotos||[];
   DB.catExtra=DB.catExtra||[];
@@ -1212,13 +1236,16 @@ function verAnexoDet(i){
 function salvar(){
   try{localStorage.setItem('obraC08',JSON.stringify(DB))}
   catch(e){
-    /* estourou o espaço: quase sempre são fotos antigas guardadas junto com os dados */
-    if(DB.fotos.some(f=>f.img)){
-      toast('Memória cheia — liberando espaço das fotos...');
-      migrarFotos(true).then(n=>{
+    /* estourou o espaço: quase sempre são fotos guardadas junto com os dados —
+       tenta liberar tanto o álbum quanto os anexos de gastos/cotações antes de desistir */
+    const temFotoPesada=DB.fotos.some(f=>f.img);
+    const temAnexoPesado=contarAnexosPesados()>0;
+    if(temFotoPesada||temAnexoPesado){
+      toast('Memória cheia — liberando espaço...');
+      Promise.all([temFotoPesada?migrarFotos(true):0, temAnexoPesado?migrarAnexosPesados(true):0]).then(([a,b])=>{
         try{ localStorage.setItem('obraC08',JSON.stringify(DB));
-          toast(n?'Espaço liberado: '+n+' foto(s) movidas':'Espaço liberado'); }
-        catch(e2){ toast('Memória cheia. Exporte o backup em Configurações.'); }
+          toast(((a||0)+(b||0))?'Espaço liberado':'Espaço liberado'); }
+        catch(e2){ toast('Memória ainda cheia. Exporte o backup em Configurações.'); }
       });
     }else toast('Memória cheia. Exporte o backup em Configurações.');
   }
@@ -5405,6 +5432,15 @@ function renderDivergencia(){
 }
 function renderNuvem(){
   const card=document.getElementById('cardNuvem'); if(!card)return;
+  if(RECUPERANDO){
+    card.style.display='block';
+    document.getElementById('nuvemMsg').innerHTML=
+      '<p style="font-size:13.5px;margin:0"><b>Restaurando os dados deste aparelho a partir da nuvem.</b> '+
+      'O arquivo salvo aqui ficou incompleto, mas nada foi apagado da nuvem — seus lançamentos continuam lá. '+
+      'Toque em "Tentar agora" com internet ligada.</p>'+
+      '<button class="btn ghost mini" style="margin-top:9px" onclick="ressincronizar(true)">Tentar agora</button>';
+    return;
+  }
   if(!SESSAO){
     card.style.display='block';
     document.getElementById('nuvemMsg').innerHTML=
