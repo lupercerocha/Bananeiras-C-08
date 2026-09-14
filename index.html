@@ -848,6 +848,7 @@ async function entrarNoApp(session){
   /* passa das fotos antigas para o espaço grande antes que a memória estoure */
   if(espacoUsado()>3.2e6 && DB.fotos.some(f=>f.img)) setTimeout(()=>migrarFotos(true),1500);
   if(contarAnexosPesados()>0) setTimeout(()=>migrarAnexosPesados(true),2500);
+  if((DB.notas||[]).some(n=>n.img&&!n.arqLocal&&!n.arqPath)) setTimeout(()=>migrarFotosNotas(true),3500);
 }
 
 /* funde os dados da nuvem com os locais pelo conteúdo (mesma lógica do "Importar só o que for novo") */
@@ -1240,11 +1241,15 @@ function salvar(){
        tenta liberar tanto o álbum quanto os anexos de gastos/cotações antes de desistir */
     const temFotoPesada=DB.fotos.some(f=>f.img);
     const temAnexoPesado=contarAnexosPesados()>0;
-    if(temFotoPesada||temAnexoPesado){
+    const temNotaPesada=(DB.notas||[]).some(n=>n.img&&!n.arqLocal&&!n.arqPath);
+    if(temFotoPesada||temAnexoPesado||temNotaPesada){
       toast('Memória cheia — liberando espaço...');
-      Promise.all([temFotoPesada?migrarFotos(true):0, temAnexoPesado?migrarAnexosPesados(true):0]).then(([a,b])=>{
-        try{ localStorage.setItem('obraC08',JSON.stringify(DB));
-          toast(((a||0)+(b||0))?'Espaço liberado':'Espaço liberado'); }
+      Promise.all([
+        temFotoPesada?migrarFotos(true):0,
+        temAnexoPesado?migrarAnexosPesados(true):0,
+        temNotaPesada?migrarFotosNotas(true):0
+      ]).then(()=>{
+        try{ localStorage.setItem('obraC08',JSON.stringify(DB)); toast('Espaço liberado'); }
         catch(e2){ toast('Memória ainda cheia. Exporte o backup em Configurações.'); }
       });
     }else toast('Memória cheia. Exporte o backup em Configurações.');
@@ -2820,11 +2825,28 @@ async function migrarAnexosPesados(silencioso){
   if(!silencioso) toast(n?`${n} foto(s) movida(s) — o pacote enviado à nuvem ficou bem mais leve`:'Nenhuma foto pesada para mover');
   return n;
 }
+/* fotos de notas fiscais (a foto tirada da nota em papel) também ficavam em base64
+   dentro do objeto — a terceira fonte do mesmo problema das fotos e dos anexos */
+async function migrarFotosNotas(silencioso){
+  let n=0;
+  for(const nota of (DB.notas||[])){
+    if(!nota.img||nota.arqLocal||nota.arqPath)continue;
+    try{
+      const thumb=await reduzirImagem(nota.img,220,.45);
+      await guardarArquivoNota(nota, new File([dataUrlParaBlob(nota.img)], (nota.numero||'nota')+'.jpg', {type:'image/jpeg'}));
+      nota.thumb=thumb; delete nota.img; nota.at=Date.now(); n++;
+    }catch(e){}
+  }
+  if(n)salvar();
+  if(!silencioso) toast(n?`${n} foto(s) de nota movida(s)`:'Nenhuma foto de nota pesada para mover');
+  return n;
+}
 function tamanhoDB(){ try{ return new Blob([JSON.stringify(DB)]).size; }catch(e){ return 0; } }
 function contarAnexosPesados(){
   let n=0;
   DB.lanc.forEach(l=>(l.anexos||[]).forEach(a=>{ if(a.tipo==='imagem'&&a.dado)n++; }));
   DB.cot.forEach(c=>(c.anexos||[]).forEach(a=>{ if(a.tipo==='imagem'&&a.dado)n++; }));
+  (DB.notas||[]).forEach(n2=>{ if(n2.img&&!n2.arqLocal&&!n2.arqPath)n++; });
   return n;
 }
 function verSincronizacao(){
@@ -2835,7 +2857,7 @@ function verSincronizacao(){
     <div class="stat"><span>Tamanho do pacote de dados</span><b class="mono">${kb} KB</b></div>
     <div class="stat"><span>Fotos ainda pesadas</span><b class="mono" style="color:${pesados?'var(--amber)':'var(--green)'}">${pesados}</b></div>
   </div>
-  ${pesados?`<button class="btn" onclick="migrarAnexosPesados().then(verSincronizacao)">Mover essas ${pesados} foto(s) agora</button>`:''}
+  ${pesados?`<button class="btn" onclick="Promise.all([migrarAnexosPesados(true),migrarFotosNotas(true)]).then(()=>{render();verSincronizacao()})">Mover essas ${pesados} foto(s) agora</button>`:''}
   <button class="btn ghost mini" style="margin-top:9px" onclick="ressincronizar(true).then(verSincronizacao)">Forçar sincronização agora</button>
   <p class="hint">Fotos anexadas a gastos e cotações ficavam dentro do próprio pacote enviado à nuvem. Quando esse pacote crescia demais, o envio podia falhar sem avisar. Agora as fotos novas já vão direto para um espaço separado — mais leve e mais confiável.</p>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
@@ -3001,7 +3023,7 @@ function abrirNota(id,daLeitura){
     ${cands.map(l=>`<option value="${l.id}" ${n.lancId===l.id?'selected':''}>${l.data.split('-').reverse().join('/')} · ${l.desc} · ${(+l.total).toLocaleString('pt-BR',{minimumFractionDigits:2})}</option>`).join('')}
   </select>
   <label>Observações</label><textarea id="n_obs">${n.obs||''}</textarea>
-  ${n.img?`<img src="${n.img}" style="width:100%;border-radius:12px;margin-top:10px">`:''}
+  ${(n.img||n.thumb)?`<img src="${n.img||n.thumb}" style="width:100%;border-radius:12px;margin-top:10px">`:''}
   <div style="height:14px"></div>
   <button class="btn" onclick="salvarNota('${id||''}')">Salvar nota</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
@@ -3035,7 +3057,11 @@ function salvarNota(id){
   const arq=base._file||null;
   NOTA_TMP=null; salvar(); fechar(); render(); toast('Nota salva');
   if(arq){
-    guardarArquivoNota(n,arq).then(()=>{
+    guardarArquivoNota(n,arq).then(async()=>{
+      if(n.img&&(n.arqLocal||n.arqPath)){
+        try{ n.thumb=await reduzirImagem(n.img,220,.45); }catch(e){}
+        delete n.img;
+      }
       salvar(); render();
       if(n.arqErro==='bucket') toast('Arquivo guardado neste aparelho. Para abrir no outro, crie o espaço de arquivos no Supabase.');
     });
@@ -3062,7 +3088,7 @@ function verNota(id){
   ${n.obs?`<p class="hint">${n.obs}</p>`:''}
   ${l?`<div class="item" onclick="verGasto('${l.id}')"><div class="mid"><b>Gasto vinculado</b><small>${l.desc}</small></div>
     <div class="val mono">${brl(l.total)}</div></div>`:'<p class="hint">Nenhum gasto vinculado a esta nota.</p>'}
-  ${n.img?`<img src="${n.img}" style="width:100%;border-radius:12px;margin:10px 0">`:''}
+  ${(n.img||n.thumb)?`<img src="${n.img||n.thumb}" style="width:100%;border-radius:12px;margin:10px 0">`:''}
   ${(n.arqLocal||n.arqPath||n.img)?`<button class="btn dark" onclick="verArquivoNota('${n.id}')">📄 Ver arquivo da nota</button>`:''}
   ${l?'':`<button class="btn" style="margin-top:9px" onclick="vincularNotaAGasto('${n.id}')">Vincular a um gasto já lançado</button>`}
   ${(n.itens||[]).length?`<button class="btn ghost mini" style="margin-top:9px" onclick="lancarItensDaNota('${n.id}')">Lançar itens como novos gastos</button>
