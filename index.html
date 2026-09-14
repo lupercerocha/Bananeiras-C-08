@@ -847,6 +847,7 @@ async function entrarNoApp(session){
   render();
   /* passa das fotos antigas para o espaço grande antes que a memória estoure */
   if(espacoUsado()>3.2e6 && DB.fotos.some(f=>f.img)) setTimeout(()=>migrarFotos(true),1500);
+  if(contarAnexosPesados()>0) setTimeout(()=>migrarAnexosPesados(true),2500);
 }
 
 /* funde os dados da nuvem com os locais pelo conteúdo (mesma lógica do "Importar só o que for novo") */
@@ -909,7 +910,11 @@ async function sincronizarNaEntrada(){
   try{
     const {data,error}=await supa.from('obra_dados').select('dados').eq('user_id',SESSAO.user.id).maybeSingle();
     if(error){ SYNC_OK=false; return; }
-    if(data&&data.dados){ mesclarSeguro(data.dados); salvar(); }
+    if(data&&data.dados){
+      mesclarSeguro(data.dados);
+      if(RECUPERANDO && data.dados.lanc && data.dados.lanc.length) RECUPERANDO=false;
+      salvar();
+    }
     await enviarNuvem();
     SYNC_OK=true;
   }catch(e){ SYNC_OK=false; }
@@ -933,14 +938,20 @@ window.addEventListener('focus',()=>ressincronizar());
 setInterval(()=>{ if(!document.hidden) ressincronizar(); },60000);
 async function enviarNuvem(){
   if(!SESSAO)return;
+  if(RECUPERANDO){ SYNC_OK=false; return; }               /* não envia enquanto o local ainda pode estar incompleto */
+  /* freio de segurança: nunca sobrescreve uma nuvem com dados quando o local ficou vazio de repente */
+  const contagemAntes=+(localStorage.getItem('obraC08_contagem')||0);
+  if(DB.lanc.length===0 && contagemAntes>=5){ SYNC_OK=false; return; }
   try{
     const {error}=await supa.from('obra_dados').upsert(
       {user_id:SESSAO.user.id, dados:DB, updated_at:new Date().toISOString()},
       {onConflict:'user_id'});
     SYNC_OK=!error;
+    if(SYNC_OK) localStorage.setItem('obraC08_contagem', DB.lanc.length);
   }catch(e){ SYNC_OK=false; }
 }
 function sincronizarDepoisDeSalvar(){
+  if(RECUPERANDO)return;
   clearTimeout(SYNC_TIMER);
   SYNC_TIMER=setTimeout(enviarNuvem,1200);
 }
@@ -1073,18 +1084,32 @@ const SEED={
 
 /* ---------- estado ---------- */
 let DB;
+let RECUPERANDO=false;
 function carregar(){
-  try{DB=JSON.parse(localStorage.getItem('obraC08')||'null')}catch(e){DB=null}
+  const bruto=localStorage.getItem('obraC08');
+  try{ DB=JSON.parse(bruto||'null'); }
+  catch(e){
+    DB=null;
+    if(bruto){
+      /* dado corrompido (quase sempre por uma gravação que falhou por falta de espaço) —
+         guarda uma cópia do que sobrou e NÃO cria uma base vazia por cima, nem envia nada
+         à nuvem, até a sincronização normal restaurar os dados de lá */
+      try{ localStorage.setItem('obraC08_recuperar_'+Date.now(), bruto); }catch(e2){}
+      RECUPERANDO=true;
+    }
+  }
   if(!DB){
     DB={lanc:[],cot:[],fotos:[],passos:[],cfg:{inicio:'',meses:8,area:0}};
-    SEED.lanc.forEach((x,i)=>DB.lanc.push({id:'sd-l'+i,at:0,data:x.d,desc:x.t,cat:x.c,forn:x.f,qtd:x.q,unit:x.u,
-      total:x.v,pag:'Pago',nf:'',link:'',obs:'',ctrl:false,qtdRec:0,baixas:[]}));
-    SEED.cot.forEach((x,i)=>DB.cot.push({id:'sd-c'+i,at:0,data:hoje(),item:x.t,forn:x.f,
-      itens:x.its.map(v=>({c:v[0],d:v[1],q:v[2],u:v[3],f:v[4]})),
-      total:x.its.reduce((s,v)=>s+v[2]*v[3],0),
-      validade:x.val,obs:x.ob,status:'aberta'}));
-    SEED.passos.forEach((t,i)=>DB.passos.push({id:'sd-p'+i,at:0,n:i+1,txt:t,ok:false,cat:'c00'}));
-    salvar();
+    if(!RECUPERANDO){
+      SEED.lanc.forEach((x,i)=>DB.lanc.push({id:'sd-l'+i,at:0,data:x.d,desc:x.t,cat:x.c,forn:x.f,qtd:x.q,unit:x.u,
+        total:x.v,pag:'Pago',nf:'',link:'',obs:'',ctrl:false,qtdRec:0,baixas:[]}));
+      SEED.cot.forEach((x,i)=>DB.cot.push({id:'sd-c'+i,at:0,data:hoje(),item:x.t,forn:x.f,
+        itens:x.its.map(v=>({c:v[0],d:v[1],q:v[2],u:v[3],f:v[4]})),
+        total:x.its.reduce((s,v)=>s+v[2]*v[3],0),
+        validade:x.val,obs:x.ob,status:'aberta'}));
+      SEED.passos.forEach((t,i)=>DB.passos.push({id:'sd-p'+i,at:0,n:i+1,txt:t,ok:false,cat:'c00'}));
+      salvar();
+    }
   }
   DB.fotos=DB.fotos||[];
   DB.catExtra=DB.catExtra||[];
@@ -1141,7 +1166,7 @@ function pintaAnexos(elId){
   if(!box)return;
   box.innerHTML=(ANX_ALVO||[]).map((a,i)=>`
     <div class="anx" onclick="verAnexo(${i})">
-      <div class="ic">${a.tipo==='imagem'?`<img src="${a.dado}">`:a.tipo==='arquivo'?(/pdf/i.test(a.mime||a.nome)?'📄':'📎'):'🔗'}</div>
+      <div class="ic">${a.tipo==='imagem'?`<img src="${a.thumb||a.dado}">`:a.tipo==='arquivo'?(/pdf/i.test(a.mime||a.nome)?'📄':'📎'):'🔗'}</div>
       <div class="nm">${a.nome||(a.tipo==='imagem'?'Foto do documento':'Link')}</div>
       <button class="rm" onclick="event.stopPropagation();rmAnexo(${i},'${elId}')">×</button>
     </div>`).join('')
@@ -1164,8 +1189,12 @@ document.getElementById('anexoInput').onchange=async e=>{
   for(const f of files){
     if(/^image\//.test(f.type)){
       try{
-        const dado=await comprimirImagem(f,1000,.6);
-        ANX_ALVO.push({id:uid(),tipo:'imagem',nome:f.name||'Foto do documento',dado});
+        toast('Guardando '+(f.name||'a foto')+'...');
+        const dataUrl=await comprimirImagem(f,1100,.62);
+        const thumb=await reduzirImagem(dataUrl,220,.45);
+        const id=uid();
+        const meta=await salvarArquivoAnexo('anx:'+id, new File([dataUrlParaBlob(dataUrl)], f.name||'foto.jpg', {type:'image/jpeg'}));
+        ANX_ALVO.push({id,tipo:'imagem',nome:f.name||'Foto do documento',thumb,mime:meta.mime,path:meta.path,local:meta.local});
       }catch(x){ toast('Não consegui ler '+(f.name||'a imagem')); }
     }else{
       const id=uid();
@@ -1181,7 +1210,7 @@ function rmAnexo(i,elId){ ANX_ALVO.splice(i,1); pintaAnexos(elId); }
 function verAnexo(i){
   const a=ANX_ALVO[i];
   if(a.tipo==='link'){ window.open(a.dado,'_blank'); return; }
-  if(a.tipo==='arquivo'){ mostrarArquivoAnexo(a,'fechar()'); return; }
+  if(a.tipo==='arquivo'||(a.tipo==='imagem'&&(a.path||a.local))){ mostrarArquivoAnexo(a,'fecharAnexoView()'); return; }
   abrir(`<h2>${a.nome}</h2>
     <img src="${a.dado}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
     <button class="btn ghost mini" onclick="fecharAnexoView()">Fechar</button>`);
@@ -1193,27 +1222,30 @@ function verAnexoLista(list){
   ANX_VER=list||[];
   abrir(`<h2>Anexos</h2><div class="card" style="box-shadow:none;margin-top:10px">
     ${ANX_VER.length?ANX_VER.map((a,i)=>`<div class="anx" onclick="verAnexoDet(${i})">
-      <div class="ic">${a.tipo==='imagem'?`<img src="${a.dado}">`:a.tipo==='arquivo'?(/pdf/i.test(a.mime||a.nome)?'📄':'📎'):'🔗'}</div>
+      <div class="ic">${a.tipo==='imagem'?`<img src="${a.thumb||a.dado}">`:a.tipo==='arquivo'?(/pdf/i.test(a.mime||a.nome)?'📄':'📎'):'🔗'}</div>
       <div class="nm">${a.nome||(a.tipo==='imagem'?'Foto do documento':'Link')}</div></div>`).join(''):'<div class="empty">Nenhum anexo</div>'}
   </div><button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
 function verAnexoDet(i){
   const a=ANX_VER[i];
   if(a.tipo==='link'){ window.open(a.dado,'_blank'); return; }
-  if(a.tipo==='arquivo'){ mostrarArquivoAnexo(a,`verAnexoLista(ANX_VER)`); return; }
+  if(a.tipo==='arquivo'||(a.tipo==='imagem'&&(a.path||a.local))){ mostrarArquivoAnexo(a,`verAnexoLista(ANX_VER)`); return; }
   abrir(`<h2>${a.nome}</h2><img src="${a.dado}" style="width:100%;border-radius:12px;margin:10px 0;display:block">
   <button class="btn ghost mini" onclick="fechar()">Fechar</button>`);
 }
 function salvar(){
   try{localStorage.setItem('obraC08',JSON.stringify(DB))}
   catch(e){
-    /* estourou o espaço: quase sempre são fotos antigas guardadas junto com os dados */
-    if(DB.fotos.some(f=>f.img)){
-      toast('Memória cheia — liberando espaço das fotos...');
-      migrarFotos(true).then(n=>{
+    /* estourou o espaço: quase sempre são fotos guardadas junto com os dados —
+       tenta liberar tanto o álbum quanto os anexos de gastos/cotações antes de desistir */
+    const temFotoPesada=DB.fotos.some(f=>f.img);
+    const temAnexoPesado=contarAnexosPesados()>0;
+    if(temFotoPesada||temAnexoPesado){
+      toast('Memória cheia — liberando espaço...');
+      Promise.all([temFotoPesada?migrarFotos(true):0, temAnexoPesado?migrarAnexosPesados(true):0]).then(([a,b])=>{
         try{ localStorage.setItem('obraC08',JSON.stringify(DB));
-          toast(n?'Espaço liberado: '+n+' foto(s) movidas':'Espaço liberado'); }
-        catch(e2){ toast('Memória cheia. Exporte o backup em Configurações.'); }
+          toast(((a||0)+(b||0))?'Espaço liberado':'Espaço liberado'); }
+        catch(e2){ toast('Memória ainda cheia. Exporte o backup em Configurações.'); }
       });
     }else toast('Memória cheia. Exporte o backup em Configurações.');
   }
@@ -2760,6 +2792,54 @@ document.getElementById('notaInput').onchange=async e=>{
   }
   if(arqs.length>1)toast('Enviei a primeira. Repita para as demais.');
 };
+/* move fotos anexadas a gastos e cotações — hoje embutidas em base64 dentro do pacote
+   enviado à nuvem a cada sincronização — para o armazenamento eficiente (idb + storage) */
+async function migrarAnexosPesados(silencioso){
+  let n=0;
+  const processa=async lista=>{
+    for(const item of lista){
+      if(!item.anexos||!item.anexos.length)continue;
+      let mexeu=false;
+      for(const a of item.anexos){
+        if(a.tipo!=='imagem'||!a.dado||a.path||a.local)continue;
+        try{
+          const thumb=a.thumb||await reduzirImagem(a.dado,220,.45);
+          const meta=await salvarArquivoAnexo('anx:'+a.id,
+            new File([dataUrlParaBlob(a.dado)], a.nome||'foto.jpg', {type:'image/jpeg'}));
+          a.thumb=thumb; a.mime=meta.mime; a.local=meta.local; if(meta.path)a.path=meta.path;
+          delete a.dado;
+          mexeu=true; n++;
+        }catch(e){}
+      }
+      if(mexeu)item.at=Date.now();
+    }
+  };
+  await processa(DB.lanc);
+  await processa(DB.cot);
+  if(n)salvar();
+  if(!silencioso) toast(n?`${n} foto(s) movida(s) — o pacote enviado à nuvem ficou bem mais leve`:'Nenhuma foto pesada para mover');
+  return n;
+}
+function tamanhoDB(){ try{ return new Blob([JSON.stringify(DB)]).size; }catch(e){ return 0; } }
+function contarAnexosPesados(){
+  let n=0;
+  DB.lanc.forEach(l=>(l.anexos||[]).forEach(a=>{ if(a.tipo==='imagem'&&a.dado)n++; }));
+  DB.cot.forEach(c=>(c.anexos||[]).forEach(a=>{ if(a.tipo==='imagem'&&a.dado)n++; }));
+  return n;
+}
+function verSincronizacao(){
+  const kb=Math.round(tamanhoDB()/1024), pesados=contarAnexosPesados();
+  abrir(`<h2>Sincronização</h2>
+  <div class="card" style="box-shadow:none;margin-top:10px">
+    <div class="stat"><span>Status</span><b style="color:${SESSAO?(SYNC_OK?'var(--green)':'var(--red)'):'var(--amber)'}">${!SESSAO?'modo local':SYNC_OK?'em dia ✓':'falhou'}</b></div>
+    <div class="stat"><span>Tamanho do pacote de dados</span><b class="mono">${kb} KB</b></div>
+    <div class="stat"><span>Fotos ainda pesadas</span><b class="mono" style="color:${pesados?'var(--amber)':'var(--green)'}">${pesados}</b></div>
+  </div>
+  ${pesados?`<button class="btn" onclick="migrarAnexosPesados().then(verSincronizacao)">Mover essas ${pesados} foto(s) agora</button>`:''}
+  <button class="btn ghost mini" style="margin-top:9px" onclick="ressincronizar(true).then(verSincronizacao)">Forçar sincronização agora</button>
+  <p class="hint">Fotos anexadas a gastos e cotações ficavam dentro do próprio pacote enviado à nuvem. Quando esse pacote crescia demais, o envio podia falhar sem avisar. Agora as fotos novas já vão direto para um espaço separado — mais leve e mais confiável.</p>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
 function comprimirImagem(file,maxLado,qual){
   return new Promise((ok,err)=>{
     const r=new FileReader();
@@ -5352,6 +5432,15 @@ function renderDivergencia(){
 }
 function renderNuvem(){
   const card=document.getElementById('cardNuvem'); if(!card)return;
+  if(RECUPERANDO){
+    card.style.display='block';
+    document.getElementById('nuvemMsg').innerHTML=
+      '<p style="font-size:13.5px;margin:0"><b>Restaurando os dados deste aparelho a partir da nuvem.</b> '+
+      'O arquivo salvo aqui ficou incompleto, mas nada foi apagado da nuvem — seus lançamentos continuam lá. '+
+      'Toque em "Tentar agora" com internet ligada.</p>'+
+      '<button class="btn ghost mini" style="margin-top:9px" onclick="ressincronizar(true)">Tentar agora</button>';
+    return;
+  }
   if(!SESSAO){
     card.style.display='block';
     document.getElementById('nuvemMsg').innerHTML=
@@ -6252,6 +6341,7 @@ function renderIO(){
     <button class="btn soft" onclick="abrirDuplicados()"><span class="ic">🔍</span>Duplicados</button>
     <button class="btn soft" onclick="verRestauracao()"><span class="ic">⏱</span>Restaurar</button>
     <button class="btn soft" onclick="migrarFotos()"><span class="ic">🧹</span>Liberar memória</button>
+    <button class="btn soft" onclick="verSincronizacao()"><span class="ic">📡</span>Sincronização</button>
     <button class="btn soft" onclick="conferirTotais()"><span class="ic">🧮</span>Conferir totais</button>
     <button class="btn soft" onclick="conferirEntradas()"><span class="ic">🔎</span>Conferir entradas</button>
   </div>
