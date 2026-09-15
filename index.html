@@ -573,6 +573,11 @@ a{color:var(--teal)}
       <option value="pago">Só pagos</option>
       <option value="aberto">Só a pagar</option>
     </select>
+    <select id="fStatus" style="margin-top:9px" onchange="renderGastos()">
+      <option value="ativos">Ativos</option>
+      <option value="cancelados">Cancelados</option>
+      <option value="todos">Todos</option>
+    </select>
     <label style="margin-top:9px">A data do período é</label>
     <select id="fBase" onchange="renderGastos()">
       <option value="compra">Data da compra</option>
@@ -1275,6 +1280,7 @@ const pagoParcial=l=>(l.pagamentos||[]).reduce((s,p)=>s+ +p.valor,0);
 const saldoAPagar=l=>isPago(l)?0:Math.max(0,+l.total-pagoParcial(l));
 /* quanto já saiu do bolso neste lançamento: tudo, se está pago; só as parcelas, se está em aberto */
 const valorPago=l=>{
+  if(l.cancelado)return 0;
   const t=+l.total||0;
   if(isPago(l))return t;
   if(t<0)return t;                       /* desconto ou estorno entra inteiro */
@@ -1293,6 +1299,7 @@ const temParcial=l=>!isPago(l)&&pagoParcial(l)>0;
 /* fatias por etapa; se o rateio não fechar com o total, ajusta proporcionalmente
    para o painel nunca somar diferente da lista de gastos */
 function partes(l){
+  if(l.cancelado)return [];                 /* cancelado não entra em nenhuma soma, em lugar nenhum */
   const tot=+l.total||0;
   if(!(l.rateio&&l.rateio.length))return [{cat:l.cat,valor:tot}];
   const ps=l.rateio.map(r=>({cat:r.cat,valor:+r.valor||0}));
@@ -1942,12 +1949,14 @@ function renderGastos(){
     iniEl.value=hoje().slice(0,8)+'01'; fimEl.value=hoje();
   }
   const fc=sel.value, fg=document.getElementById('fGrupo').value, fs=document.getElementById('fSit').value;
+  const fst=(document.getElementById('fStatus')||{}).value||'ativos';
   const busca=alfa2(document.getElementById('fBusca').value);
   const semPeriodo=semEl.checked, dIni=iniEl.value, dFim=fimEl.value;
   const porDigitacao=(document.getElementById('fBase')||{}).value==='digitacao';
   const dataFiltro=l=>porDigitacao?dataDigitada(l):l.data;
   let L=DB.lanc.filter(l=>(!fc||l.cat===fc)&&(!fg||cat(l.cat).g===fg)
         &&(!fs||(fs==='pago'?isPago(l):!isPago(l)))
+        &&(fst==='todos'||(fst==='cancelados'?l.cancelado:!l.cancelado))
         &&(semPeriodo||((!dIni||dataFiltro(l)>=dIni)&&(!dFim||dataFiltro(l)<=dFim))));
   if(busca){
     L=L.filter(l=>{
@@ -1967,19 +1976,19 @@ function renderGastos(){
   document.getElementById('gTotalLbl').textContent=
     (semPeriodo?'Total de todos os períodos':`Total de ${fmt(dIni)||'início'} a ${fmt(dFim)||'hoje'}`)
     +(porDigitacao?' (pela digitação)':'');
-  const geral=DB.lanc.reduce((s,l)=>s+ +l.total,0);
+  const geral=DB.lanc.filter(l=>!l.cancelado).reduce((s,l)=>s+ +l.total,0);
   document.getElementById('gTotalGeral').textContent=brl(geral);
   document.getElementById('gTotalGeralLinha').style.display=
     (semPeriodo||L.length===DB.lanc.length)?'none':'flex';
   if(VISAO_G!=='lista'){ renderGastosAgrupado(L); return; }
   document.getElementById('gastosList').innerHTML=L.map(l=>{
     const p=dia(l.data), falta=l.ctrl?(+l.qtd - +l.qtdRec):0, ab=!isPago(l), pp=pagoParcial(l);
-    return `<div class="item" onclick="verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
+    return `<div class="item" onclick="${l.cancelado?`restaurarGasto('${l.id}')`:`verGasto('${l.id}')`}" style="${l.cancelado?'opacity:.55':(ab?'opacity:.72':'')}">
       <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span>${dtDig(l)}</div>
       <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-        <small>${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}${porDigitacao?` · <span style="color:var(--teal)">compra de ${l.data.split('-').reverse().slice(0,2).join('/')}</span>`:seloDig(l)}</small></div>
-      <div class="val"><span class="mono">${brl(l.total)}</span>
-        ${ab?`<div><span class="tag pend">${pp>0?'falta '+brl(saldoAPagar(l)):'a pagar'}</span></div>`:''}</div></div>`;
+        <small>${l.cancelado?`<span style="color:var(--red)">cancelado em ${new Date(+l.canceladoEm||0).toLocaleDateString('pt-BR')} · toque para restaurar</span>`:`${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}${porDigitacao?` · <span style="color:var(--teal)">compra de ${l.data.split('-').reverse().slice(0,2).join('/')}</span>`:seloDig(l)}`}</small></div>
+      <div class="val"><span class="mono" style="${l.cancelado?'text-decoration:line-through':''}">${brl(l.total)}</span>
+        ${l.cancelado?'<div><span class="tag">↺ restaurar</span></div>':ab?`<div><span class="tag pend">${pp>0?'falta '+brl(saldoAPagar(l)):'a pagar'}</span></div>`:''}</div></div>`;
   }).join('')||'<div class="empty"><b>Nenhum gasto neste filtro</b><p>Ajuste os filtros acima.</p></div>';
 }
 document.getElementById('fCat').onchange=renderGastos;
@@ -4318,7 +4327,7 @@ function abrirGasto(l){
   <label>Observações</label><textarea id="x_obs">${l.obs}</textarea>
   <div style="height:14px"></div>
   <button class="btn" onclick="salvarGasto('${l.id}')">Salvar</button>
-  ${l.id?`<button class="btn ghost mini" style="margin-top:9px" onclick="excluirGasto('${l.id}')">Excluir lançamento</button>`:''}
+  ${l.id?`<button class="btn ghost mini" style="margin-top:9px" onclick="excluirGasto('${l.id}')">Cancelar lançamento</button>`:''}
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
 
   const q=document.getElementById('x_qtd'),u=document.getElementById('x_unit'),t=document.getElementById('x_total');
@@ -4448,29 +4457,34 @@ function salvarGasto(id){
 const val=i=>document.getElementById(i).value;
 function excluirGasto(id){
   const l=DB.lanc.find(x=>x.id===id);
-  const abertos=l.serie?DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)):[];
+  const abertos=l.serie?DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)&&!x.cancelado):[];
   if(l.serie&&abertos.length>1){
     ACAO_PENDENTE=()=>{
-      DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)).forEach(x=>marcarExcluido(x,'lanc'));
-      DB.lanc=DB.lanc.filter(x=>!(x.serie===l.serie&&!isPago(x)));
-      salvar();fechar();render();toast('Lançamentos em aberto da série excluídos');
+      DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)&&!x.cancelado)
+        .forEach(x=>{x.cancelado=true; x.canceladoEm=Date.now(); x.at=Date.now();});
+      salvar();fechar();render();toast('Lançamentos em aberto da série cancelados');
     };
     abrir(`<h2>Faz parte de uma série mensal</h2>
-    <p class="sub">"${l.desc}" se repete todo mês. O que você quer excluir?</p>
-    <button class="btn danger" onclick="executarPendente()">Excluir os ${abertos.length} em aberto da série</button>
-    <button class="btn ghost mini" style="margin-top:9px" onclick="excluirSoEste('${id}')">Excluir só este lançamento</button>
-    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+    <p class="sub">"${l.desc}" se repete todo mês. O que você quer cancelar?</p>
+    <button class="btn danger" onclick="executarPendente()">Cancelar os ${abertos.length} em aberto da série</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="excluirSoEste('${id}')">Cancelar só este lançamento</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar operação</button>`);
     return;
   }
   excluirSoEste(id);
 }
 function excluirSoEste(id){
   const l=DB.lanc.find(x=>x.id===id);
-  confirmar('Excluir lançamento',`"${l.desc}" — ${brl(l.total)}. Não é possível desfazer.`,
-    'Excluir',()=>{
-      marcarExcluido(l,'lanc');
-      DB.lanc=DB.lanc.filter(x=>x.id!==id);salvar();fechar();render();toast('Lançamento excluído');
+  confirmar('Cancelar lançamento',`"${l.desc}" — ${brl(l.total)}. Ele sai das contas e dos totais, mas fica guardado — dá para restaurar depois em "Ver cancelados".`,
+    'Cancelar lançamento',()=>{
+      l.cancelado=true; l.canceladoEm=Date.now(); l.at=Date.now();
+      salvar();fechar();render();toast('Lançamento cancelado — pode restaurar em "Ver cancelados"');
     },true);
+}
+function restaurarGasto(id){
+  const l=DB.lanc.find(x=>x.id===id); if(!l)return;
+  l.cancelado=false; delete l.canceladoEm; l.at=Date.now();
+  salvar();fechar();render();toast('Lançamento restaurado');
 }
 
 function verGasto(id){
@@ -4509,13 +4523,16 @@ function verGasto(id){
     <p class="hint">Use para pagar o pedreiro aos poucos. Quando o saldo zerar, vira "Pago" sozinho.</p>`:''}
   ${l.pagamentos&&l.pagamentos.length?'<div class="divider"></div><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)">Pagamentos</h3>'+
     l.pagamentos.map(p=>`<div class="stat"><span>${p.d.split('-').reverse().join('/')}</span><b class="mono">${brl(p.valor)}</b></div>`).join(''):''}
+  ${l.cancelado?`<div class="stat" style="background:rgba(196,83,77,.08);border-radius:10px;padding:9px 11px;border:0"><span style="color:var(--red);font-weight:700">✕ Cancelado</span><b style="font-size:12px;color:var(--ink-2)">${new Date(+l.canceladoEm||0).toLocaleDateString('pt-BR')}</b></div>`:''}
   <div style="height:14px"></div>
-  ${isPago(l)?'':`<button class="btn" onclick="marcarPago('${l.id}')">Marcar tudo como pago</button><div style="height:9px"></div>`}
+  ${isPago(l)||l.cancelado?'':`<button class="btn" onclick="marcarPago('${l.id}')">Marcar tudo como pago</button><div style="height:9px"></div>`}
   <div class="row2">
     <button class="btn ghost mini" onclick="abrirGasto(DB.lanc.find(x=>x.id==='${l.id}'))">Editar</button>
     <button class="btn ghost mini" onclick="duplicar('${l.id}')">Duplicar</button>
   </div>
-  <button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="excluirGasto('${l.id}')">Excluir lançamento</button>
+  ${l.cancelado
+    ?`<button class="btn ghost mini" style="margin-top:9px;color:var(--green)" onclick="restaurarGasto('${l.id}')">↺ Restaurar lançamento</button>`
+    :`<button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="excluirGasto('${l.id}')">Cancelar lançamento</button>`}
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
 function darPagamento(id){
@@ -5563,6 +5580,11 @@ function pagamentosDe(id){
 function pagamentosFiltrados(){
   return DB.lanc.filter(l=>noPeriodoEq(l)&&(!EQ_QUEM||l.trabId===EQ_QUEM)).sort(ordenaEq);
 }
+/* mão de obra lançada sem vincular a nenhum colaborador — some do resumo por pessoa, mas continua nos Gastos */
+function moSemColaborador(){
+  return DB.lanc.filter(l=>!l.cancelado&&!l.trabId&&cat(l.cat).id==='c07'&&noPeriodoEqSemTrab(l));
+}
+const noPeriodoEqSemTrab=l=>(!EQ_INI||dataBaseEq(l)>=EQ_INI)&&(!EQ_FIM||dataBaseEq(l)<=EQ_FIM);
 function rotuloPeriodoEq(){
   const p=(EQ_INI||EQ_FIM)
     ? `${EQ_INI?EQ_INI.split('-').reverse().join('/'):'início'} a ${EQ_FIM?EQ_FIM.split('-').reverse().join('/'):'hoje'}`
@@ -5596,9 +5618,10 @@ function renderEquipe(){
   });
 
   const mo=pagamentosFiltrados();
-  const totalMO=mo.reduce((s,l)=>s+ +l.total,0);
-  const diasMO=mo.reduce((s,l)=>s+(+l.qtd||0),0);
-  const aberto=mo.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
+  const orfaos=EQ_QUEM?[]:moSemColaborador();
+  const totalMO=mo.reduce((s,l)=>s+ +l.total,0)+orfaos.reduce((s,l)=>s+ +l.total,0);
+  const diasMO=mo.reduce((s,l)=>s+(+l.qtd||0),0)+orfaos.reduce((s,l)=>s+(+l.qtd||0),0);
+  const aberto=mo.concat(orfaos).filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
   const el=document.getElementById('equipeResumo');
   if(el)el.innerHTML=
     `<div class="stat"><span>${EQ_QUEM?'Pago a '+((eq.find(t=>t.id===EQ_QUEM)||{}).nome||''):'Total investido em equipe'}</span>
@@ -5645,6 +5668,25 @@ function renderEquipe(){
       </div></div>`;
   }).join('')
   : '<div class="card"><div class="empty"><b>Nenhum trabalhador cadastrado</b><p>Cadastre o pedreiro, servente ou ajudante e o valor da diária para controlar a mão de obra.</p></div></div>';
+  if(orfaos.length){
+    const totOrf=orfaos.reduce((s,l)=>s+ +l.total,0), k='eq:orfaos';
+    lista.innerHTML += `<div class="acc ${ACC[k]?'on':''}" data-acc="${k}" style="margin-bottom:8px;border-left:3px solid var(--amber)">
+      <div class="acch">
+        <div style="flex:1;min-width:0">
+          <b style="font-size:14.5px">Sem colaborador vinculado</b>
+          <div style="font-size:11.5px;color:var(--ink-2)">${orfaos.length} lançamento(s) em "07 Mão de obra" digitados fora da tela de pagamentos</div>
+        </div>
+        <b class="mono" style="white-space:nowrap">${brl(totOrf)}</b>
+        <span class="arw">▼</span>
+      </div>
+      <div class="accb">
+        ${orfaos.map(l=>`<div class="item" data-gasto="${l.id}" ${!isPago(l)?'style="opacity:.72"':''}>
+          <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+          <div class="mid"><b>${l.desc}</b><small>${l.forn||'sem fornecedor'}</small></div>
+          <div class="val"><span class="mono">${brl(l.total)}</span></div></div>`).join('')}
+        <p class="hint">Contam no total da equipe, mas não em nenhum colaborador específico. Edite cada um em Gastos para vincular a um nome, ou lance de novo por "Lançar pagamentos" e cancele este.</p>
+      </div></div>`;
+  }
 
   /* liga os cliques por código — mais confiável que onclick no HTML */
   lista.querySelectorAll('.acc').forEach(card=>{
@@ -6111,12 +6153,27 @@ function salvarTrabalhador(id){
 let PG_ABERTO=false;
 function editarColabDaGrade(id){ PG_ABERTO=true; abrirTrabalhador(id); }
 function excluirTrabalhador(id){
-  const temLanc=DB.lanc.some(l=>l.trabId===id);
-  confirmar('Excluir trabalhador',
-    temLanc?'As semanas já lançadas continuam nos gastos, apenas o cadastro sai daqui.':'Não é possível desfazer.',
+  const t=equipe().find(x=>x.id===id); if(!t)return;
+  const ativos=DB.lanc.filter(l=>l.trabId===id&&!l.cancelado);
+  if(ativos.length){
+    const soma=ativos.reduce((s,l)=>s+ +l.total,0);
+    abrir(`<h2>Não dá para excluir agora</h2>
+    <p class="sub">"${t.nome}" tem ${ativos.length} gasto(s) lançado(s), somando ${brl(soma)}.</p>
+    <p class="hint">Cancele (ou mude o colaborador desses lançamentos) antes de excluir — assim o histórico de pagamentos não some sem querer.</p>
+    <button class="btn" onclick="fechar();EQ_QUEM='${id}';document.querySelector('nav button[data-v=equipe]').click();setTimeout(verTodosPagamentos,60)">Ver esses gastos</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+    return;
+  }
+  confirmar('Excluir trabalhador',`"${t.nome}" não tem gastos vinculados. Ele sai da lista, mas fica guardado — dá para restaurar em "Ver cancelados".`,
     'Excluir',()=>{
-      DB.equipe=equipe().filter(x=>x.id!==id);salvar();fechar();render();toast('Trabalhador excluído');
+      t.cancelado=true; t.canceladoEm=Date.now(); t.at=Date.now();
+      salvar();fechar();render();toast('Trabalhador removido — pode restaurar em "Ver cancelados"');
     },true);
+}
+function restaurarTrabalhador(id){
+  const t=equipe().find(x=>x.id===id); if(!t)return;
+  t.cancelado=false; delete t.canceladoEm; t.at=Date.now();
+  salvar();fechar();render();toast('Trabalhador restaurado');
 }
 function abrirSemana(trabId){
   const t=equipe().find(x=>x.id===trabId); if(!t)return;
