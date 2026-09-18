@@ -4738,6 +4738,7 @@ function virouCompra(id){
 function abrirConfirmarCompra(c){
   const base=preencherFamilias((c.itens&&c.itens.length)?itensComDesconto(c):[{c:'',d:c.item,q:1,u:c.total,f:''}]);
   panel._itC=JSON.parse(JSON.stringify(base)).map(i=>({...i,cats:[i.cat||'c00']}));
+  panel._itC0Show=false;
   panel._cotOrig=c;
   abrir(`<h2>Lançar compra</h2>
   <p class="sub">${c.conc?`⚖ ${c.conc} · `:''}${c.forn||'Sem fornecedor'}${(+c.at>0)?` · digitada em ${horaDigitada(c)}`:''} · marque em quais etapas cada item entra</p>
@@ -4753,7 +4754,14 @@ function abrirConfirmarCompra(c){
 }
 function pintaItensCompra(){
   const etapasCon=CATS_AZ.filter(x=>x.g==='con');
-  document.getElementById('itensCompra').innerHTML=panel._itC.map((it,i)=>{
+  const banner=(panel._itC0Show&&panel._itC.length>1)?`<div class="card" style="background:rgba(22,163,148,.08);border:1px solid var(--teal);margin-bottom:9px;padding:10px 12px;box-shadow:none">
+     <p style="margin:0;font-size:13px">Usar essas mesmas etapas para os outros ${panel._itC.length-1} item(ns) da compra?</p>
+     <div class="row2" style="margin-top:8px">
+       <button class="btn mini" onclick="aplicarEtapasATodos()">Aplicar a todos</button>
+       <button class="btn ghost mini" onclick="panel._itC0Show=false;pintaItensCompra()">Não, obrigado</button>
+     </div>
+   </div>`:'';
+  document.getElementById('itensCompra').innerHTML=banner+panel._itC.map((it,i)=>{
     const n=it.cats.length, bruto=(+it.q||0)*(+it.u||0), corte=+it.descItem||0;
     const valorItem=+(bruto-corte).toFixed(2);
     return `<div class="grp" style="background:var(--surface-2);margin-bottom:8px">
@@ -4784,13 +4792,26 @@ function toggleEtapaItem(i,catId,checked){
   const it=panel._itC[i];
   if(checked){ if(!it.cats.includes(catId)) it.cats.push(catId); }
   else { it.cats=it.cats.filter(c=>c!==catId); }
+  if(i===0) panel._itC0Show = panel._itC.length>1 && it.cats.length>0;
   pintaItensCompra();
 }
 function marcarTodasEtapas(i){
   panel._itC[i].cats=CATS_AZ.filter(x=>x.g==='con').map(x=>x.id);
+  if(i===0) panel._itC0Show = panel._itC.length>1;
   pintaItensCompra();
 }
-function limparEtapas(i){ panel._itC[i].cats=[]; pintaItensCompra(); }
+function limparEtapas(i){
+  panel._itC[i].cats=[];
+  if(i===0) panel._itC0Show=false;
+  pintaItensCompra();
+}
+function aplicarEtapasATodos(){
+  const base=panel._itC[0].cats.slice();
+  panel._itC.forEach((it,i)=>{ if(i>0) it.cats=base.slice(); });
+  panel._itC0Show=false;
+  pintaItensCompra();
+  toast('Etapas aplicadas aos '+(panel._itC.length-1)+' outros itens — ajuste algum se precisar');
+}
 function confirmarCompra(){
   if(panel._itC.some(it=>it.cats.length===0)){toast('Falta escolher a etapa de algum item.');return}
   const c=panel._cotOrig, pago=document.getElementById('ic_pago').checked;
