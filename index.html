@@ -683,6 +683,7 @@ a{color:var(--teal)}
 <section class="view" id="v-equipe">
   <button class="btn" onclick="abrirPagamentos()">💰 Lançar pagamentos</button>
   <div class="acoes">
+    <button class="btn soft" onclick="abrirComprovantes()"><span class="ic">📄</span>Por comprovante Pix</button>
     <button class="btn soft" onclick="abrirTrabalhador()"><span class="ic">＋</span>Novo trabalhador</button>
   </div>
   <div class="card" style="margin-top:12px">
@@ -786,6 +787,7 @@ a{color:var(--teal)}
 <input type="file" id="pdfCotInput" accept="application/pdf,.pdf" hidden>
 <input type="file" id="notaInput" multiple hidden>
 <input type="file" id="qrInput" accept="image/*" capture="environment" hidden>
+<input type="file" id="compInput" accept=".pdf,application/pdf,image/*" multiple hidden>
 <datalist id="dlProdutos"></datalist>
 <datalist id="dlCategorias"></datalist>
 <datalist id="dlForn"></datalist>
@@ -5749,6 +5751,7 @@ function verTodosPagamentos(){
 }
 /* ---------- pagamentos da equipe: uma tela, uma linha por colaborador ---------- */
 let PG={tipo:'semanal',ini:'',fim:'',linhas:{}};
+let PG_MANTER_LINHAS=false;
 const DIA_SEM=['dom','seg','ter','qua','qui','sex','sáb'];
 function diasDoPeriodo(ini,fim){
   const out=[]; if(!ini||!fim)return out;
@@ -5783,6 +5786,136 @@ function periodoPadrao(tipo,base){
 }
 const PG_SEM_DIAS=t=>t==='adiantamento'||t==='compra';
 
+/* ---------- lançar pagamentos a partir de comprovantes de Pix ---------- */
+let COMP_REV=[];
+function abrirComprovantes(){ document.getElementById('compInput').click(); }
+document.getElementById('compInput').onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=''; if(!files.length)return;
+  toast('Lendo '+files.length+' comprovante(s)...');
+  COMP_REV=[];
+  for(const f of files){
+    const row={file:f,nome:'',valor:0,data:hoje(),matchId:'',novo:false,isImage:/^image\//.test(f.type)};
+    if(/pdf/i.test(f.type)){
+      try{
+        const linhas=await linhasDoPdf(f);
+        const p=parseComprovantePix(linhas);
+        row.nome=p.nome; row.valor=p.valor; if(p.data)row.data=p.data;
+      }catch(x){}
+    }
+    const cand=melhorColaboradorPara(row.nome);
+    row.matchId=cand?cand.id:'';
+    row.novo=!cand;
+    COMP_REV.push(row);
+  }
+  abrirRevisaoComprovantes();
+};
+/* tenta achar valor, data e nome do destinatário no texto do comprovante — formatos variam bastante entre bancos */
+function parseComprovantePix(linhas){
+  const texto=linhas.join(' \n ');
+  let valor=0;
+  const comLabel=texto.match(/valor[^\n\d]{0,15}(R\$\s*[\d.,]+)/i);
+  const qualquer=[...texto.matchAll(/R\$\s*([\d.,]+)/g)];
+  if(comLabel) valor=nBR(comLabel[1].replace('R$','').trim());
+  else if(qualquer.length) valor=Math.max(...qualquer.map(m=>nBR(m[1])));
+  let data='';
+  const dm=texto.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  const MESES={janeiro:'01',fevereiro:'02',março:'03',marco:'03',abril:'04',maio:'05',junho:'06',
+    julho:'07',agosto:'08',setembro:'09',outubro:'10',novembro:'11',dezembro:'12'};
+  const dext=texto.match(/(\d{1,2})\s*de\s*([a-zçã]+)\s*de\s*(\d{4})/i);
+  if(dm) data=`${dm[3]}-${dm[2]}-${dm[1]}`;
+  else if(dext&&MESES[dext[2].toLowerCase()]) data=`${dext[3]}-${MESES[dext[2].toLowerCase()]}-${dext[1].padStart(2,'0')}`;
+  let nome='';
+  for(let i=0;i<linhas.length;i++){
+    if(/destinat[áa]rio|favorecido|recebedor|nome\s*do\s*recebedor|para\s*quem|^para$|^pago\s*a$/i.test(linhas[i].trim())){
+      const mesma=linhas[i].split(':').slice(1).join(':').trim();
+      nome=mesma||linhas[i+1]||'';
+      break;
+    }
+  }
+  if(!nome){
+    /* formato em duas seções ("Quem recebeu" / "Quem pagou"), cada uma com um rótulo "Nome" —
+       tem que pegar o nome de dentro de "Quem recebeu", nunca o de "Quem pagou" (que é o próprio usuário) */
+    const iRec=linhas.findIndex(l=>/quem\s*recebeu/i.test(l));
+    const iPag=linhas.findIndex(l=>/quem\s*pagou/i.test(l));
+    if(iRec>=0){
+      const fim=(iPag>iRec)?iPag:linhas.length;
+      for(let i=iRec+1;i<fim;i++){
+        if(/^nome$/i.test(linhas[i].trim())){ nome=linhas[i+1]||''; break; }
+      }
+    }
+  }
+  if(!nome){
+    const cand=linhas.find(l=>{
+      const p=l.trim().split(/\s+/);
+      return p.length>=2 && p.length<=5 && /^[A-Za-zÀ-ÿ\s]+$/.test(l) && !/pix|comprovante|banco|ag[êe]ncia|conta|transfer|chave|valor|data|hor[áa]rio|instituição|cpf|cnpj/i.test(l);
+    });
+    if(cand) nome=cand.trim();
+  }
+  return {valor,data,nome:capNomes(nome.replace(/[^\wÀ-ÿ\s]/g,'').trim())};
+}
+function melhorColaboradorPara(nome){
+  if(!nome)return null;
+  const stop=new Set(['de','da','do','dos','das','e']);
+  const alvo=alfa2(nome).split(/\s+/).filter(w=>w&&!stop.has(w));
+  if(!alvo.length)return null;
+  /* uma palavra "bate" também quando uma das duas é só a inicial da outra —
+     cobre nome cadastrado abreviado ("Anderson S L Fontes") contra o nome
+     completo do comprovante ("Anderson dos Santos Lourenço de Fontes") */
+  const bateTok=(a,b)=> a===b || (a.length<=2&&b[0]===a[0]) || (b.length<=2&&a[0]===b[0]);
+  let melhor=null,melhorScore=0;
+  equipe().forEach(t=>{
+    const meu=alfa2(t.nome).split(/\s+/).filter(w=>w&&!stop.has(w));
+    if(!meu.length)return;
+    const bate=meu.filter(w=>alvo.some(a=>bateTok(w,a))).length;
+    const score=bate/meu.length;
+    if(score>melhorScore){melhorScore=score;melhor=t;}
+  });
+  return melhorScore>=0.6?melhor:null;
+}
+function abrirRevisaoComprovantes(){
+  const eq=equipe();
+  abrir(`<h2>Conferir comprovantes</h2>
+  <p class="sub">${COMP_REV.length} arquivo(s). Confira nome, valor e data — ${COMP_REV.some(r=>r.isImage)?'nas imagens eu não consigo ler o texto, preencha à mão. ':''}o comprovante fica anexado ao pagamento.</p>
+  <div style="max-height:56vh;overflow:auto">
+  ${COMP_REV.map((r,i)=>`<div class="card" style="box-shadow:none;margin-top:9px;border:1px solid var(--line)">
+    <b style="font-size:13px">${r.file.name}</b>
+    <div class="row2" style="margin-top:7px">
+      <div><label style="margin-top:0">Data</label><input type="date" value="${r.data}" onchange="COMP_REV[${i}].data=this.value"></div>
+      <div><label style="margin-top:0">Valor</label><input inputmode="numeric" value="${r.valor?num2moeda(r.valor):''}" placeholder="0,00" oninput="onMoedaInput(this);COMP_REV[${i}].valor=moeda2num(this.value)"></div>
+    </div>
+    <label style="margin-top:8px">Colaborador</label>
+    <select onchange="mudarMatchComp(${i},this.value)">
+      <option value="">+ Novo colaborador com este nome</option>
+      ${eq.map(t=>`<option value="${t.id}" ${r.matchId===t.id?'selected':''}>${t.nome}</option>`).join('')}
+    </select>
+    ${!r.matchId?`<input style="margin-top:7px" data-cap="1" value="${r.nome.replace(/"/g,'&quot;')}" placeholder="Nome do colaborador"
+      oninput="COMP_REV[${i}].nome=this.value">`:''}
+  </div>`).join('')}
+  </div>
+  <button class="btn" style="margin-top:12px" onclick="confirmarComprovantes()">Ir para o período e os dias trabalhados</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function mudarMatchComp(i,id){ COMP_REV[i].matchId=id; abrirRevisaoComprovantes(); }
+function confirmarComprovantes(){
+  if(COMP_REV.some(r=>!(r.valor>0))){toast('Falta o valor de algum comprovante.');return}
+  PG.linhas=PG.linhas||{};
+  COMP_REV.forEach(r=>{
+    let t;
+    if(r.matchId) t=equipe().find(x=>x.id===r.matchId);
+    else{
+      if(!r.nome.trim()){toast('Falta o nome de algum comprovante.');return}
+      t={id:uid(),nome:capNomes(r.nome),funcao:'',diaria:0,at:Date.now()};
+      equipe().push(t);
+    }
+    PG.linhas[t.id]={on:true,dias:{},valor:r.valor,manual:true,obs:'',_anexoFile:r.file,_anexoData:r.data};
+    PG_FOCO=t.id;
+  });
+  salvar();
+  COMP_REV=[];
+  PG_MANTER_LINHAS=true;
+  abrirPagamentos();
+}
+
 function abrirPagamentos(){
   if(!equipe().length){
     abrir(`<h2>Pagamentos da equipe</h2>
@@ -5793,7 +5926,8 @@ function abrirPagamentos(){
   }
   const p=periodoPadrao(PG.tipo);
   if(!PG.ini){PG.ini=p.ini;PG.fim=p.fim}
-  PG.linhas={};
+  if(!PG_MANTER_LINHAS) PG.linhas={};
+  PG_MANTER_LINHAS=false;
   desenharPagamentos();
 }
 function mudarTipoPg(){
@@ -5999,39 +6133,58 @@ function valorLinhaPg(id,txt){
   const sn=document.getElementById('pgQtd');
   if(sn)sn.textContent=Object.values(PG.linhas).filter(x=>x.on&&(+x.valor>0)).length+' pagamento(s) a lançar';
 }
-function salvarPagamentos(){
+async function salvarPagamentos(){
   const pago=document.getElementById('pg_pago').checked;
   const semDias=PG_SEM_DIAS(PG.tipo);
   const obs=semDias?capNomes(val('pg_obs')):'';
   const rot={diario:'diária',semanal:'semana',quinzenal:'quinzena',mensal:'mês',
     adiantamento:'adiantamento',compra:'pedido de compra'}[PG.tipo];
   const fmt=d=>d.split('-').reverse().slice(0,2).join('/');
-  let n=0,soma=0;
+  let n=0,soma=0; const paraAnexar=[];
   equipe().forEach(t=>{
     const L=PG.linhas[t.id];
     if(!L||!L.on)return;
     const total=+L.valor||0;
     if(!(total>0))return;
     const marcados=Object.keys(L.dias).filter(k=>+L.dias[k]>0).sort();
-    const qtd=semDias?1:+somaDias(L).toFixed(2);
-    if(!semDias&&!qtd)return;
-    const dataLanc=semDias?PG.ini:marcados[marcados.length-1];
+    const viaComprovante=!!L._anexoFile;
+    if(!semDias&&!marcados.length&&!viaComprovante)return;
+    const qtd=semDias?1:(marcados.length?+somaDias(L).toFixed(2):1);
+    const dataLanc=semDias?PG.ini:(marcados.length?marcados[marcados.length-1]:(L._anexoData||PG.ini));
     const desc=semDias
       ? `${t.nome} · ${rot}${obs?' · '+obs:''} ${fmt(PG.ini)}`
-      : (PG.tipo==='diario'
+      : !marcados.length
+        ? `${t.nome} · pago via Pix ${fmt(dataLanc)}`
+        : (PG.tipo==='diario'
           ? `${t.nome} · ${rot} ${fmt(marcados[0])}`
           : `${t.nome} · ${rot} ${fmt(marcados[0])} a ${fmt(marcados[marcados.length-1])}`);
-    DB.lanc.push({id:uid(),at:Date.now(),trabId:t.id,
+    const id=uid();
+    DB.lanc.push({id,at:Date.now(),trabId:t.id,
       data:dataLanc, desc, familia:'Mão de obra', cat:'c07', forn:t.nome,
       qtd, unit:+(total/qtd).toFixed(2), total,
       pag:pago?'Pago':'A pagar', nf:'', anexos:[],
-      obs:semDias?obs:`${qtd} diária(s) em ${marcados.length} dia(s): ${marcados.map(k=>fmt(k)+(+L.dias[k]===.5?' (½)':'')).join(', ')}`,
+      obs:semDias?obs:(marcados.length?`${qtd} diária(s) em ${marcados.length} dia(s): ${marcados.map(k=>fmt(k)+(+L.dias[k]===.5?' (½)':'')).join(', ')}`:'Comprovante de Pix'),
       tipoPg:PG.tipo, ctrl:false,qtdRec:0,baixas:[],pagamentos:[]});
+    if(viaComprovante) paraAnexar.push({id,file:L._anexoFile});
     n++; soma+=total;
   });
   if(!n){toast('Marque ao menos um colaborador com valor.');return}
   salvar(); fechar(); render();
   toast(`${n} pagamento(s) lançado(s) · ${brl(soma)}`);
+  for(const {id,file} of paraAnexar){
+    try{
+      const dataUrl=await comprimirImagem(file,1100,.62).catch(()=>null);
+      const thumb=dataUrl?await reduzirImagem(dataUrl,220,.45):null;
+      const aid=uid();
+      const meta=await salvarArquivoAnexo('anx:'+aid,file);
+      const l=DB.lanc.find(x=>x.id===id); if(!l)continue;
+      l.anexos=l.anexos||[];
+      l.anexos.push({id:aid,tipo:/^image\//.test(file.type)?'imagem':'arquivo',nome:file.name||'Comprovante Pix',
+        thumb,mime:meta.mime,path:meta.path,local:meta.local});
+      l.at=Date.now();
+    }catch(e){}
+  }
+  if(paraAnexar.length) salvar();
 }
 
 /* ---------- pagamento recorrente (engenheiro, mestre de obra, mensalistas) ---------- */
