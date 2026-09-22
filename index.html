@@ -5844,31 +5844,33 @@ function parseComprovantePix(linhas){
   const dext=texto.match(/(\d{1,2})\s*de\s*([a-zçã]+)\s*de\s*(\d{4})/i);
   if(dm) data=`${dm[3]}-${dm[2]}-${dm[1]}`;
   else if(dext&&MESES[dext[2].toLowerCase()]) data=`${dext[3]}-${MESES[dext[2].toLowerCase()]}-${dext[1].padStart(2,'0')}`;
+  const ehLabel=l=>/pix|comprovante|banco|ag[êe]ncia|conta|transfer|chave|valor|data|hor[áa]rio|institui[çc][ãa]o|cpf|cnpj|nome|id\s*da|transa[çc][ãa]o|quem|sobre|inter\b/i.test(l);
+  const pareceNome=l=>{
+    const p=l.trim().split(/\s+/);
+    return p.length>=2 && p.length<=6 && /^[A-Za-zÀ-ÿ.\s]+$/.test(l) && !ehLabel(l);
+  };
   let nome='';
   for(let i=0;i<linhas.length;i++){
     if(/destinat[áa]rio|favorecido|recebedor|nome\s*do\s*recebedor|para\s*quem|^para$|^pago\s*a$/i.test(linhas[i].trim())){
       const mesma=linhas[i].split(':').slice(1).join(':').trim();
-      nome=mesma||linhas[i+1]||'';
-      break;
+      nome=(mesma&&pareceNome(mesma))?mesma:(pareceNome(linhas[i+1]||'')?linhas[i+1]:'');
+      if(nome)break;
     }
   }
   if(!nome){
-    /* formato em duas seções ("Quem recebeu" / "Quem pagou"), cada uma com um rótulo "Nome" —
-       tem que pegar o nome de dentro de "Quem recebeu", nunca o de "Quem pagou" (que é o próprio usuário) */
-    const iRec=linhas.findIndex(l=>/quem\s*recebeu/i.test(l));
-    const iPag=linhas.findIndex(l=>/quem\s*pagou/i.test(l));
+    /* formato em duas seções ("Quem recebeu" / "Quem pagou") — o nome sai de dentro da seção de
+       quem recebeu, nunca da de quem pagou (que é o próprio usuário). O OCR raramente entrega a
+       palavra "Nome" isolada numa linha própria, então aceita a primeira linha da seção que parece
+       um nome de gente, mesmo sem o rótulo exato na frente. */
+    const iRec=linhas.findIndex(l=>/quem\s*receb/i.test(l));
+    const iPag=linhas.findIndex(l=>/quem\s*pag/i.test(l));
     if(iRec>=0){
-      const fim=(iPag>iRec)?iPag:linhas.length;
-      for(let i=iRec+1;i<fim;i++){
-        if(/^nome$/i.test(linhas[i].trim())){ nome=linhas[i+1]||''; break; }
-      }
+      const fim=(iPag>iRec)?iPag:Math.min(linhas.length,iRec+8);
+      for(let i=iRec+1;i<fim;i++){ if(pareceNome(linhas[i])){ nome=linhas[i]; break; } }
     }
   }
   if(!nome){
-    const cand=linhas.find(l=>{
-      const p=l.trim().split(/\s+/);
-      return p.length>=2 && p.length<=5 && /^[A-Za-zÀ-ÿ\s]+$/.test(l) && !/pix|comprovante|banco|ag[êe]ncia|conta|transfer|chave|valor|data|hor[áa]rio|instituição|cpf|cnpj/i.test(l);
-    });
+    const cand=linhas.find(pareceNome);
     if(cand) nome=cand.trim();
   }
   return {valor,data,nome:capNomes(nome.replace(/[^\wÀ-ÿ\s]/g,'').trim())};
@@ -5877,16 +5879,19 @@ function melhorColaboradorPara(nome){
   if(!nome)return null;
   const stop=new Set(['de','da','do','dos','das','e']);
   const alvo=alfa2(nome).split(/\s+/).filter(w=>w&&!stop.has(w));
-  if(!alvo.length)return null;
+  if(alvo.length<2)return null;               /* nome de gente tem 2+ palavras — abaixo disso é ruído de OCR */
   /* uma palavra "bate" também quando uma das duas é só a inicial da outra —
      cobre nome cadastrado abreviado ("Anderson S L Fontes") contra o nome
-     completo do comprovante ("Anderson dos Santos Lourenço de Fontes") */
+     completo do comprovante ("Anderson dos Santos Lourenço de Fontes").
+     Só vale para nome cadastrado com 2+ palavras: um nome de uma palavra só
+     (ex. "Augusto") não pode casar por causa de uma letra solta e ambígua. */
   const bateTok=(a,b)=> a===b || (a.length<=2&&b[0]===a[0]) || (b.length<=2&&a[0]===b[0]);
   let melhor=null,melhorScore=0;
   equipe().forEach(t=>{
     const meu=alfa2(t.nome).split(/\s+/).filter(w=>w&&!stop.has(w));
     if(!meu.length)return;
-    const bate=meu.filter(w=>alvo.some(a=>bateTok(w,a))).length;
+    const usaInicial=meu.length>=2;
+    const bate=meu.filter(w=>alvo.some(a=>usaInicial?bateTok(w,a):w===a)).length;
     const score=bate/meu.length;
     if(score>melhorScore){melhorScore=score;melhor=t;}
   });
