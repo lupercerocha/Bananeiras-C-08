@@ -5395,6 +5395,23 @@ function parseOrcamentoRelaxado(linhas){
   return out;
 }
 
+function carregarTesseract(){
+  return new Promise((ok,err)=>{
+    if(window.Tesseract){ok();return}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+    s.onload=()=>ok();
+    s.onerror=()=>err(new Error('cdn'));
+    document.head.appendChild(s);
+  });
+}
+/* lê o texto de uma foto de comprovante, no próprio navegador — sem mandar a imagem para lugar nenhum */
+async function linhasDaImagem(file, avisar){
+  await carregarTesseract();
+  if(avisar)avisar('Lendo o texto da imagem...');
+  const {data}=await window.Tesseract.recognize(file,'por');
+  return (data.text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+}
 function carregarPdfJs(){
   return new Promise((ok,err)=>{
     if(window.pdfjsLib){ok();return}
@@ -5794,14 +5811,17 @@ document.getElementById('compInput').onchange=async e=>{
   toast('Lendo '+files.length+' comprovante(s)...');
   COMP_REV=[];
   for(const f of files){
-    const row={file:f,nome:'',valor:0,data:hoje(),matchId:'',novo:false,isImage:/^image\//.test(f.type)};
-    if(/pdf/i.test(f.type)){
-      try{
-        const linhas=await linhasDoPdf(f);
+    const row={file:f,nome:'',valor:0,data:hoje(),matchId:'',novo:false,isImage:/^image\//.test(f.type),ocrFalhou:false};
+    try{
+      const linhas = /pdf/i.test(f.type) ? await linhasDoPdf(f)
+        : row.isImage ? await linhasDaImagem(f, m=>toast(m))
+        : null;
+      if(linhas){
         const p=parseComprovantePix(linhas);
         row.nome=p.nome; row.valor=p.valor; if(p.data)row.data=p.data;
-      }catch(x){}
-    }
+        if(row.isImage&&!p.nome&&!p.valor) row.ocrFalhou=true;
+      }
+    }catch(x){ if(row.isImage)row.ocrFalhou=true; }
     const cand=melhorColaboradorPara(row.nome);
     row.matchId=cand?cand.id:'';
     row.novo=!cand;
@@ -5875,7 +5895,7 @@ function melhorColaboradorPara(nome){
 function abrirRevisaoComprovantes(){
   const eq=equipe();
   abrir(`<h2>Conferir comprovantes</h2>
-  <p class="sub">${COMP_REV.length} arquivo(s). Confira nome, valor e data — ${COMP_REV.some(r=>r.isImage)?'nas imagens eu não consigo ler o texto, preencha à mão. ':''}o comprovante fica anexado ao pagamento.</p>
+  <p class="sub">${COMP_REV.length} arquivo(s). Confira nome, valor e data${COMP_REV.some(r=>r.ocrFalhou)?' — em alguma foto não consegui ler direito, preencha à mão nesse(s) caso(s)':''} — o comprovante fica anexado ao pagamento.</p>
   <div style="max-height:56vh;overflow:auto">
   ${COMP_REV.map((r,i)=>`<div class="card" style="box-shadow:none;margin-top:9px;border:1px solid var(--line)">
     <b style="font-size:13px">${r.file.name}</b>

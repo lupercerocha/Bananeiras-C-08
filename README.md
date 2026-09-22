@@ -89,7 +89,7 @@ A lista vem separada em concorrências, cotações com preço e a cotar. O botã
 
 **Itens** — quanto de cada material já entrou na obra, com preço médio pago por unidade.
 
-**Equipe** — pedreiro, servente e ajudantes com valor de diária. O lançamento da semana marca os dias trabalhados e vira gasto na etapa de mão de obra.
+**Equipe** — pedreiro, servente e ajudantes com valor de diária. "Lançar pagamentos" abre uma grade: marca quem trabalhou, em quais dias (2ª a sábado, com meia diária quando for o caso), e lança tudo de uma vez. "Por comprovante Pix" faz o mesmo ponto de partida a partir dos comprovantes: lê valor, data e nome de cada comprovante — texto direto se for PDF, ou por leitura de texto na própria foto (roda no aparelho, a imagem não sai dele) se for print — tenta casar com um colaborador já cadastrado ou cria um novo, anexa o comprovante ao lançamento, e leva direto para a grade — onde só falta escolher os dias trabalhados e confirmar.
 
 **Tipos de produto** — ao lançar ou importar, o sistema deduz o tipo de cada material (Ferro, Hidráulica, Ferramentas da Obra, Material elétrico...), reaproveitando a grafia que você já usa. Sempre dá para corrigir antes de salvar, e o cadastro completo (criar, renomear, excluir e mover) fica na aba Itens, em "Tipos de produto".
 
