@@ -578,31 +578,31 @@ a{color:var(--teal)}
       <option value="cancelados">Cancelados</option>
       <option value="todos">Todos</option>
     </select>
-    <label style="margin-top:9px">A data do período é</label>
-    <select id="fBase" onchange="renderGastos()">
-      <option value="compra">Data da compra</option>
-      <option value="digitacao">Data em que eu digitei</option>
-    </select>
-    <label style="margin-top:9px">Período</label>
+    <label style="margin-top:11px">Data do gasto</label>
     <div class="row2">
-      <input type="date" id="fDataIni">
-      <input type="date" id="fDataFim">
-    </div>
-    <div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">
-      <button class="btn ghost mini" id="vwLista" style="width:auto;padding:7px 12px" onclick="trocarVisao('lista')">Lista</button>
-      <button class="btn ghost mini" id="vwForn" style="width:auto;padding:7px 12px" onclick="trocarVisao('forn')">Por fornecedor</button>
-      <button class="btn ghost mini" id="vwCat" style="width:auto;padding:7px 12px" onclick="trocarVisao('cat')">Por categoria</button>
+      <button class="btn ghost mini" id="fBaseCompra" style="padding:9px 8px" onclick="trocarBaseData('compra')">🛒 Da compra</button>
+      <button class="btn ghost mini" id="fBaseDig" style="padding:9px 8px" onclick="trocarBaseData('digitacao')">⌨️ Que eu digitei</button>
     </div>
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('mes')">Este mês</button>
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('ano')">Este ano</button>
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('tudo')">Desde o início</button>
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="digitadosEm(0)">Digitei hoje</button>
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="digitadosEm(1)">Ontem</button>
+      <button class="btn ghost mini" id="prMes" style="width:auto;padding:7px 12px" onclick="periodoRapido('mes')">Este mês</button>
+      <button class="btn ghost mini" id="prAno" style="width:auto;padding:7px 12px" onclick="periodoRapido('ano')">Este ano</button>
+      <button class="btn ghost mini" id="prTudo" style="width:auto;padding:7px 12px" onclick="periodoRapido('tudo')">Desde o início</button>
+      <button class="btn ghost mini" id="prHoje" style="width:auto;padding:7px 12px" onclick="digitadosEm(0)">Hoje</button>
+      <button class="btn ghost mini" id="prOntem" style="width:auto;padding:7px 12px" onclick="digitadosEm(1)">Ontem</button>
+    </div>
+    <div class="row2" style="margin-top:9px">
+      <input type="date" id="fDataIni" onchange="periodoManual()">
+      <input type="date" id="fDataFim" onchange="periodoManual()">
     </div>
     <label class="chkline" style="margin-top:8px;display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="fSemPeriodo" style="width:auto"> Todos os períodos
     </label>
+    <label style="margin-top:11px">Ver como</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn ghost mini" id="vwLista" style="width:auto;padding:7px 12px" onclick="trocarVisao('lista')">Lista</button>
+      <button class="btn ghost mini" id="vwForn" style="width:auto;padding:7px 12px" onclick="trocarVisao('forn')">Por fornecedor</button>
+      <button class="btn ghost mini" id="vwCat" style="width:auto;padding:7px 12px" onclick="trocarVisao('cat')">Por categoria</button>
+    </div>
     <div class="stat" style="margin-top:10px"><span id="gTotalLbl">Total no período</span><b class="mono" id="gTotal">R$ 0,00</b></div>
     <div class="stat" id="gTotalGeralLinha" style="border-bottom:0"><span>Total geral da obra</span><b class="mono" id="gTotalGeral">R$ 0,00</b></div>
   </div>
@@ -1928,17 +1928,31 @@ function seloDig(o,dataRef){
   if(d===(dataRef||o.data))return '';
   return ` · <span style="color:var(--ink-2)">digitado ${d.split('-').reverse().slice(0,2).join('/')}</span>`;
 }
+let FILTRO_BASE='compra', FILTRO_PERIODO='';
+function pintarFiltroData(){
+  const ativa=(id,on)=>{const b=document.getElementById(id); if(b){b.style.background=on?'var(--teal)':''; b.style.color=on?'#fff':''; b.style.borderColor=on?'var(--teal)':'';}};
+  ativa('fBaseCompra',FILTRO_BASE==='compra'); ativa('fBaseDig',FILTRO_BASE==='digitacao');
+  ['prMes','prAno','prTudo','prHoje','prOntem'].forEach(id=>ativa(id,false));
+  if(FILTRO_PERIODO) ativa('pr'+FILTRO_PERIODO[0].toUpperCase()+FILTRO_PERIODO.slice(1),true);
+}
+function trocarBaseData(base){ FILTRO_BASE=base; renderGastos(); }
+function periodoManual(){
+  FILTRO_PERIODO='';
+  document.getElementById('fDataIni').dataset.tocado='1';
+  document.getElementById('fDataFim').dataset.tocado='1';
+  renderGastos();
+}
 function digitadosEm(diasAtras){
   const d=new Date(); d.setDate(d.getDate()-diasAtras);
   const iso=new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
-  document.getElementById('fBase').value='digitacao';
+  FILTRO_BASE='digitacao'; FILTRO_PERIODO=diasAtras?'ontem':'hoje';
   const a=document.getElementById('fDataIni'), b=document.getElementById('fDataFim'), s=document.getElementById('fSemPeriodo');
   s.checked=false; a.disabled=b.disabled=false;
   a.value=iso; b.value=iso; a.dataset.tocado='1'; b.dataset.tocado='1';
-  atualizarSelects(document);
   renderGastos();
 }
 function renderGastos(){
+  pintarFiltroData();
   const sel=document.getElementById('fCat');
   if(sel.options.length!==CATS_AZ.length+1){
     const antes=sel.value;
@@ -1954,7 +1968,7 @@ function renderGastos(){
   const fst=(document.getElementById('fStatus')||{}).value||'ativos';
   const busca=alfa2(document.getElementById('fBusca').value);
   const semPeriodo=semEl.checked, dIni=iniEl.value, dFim=fimEl.value;
-  const porDigitacao=(document.getElementById('fBase')||{}).value==='digitacao';
+  const porDigitacao=FILTRO_BASE==='digitacao';
   const dataFiltro=l=>porDigitacao?dataDigitada(l):l.data;
   let L=DB.lanc.filter(l=>(!fc||l.cat===fc)&&(!fg||cat(l.cat).g===fg)
         &&(!fs||(fs==='pago'?isPago(l):!isPago(l)))
@@ -2047,11 +2061,13 @@ function periodoRapido(qual){
   if(qual==='mes'){ ini.value=hoje().slice(0,8)+'01'; fim.value=hoje(); }
   else if(qual==='ano'){ ini.value=hoje().slice(0,4)+'-01-01'; fim.value=hoje(); }
   ini.dataset.tocado='1'; fim.dataset.tocado='1';
+  FILTRO_PERIODO=qual;
   renderGastos();
 }
 document.getElementById('fSemPeriodo').onchange=()=>{
   const on=document.getElementById('fSemPeriodo').checked;
   document.getElementById('fDataIni').disabled=on; document.getElementById('fDataFim').disabled=on;
+  FILTRO_PERIODO=on?'tudo':'';
   renderGastos();
 };
 document.getElementById('fBuscaCot').oninput=renderCot;
@@ -5897,11 +5913,12 @@ function melhorColaboradorPara(nome){
   });
   return melhorScore>=0.6?melhor:null;
 }
+let COMP_PER={ini:'',fim:'',pago:true};
 function abrirRevisaoComprovantes(){
   const eq=equipe();
   abrir(`<h2>Conferir comprovantes</h2>
   <p class="sub">${COMP_REV.length} arquivo(s). Confira nome, valor e data${COMP_REV.some(r=>r.ocrFalhou)?' — em alguma foto não consegui ler direito, preencha à mão nesse(s) caso(s)':''} — o comprovante fica anexado ao pagamento.</p>
-  <div style="max-height:56vh;overflow:auto">
+  <div style="max-height:48vh;overflow:auto">
   ${COMP_REV.map((r,i)=>`<div class="card" style="box-shadow:none;margin-top:9px;border:1px solid var(--line)">
     <b style="font-size:13px">${r.file.name}</b>
     <div class="row2" style="margin-top:7px">
@@ -5917,28 +5934,55 @@ function abrirRevisaoComprovantes(){
       oninput="COMP_REV[${i}].nome=this.value">`:''}
   </div>`).join('')}
   </div>
-  <button class="btn" style="margin-top:12px" onclick="confirmarComprovantes()">Ir para o período e os dias trabalhados</button>
+  <label style="margin-top:11px">Período de trabalho (opcional)</label>
+  <div class="row2">
+    <input type="date" value="${COMP_PER.ini}" placeholder="Início" onchange="COMP_PER.ini=this.value">
+    <input type="date" value="${COMP_PER.fim}" placeholder="Fim" onchange="COMP_PER.fim=this.value">
+  </div>
+  <p class="hint">Só entra como observação no lançamento — não precisa marcar dia por dia. Deixe em branco se não fizer diferença.</p>
+  <label class="chkline" style="margin-top:9px"><input type="checkbox" id="comp_pago" ${COMP_PER.pago?'checked':''} onchange="COMP_PER.pago=this.checked"> Já pago (é o que o comprovante já prova)</label>
+  <button class="btn" style="margin-top:12px" onclick="lancarComprovantes()">Lançar ${COMP_REV.length} pagamento(s)</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
 }
 function mudarMatchComp(i,id){ COMP_REV[i].matchId=id; abrirRevisaoComprovantes(); }
-function confirmarComprovantes(){
+async function lancarComprovantes(){
   if(COMP_REV.some(r=>!(r.valor>0))){toast('Falta o valor de algum comprovante.');return}
-  PG.linhas=PG.linhas||{};
+  if(COMP_REV.some(r=>!r.matchId&&!r.nome.trim())){toast('Falta o nome de algum colaborador.');return}
+  const fmt=d=>d.split('-').reverse().slice(0,2).join('/');
+  const perTxto=(COMP_PER.ini||COMP_PER.fim)?` · período ${COMP_PER.ini?fmt(COMP_PER.ini):'?'} a ${COMP_PER.fim?fmt(COMP_PER.fim):'?'}`:'';
+  const paraAnexar=[]; let soma=0;
   COMP_REV.forEach(r=>{
     let t;
     if(r.matchId) t=equipe().find(x=>x.id===r.matchId);
-    else{
-      if(!r.nome.trim()){toast('Falta o nome de algum comprovante.');return}
-      t={id:uid(),nome:capNomes(r.nome),funcao:'',diaria:0,at:Date.now()};
-      equipe().push(t);
-    }
-    PG.linhas[t.id]={on:true,dias:{},valor:r.valor,manual:true,obs:'',_anexoFile:r.file,_anexoData:r.data};
-    PG_FOCO=t.id;
+    else{ t={id:uid(),nome:capNomes(r.nome),funcao:'',diaria:0,at:Date.now()}; equipe().push(t); }
+    const id=uid();
+    DB.lanc.push({id,at:Date.now(),trabId:t.id,
+      data:r.data, desc:`${t.nome} · pago via Pix ${fmt(r.data)}`,
+      familia:'Mão de obra', cat:'c07', forn:t.nome,
+      qtd:1, unit:r.valor, total:r.valor,
+      pag:COMP_PER.pago?'Pago':'A pagar', nf:'', anexos:[],
+      obs:`Comprovante de Pix${perTxto}`,
+      tipoPg:'pix', ctrl:false,qtdRec:0,baixas:[],pagamentos:[]});
+    paraAnexar.push({id,file:r.file});
+    soma+=r.valor;
   });
-  salvar();
-  COMP_REV=[];
-  PG_MANTER_LINHAS=true;
-  abrirPagamentos();
+  salvar(); fechar(); render();
+  toast(`${COMP_REV.length} pagamento(s) lançado(s) · ${brl(soma)}`);
+  COMP_REV=[]; COMP_PER={ini:'',fim:'',pago:true};
+  for(const {id,file} of paraAnexar){
+    try{
+      const dataUrl=await comprimirImagem(file,1100,.62).catch(()=>null);
+      const thumb=dataUrl?await reduzirImagem(dataUrl,220,.45):null;
+      const aid=uid();
+      const meta=await salvarArquivoAnexo('anx:'+aid,file);
+      const l=DB.lanc.find(x=>x.id===id); if(!l)continue;
+      l.anexos=l.anexos||[];
+      l.anexos.push({id:aid,tipo:/^image\//.test(file.type)?'imagem':'arquivo',nome:file.name||'Comprovante Pix',
+        thumb,mime:meta.mime,path:meta.path,local:meta.local});
+      l.at=Date.now();
+    }catch(e){}
+  }
+  if(paraAnexar.length) salvar();
 }
 
 function abrirPagamentos(){
