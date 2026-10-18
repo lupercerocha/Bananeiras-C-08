@@ -321,6 +321,46 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .sheet .panel{position:absolute;left:0;right:0;bottom:0;max-height:92vh;overflow:auto;
  background:var(--surface);border-radius:20px 20px 0 0;padding:8px 16px calc(24px + var(--safe));
  animation:up .22s cubic-bezier(.2,.8,.3,1)}
+/* telas de digitação: sem rolagem no computador, barra de ações sempre à vista */
+.sheet .panel.form{padding-bottom:0}
+.fgrid{display:grid;grid-template-columns:1fr;gap:0 24px}
+.fcol{min-width:0}
+.fbar{position:sticky;bottom:0;z-index:3;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+ background:var(--surface);border-top:1px solid var(--line);margin:12px -16px 0;
+ padding:10px 16px calc(10px + var(--safe))}
+.fbar .btn{width:auto;flex:1 1 auto;min-width:120px}
+.fbar .btn.ghost{flex:0 0 auto;min-width:0}
+details.mais{margin-top:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+details.mais>summary{cursor:pointer;padding:9px 12px;font-size:13px;font-weight:600;color:var(--ink-2);list-style:none}
+details.mais>summary::-webkit-details-marker{display:none}
+details.mais>summary::before{content:'▸ '}
+details.mais[open]>summary::before{content:'▾ '}
+details.mais>.maisb{padding:0 12px 12px}
+.itrow1{display:grid;gap:9px;grid-template-columns:1fr}
+.itrow2{display:grid;gap:9px;grid-template-columns:1fr 1.3fr 1.3fr auto;align-items:end;margin-top:8px}
+.itrow2 .itot{padding:11px 4px;font-weight:700;font-size:14px;white-space:nowrap}
+.grp.itm{padding:9px 10px}
+.grp.itm label{margin-top:0;font-size:10.5px}
+@media(min-width:620px){.itrow1{grid-template-columns:2fr 1.2fr}.itrow1.c3{grid-template-columns:2fr 1.2fr 1.2fr}}
+@media(min-width:900px){
+ .sheet .panel{left:0;right:0;top:0;bottom:0;margin:auto;height:fit-content;width:min(820px,94vw);
+  border-radius:16px;max-height:94vh}
+ .sheet .panel.form{width:min(1080px,95vw)}
+ .sheet .panel .grab{display:none}
+ .fgrid{grid-template-columns:1fr 1fr}
+ .lista-itens{max-height:calc(94vh - 420px);min-height:170px;overflow:auto;padding-right:4px}
+}
+.crow{display:grid;gap:8px;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:8px;background:var(--surface-2)}
+.crow label{margin-top:0;font-size:10.5px}
+.crow .cnome small{display:block;color:var(--ink-2);font-size:11px;word-break:break-all}
+.crow>div:nth-child(4){grid-column:1/-1}
+.lista-comp{max-height:none}
+@media(min-width:900px){
+ .fgrid.w2{grid-template-columns:1.5fr 1fr}
+ .lista-comp{max-height:calc(94vh - 230px);overflow:auto;padding-right:4px}
+ .crow{grid-template-columns:.9fr .8fr 1.5fr}
+ .crow>div:nth-child(4){grid-column:auto}
+}
 @keyframes up{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
 .grab{width:38px;height:4px;border-radius:3px;background:var(--line);margin:6px auto 12px}
 .sheet .panel{touch-action:pan-y}
@@ -573,31 +613,36 @@ a{color:var(--teal)}
       <option value="pago">Só pagos</option>
       <option value="aberto">Só a pagar</option>
     </select>
-    <label style="margin-top:9px">A data do período é</label>
-    <select id="fBase" onchange="renderGastos()">
-      <option value="compra">Data da compra</option>
-      <option value="digitacao">Data em que eu digitei</option>
+    <select id="fStatus" style="margin-top:9px" onchange="renderGastos()">
+      <option value="ativos">Ativos</option>
+      <option value="cancelados">Cancelados</option>
+      <option value="todos">Todos</option>
     </select>
-    <label style="margin-top:9px">Período</label>
+    <label style="margin-top:11px">Data do gasto</label>
     <div class="row2">
-      <input type="date" id="fDataIni">
-      <input type="date" id="fDataFim">
-    </div>
-    <div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">
-      <button class="btn ghost mini" id="vwLista" style="width:auto;padding:7px 12px" onclick="trocarVisao('lista')">Lista</button>
-      <button class="btn ghost mini" id="vwForn" style="width:auto;padding:7px 12px" onclick="trocarVisao('forn')">Por fornecedor</button>
-      <button class="btn ghost mini" id="vwCat" style="width:auto;padding:7px 12px" onclick="trocarVisao('cat')">Por categoria</button>
+      <button class="btn ghost mini" id="fBaseCompra" style="padding:9px 8px" onclick="trocarBaseData('compra')">🛒 Da compra</button>
+      <button class="btn ghost mini" id="fBaseDig" style="padding:9px 8px" onclick="trocarBaseData('digitacao')">⌨️ Que eu digitei</button>
     </div>
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('mes')">Este mês</button>
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('ano')">Este ano</button>
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="periodoRapido('tudo')">Desde o início</button>
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="digitadosEm(0)">Digitei hoje</button>
-      <button class="btn ghost mini" style="width:auto;padding:7px 12px" onclick="digitadosEm(1)">Ontem</button>
+      <button class="btn ghost mini" id="prMes" style="width:auto;padding:7px 12px" onclick="periodoRapido('mes')">Este mês</button>
+      <button class="btn ghost mini" id="prAno" style="width:auto;padding:7px 12px" onclick="periodoRapido('ano')">Este ano</button>
+      <button class="btn ghost mini" id="prTudo" style="width:auto;padding:7px 12px" onclick="periodoRapido('tudo')">Desde o início</button>
+      <button class="btn ghost mini" id="prHoje" style="width:auto;padding:7px 12px" onclick="digitadosEm(0)">Hoje</button>
+      <button class="btn ghost mini" id="prOntem" style="width:auto;padding:7px 12px" onclick="digitadosEm(1)">Ontem</button>
+    </div>
+    <div class="row2" style="margin-top:9px">
+      <input type="date" id="fDataIni" onchange="periodoManual()">
+      <input type="date" id="fDataFim" onchange="periodoManual()">
     </div>
     <label class="chkline" style="margin-top:8px;display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="fSemPeriodo" style="width:auto"> Todos os períodos
     </label>
+    <label style="margin-top:11px">Ver como</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn ghost mini" id="vwLista" style="width:auto;padding:7px 12px" onclick="trocarVisao('lista')">Lista</button>
+      <button class="btn ghost mini" id="vwForn" style="width:auto;padding:7px 12px" onclick="trocarVisao('forn')">Por fornecedor</button>
+      <button class="btn ghost mini" id="vwCat" style="width:auto;padding:7px 12px" onclick="trocarVisao('cat')">Por categoria</button>
+    </div>
     <div class="stat" style="margin-top:10px"><span id="gTotalLbl">Total no período</span><b class="mono" id="gTotal">R$ 0,00</b></div>
     <div class="stat" id="gTotalGeralLinha" style="border-bottom:0"><span>Total geral da obra</span><b class="mono" id="gTotalGeral">R$ 0,00</b></div>
   </div>
@@ -678,7 +723,9 @@ a{color:var(--teal)}
 <section class="view" id="v-equipe">
   <button class="btn" onclick="abrirPagamentos()">💰 Lançar pagamentos</button>
   <div class="acoes">
+    <button class="btn soft" onclick="abrirComprovantes()"><span class="ic">📄</span>Por comprovante Pix</button>
     <button class="btn soft" onclick="abrirTrabalhador()"><span class="ic">＋</span>Novo trabalhador</button>
+    <button class="btn soft" onclick="abrirCadRapido()"><span class="ic">📋</span>Cadastro rápido</button>
   </div>
   <div class="card" style="margin-top:12px">
     <label style="margin-top:0">A data do período é</label>
@@ -781,6 +828,7 @@ a{color:var(--teal)}
 <input type="file" id="pdfCotInput" accept="application/pdf,.pdf" hidden>
 <input type="file" id="notaInput" multiple hidden>
 <input type="file" id="qrInput" accept="image/*" capture="environment" hidden>
+<input type="file" id="compInput" accept=".pdf,application/pdf,image/*" multiple hidden>
 <datalist id="dlProdutos"></datalist>
 <datalist id="dlCategorias"></datalist>
 <datalist id="dlForn"></datalist>
@@ -848,6 +896,7 @@ async function entrarNoApp(session){
   /* passa das fotos antigas para o espaço grande antes que a memória estoure */
   if(espacoUsado()>3.2e6 && DB.fotos.some(f=>f.img)) setTimeout(()=>migrarFotos(true),1500);
   if(contarAnexosPesados()>0) setTimeout(()=>migrarAnexosPesados(true),2500);
+  if((DB.notas||[]).some(n=>n.img&&!n.arqLocal&&!n.arqPath)) setTimeout(()=>migrarFotosNotas(true),3500);
 }
 
 /* funde os dados da nuvem com os locais pelo conteúdo (mesma lógica do "Importar só o que for novo") */
@@ -1170,9 +1219,9 @@ function pintaAnexos(elId){
       <div class="nm">${a.nome||(a.tipo==='imagem'?'Foto do documento':'Link')}</div>
       <button class="rm" onclick="event.stopPropagation();rmAnexo(${i},'${elId}')">×</button>
     </div>`).join('')
-    +`<div class="row2" style="margin-top:2px">
-      <input id="anx_link" placeholder="Colar link (Drive, foto...)" style="flex:2">
-      <button class="btn mini ghost" style="flex:0 0 auto;padding:11px 14px" onclick="addAnexoLink('${elId}')">+ Link</button>
+    +`<div style="display:flex;gap:8px;margin-top:2px">
+      <input id="anx_link" placeholder="Colar link (Drive, foto...)" style="flex:1;min-width:0">
+      <button class="btn mini ghost" style="flex:0 0 auto;width:auto;padding:11px 14px" onclick="addAnexoLink('${elId}')">+ Link</button>
     </div>
     <button class="btn mini ghost" style="margin-top:7px;width:100%" onclick="abrirAnexoFoto('${elId}')">📎 Anexar PDF ou foto (pode escolher vários)</button>`;
 }
@@ -1240,11 +1289,15 @@ function salvar(){
        tenta liberar tanto o álbum quanto os anexos de gastos/cotações antes de desistir */
     const temFotoPesada=DB.fotos.some(f=>f.img);
     const temAnexoPesado=contarAnexosPesados()>0;
-    if(temFotoPesada||temAnexoPesado){
+    const temNotaPesada=(DB.notas||[]).some(n=>n.img&&!n.arqLocal&&!n.arqPath);
+    if(temFotoPesada||temAnexoPesado||temNotaPesada){
       toast('Memória cheia — liberando espaço...');
-      Promise.all([temFotoPesada?migrarFotos(true):0, temAnexoPesado?migrarAnexosPesados(true):0]).then(([a,b])=>{
-        try{ localStorage.setItem('obraC08',JSON.stringify(DB));
-          toast(((a||0)+(b||0))?'Espaço liberado':'Espaço liberado'); }
+      Promise.all([
+        temFotoPesada?migrarFotos(true):0,
+        temAnexoPesado?migrarAnexosPesados(true):0,
+        temNotaPesada?migrarFotosNotas(true):0
+      ]).then(()=>{
+        try{ localStorage.setItem('obraC08',JSON.stringify(DB)); toast('Espaço liberado'); }
         catch(e2){ toast('Memória ainda cheia. Exporte o backup em Configurações.'); }
       });
     }else toast('Memória cheia. Exporte o backup em Configurações.');
@@ -1270,6 +1323,7 @@ const pagoParcial=l=>(l.pagamentos||[]).reduce((s,p)=>s+ +p.valor,0);
 const saldoAPagar=l=>isPago(l)?0:Math.max(0,+l.total-pagoParcial(l));
 /* quanto já saiu do bolso neste lançamento: tudo, se está pago; só as parcelas, se está em aberto */
 const valorPago=l=>{
+  if(l.cancelado)return 0;
   const t=+l.total||0;
   if(isPago(l))return t;
   if(t<0)return t;                       /* desconto ou estorno entra inteiro */
@@ -1288,6 +1342,7 @@ const temParcial=l=>!isPago(l)&&pagoParcial(l)>0;
 /* fatias por etapa; se o rateio não fechar com o total, ajusta proporcionalmente
    para o painel nunca somar diferente da lista de gastos */
 function partes(l){
+  if(l.cancelado)return [];                 /* cancelado não entra em nenhuma soma, em lugar nenhum */
   const tot=+l.total||0;
   if(!(l.rateio&&l.rateio.length))return [{cat:l.cat,valor:tot}];
   const ps=l.rateio.map(r=>({cat:r.cat,valor:+r.valor||0}));
@@ -1719,7 +1774,8 @@ document.addEventListener('click',()=>{
     if(l.previousElementSibling)l.previousElementSibling.classList.remove('aberto')});
 });
 
-function abrir(html){
+function abrir(html,opts){
+  panel.classList.toggle('form',!!(opts&&opts.form));
   panel.innerHTML='<div class="grab"></div>'+html;
   aplicarSelects(panel);
   panel.style.transition=''; panel.style.transform='';
@@ -1914,17 +1970,31 @@ function seloDig(o,dataRef){
   if(d===(dataRef||o.data))return '';
   return ` · <span style="color:var(--ink-2)">digitado ${d.split('-').reverse().slice(0,2).join('/')}</span>`;
 }
+let FILTRO_BASE='compra', FILTRO_PERIODO='';
+function pintarFiltroData(){
+  const ativa=(id,on)=>{const b=document.getElementById(id); if(b){b.style.background=on?'var(--teal)':''; b.style.color=on?'#fff':''; b.style.borderColor=on?'var(--teal)':'';}};
+  ativa('fBaseCompra',FILTRO_BASE==='compra'); ativa('fBaseDig',FILTRO_BASE==='digitacao');
+  ['prMes','prAno','prTudo','prHoje','prOntem'].forEach(id=>ativa(id,false));
+  if(FILTRO_PERIODO) ativa('pr'+FILTRO_PERIODO[0].toUpperCase()+FILTRO_PERIODO.slice(1),true);
+}
+function trocarBaseData(base){ FILTRO_BASE=base; renderGastos(); }
+function periodoManual(){
+  FILTRO_PERIODO='';
+  document.getElementById('fDataIni').dataset.tocado='1';
+  document.getElementById('fDataFim').dataset.tocado='1';
+  renderGastos();
+}
 function digitadosEm(diasAtras){
   const d=new Date(); d.setDate(d.getDate()-diasAtras);
   const iso=new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
-  document.getElementById('fBase').value='digitacao';
+  FILTRO_BASE='digitacao'; FILTRO_PERIODO=diasAtras?'ontem':'hoje';
   const a=document.getElementById('fDataIni'), b=document.getElementById('fDataFim'), s=document.getElementById('fSemPeriodo');
   s.checked=false; a.disabled=b.disabled=false;
   a.value=iso; b.value=iso; a.dataset.tocado='1'; b.dataset.tocado='1';
-  atualizarSelects(document);
   renderGastos();
 }
 function renderGastos(){
+  pintarFiltroData();
   const sel=document.getElementById('fCat');
   if(sel.options.length!==CATS_AZ.length+1){
     const antes=sel.value;
@@ -1937,12 +2007,14 @@ function renderGastos(){
     iniEl.value=hoje().slice(0,8)+'01'; fimEl.value=hoje();
   }
   const fc=sel.value, fg=document.getElementById('fGrupo').value, fs=document.getElementById('fSit').value;
+  const fst=(document.getElementById('fStatus')||{}).value||'ativos';
   const busca=alfa2(document.getElementById('fBusca').value);
   const semPeriodo=semEl.checked, dIni=iniEl.value, dFim=fimEl.value;
-  const porDigitacao=(document.getElementById('fBase')||{}).value==='digitacao';
+  const porDigitacao=FILTRO_BASE==='digitacao';
   const dataFiltro=l=>porDigitacao?dataDigitada(l):l.data;
   let L=DB.lanc.filter(l=>(!fc||l.cat===fc)&&(!fg||cat(l.cat).g===fg)
         &&(!fs||(fs==='pago'?isPago(l):!isPago(l)))
+        &&(fst==='todos'||(fst==='cancelados'?l.cancelado:!l.cancelado))
         &&(semPeriodo||((!dIni||dataFiltro(l)>=dIni)&&(!dFim||dataFiltro(l)<=dFim))));
   if(busca){
     L=L.filter(l=>{
@@ -1962,19 +2034,19 @@ function renderGastos(){
   document.getElementById('gTotalLbl').textContent=
     (semPeriodo?'Total de todos os períodos':`Total de ${fmt(dIni)||'início'} a ${fmt(dFim)||'hoje'}`)
     +(porDigitacao?' (pela digitação)':'');
-  const geral=DB.lanc.reduce((s,l)=>s+ +l.total,0);
+  const geral=DB.lanc.filter(l=>!l.cancelado).reduce((s,l)=>s+ +l.total,0);
   document.getElementById('gTotalGeral').textContent=brl(geral);
   document.getElementById('gTotalGeralLinha').style.display=
     (semPeriodo||L.length===DB.lanc.length)?'none':'flex';
   if(VISAO_G!=='lista'){ renderGastosAgrupado(L); return; }
   document.getElementById('gastosList').innerHTML=L.map(l=>{
     const p=dia(l.data), falta=l.ctrl?(+l.qtd - +l.qtdRec):0, ab=!isPago(l), pp=pagoParcial(l);
-    return `<div class="item" onclick="verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
+    return `<div class="item" onclick="${l.cancelado?`restaurarGasto('${l.id}')`:`verGasto('${l.id}')`}" style="${l.cancelado?'opacity:.55':(ab?'opacity:.72':'')}">
       <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span>${dtDig(l)}</div>
       <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-        <small>${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}${porDigitacao?` · <span style="color:var(--teal)">compra de ${l.data.split('-').reverse().slice(0,2).join('/')}</span>`:seloDig(l)}</small></div>
-      <div class="val"><span class="mono">${brl(l.total)}</span>
-        ${ab?`<div><span class="tag pend">${pp>0?'falta '+brl(saldoAPagar(l)):'a pagar'}</span></div>`:''}</div></div>`;
+        <small>${l.cancelado?`<span style="color:var(--red)">cancelado em ${new Date(+l.canceladoEm||0).toLocaleDateString('pt-BR')} · toque para restaurar</span>`:`${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}${porDigitacao?` · <span style="color:var(--teal)">compra de ${l.data.split('-').reverse().slice(0,2).join('/')}</span>`:seloDig(l)}`}</small></div>
+      <div class="val"><span class="mono" style="${l.cancelado?'text-decoration:line-through':''}">${brl(l.total)}</span>
+        ${l.cancelado?'<div><span class="tag">↺ restaurar</span></div>':ab?`<div><span class="tag pend">${pp>0?'falta '+brl(saldoAPagar(l)):'a pagar'}</span></div>`:''}</div></div>`;
   }).join('')||'<div class="empty"><b>Nenhum gasto neste filtro</b><p>Ajuste os filtros acima.</p></div>';
 }
 document.getElementById('fCat').onchange=renderGastos;
@@ -2031,11 +2103,13 @@ function periodoRapido(qual){
   if(qual==='mes'){ ini.value=hoje().slice(0,8)+'01'; fim.value=hoje(); }
   else if(qual==='ano'){ ini.value=hoje().slice(0,4)+'-01-01'; fim.value=hoje(); }
   ini.dataset.tocado='1'; fim.dataset.tocado='1';
+  FILTRO_PERIODO=qual;
   renderGastos();
 }
 document.getElementById('fSemPeriodo').onchange=()=>{
   const on=document.getElementById('fSemPeriodo').checked;
   document.getElementById('fDataIni').disabled=on; document.getElementById('fDataFim').disabled=on;
+  FILTRO_PERIODO=on?'tudo':'';
   renderGastos();
 };
 document.getElementById('fBuscaCot').oninput=renderCot;
@@ -2820,11 +2894,28 @@ async function migrarAnexosPesados(silencioso){
   if(!silencioso) toast(n?`${n} foto(s) movida(s) — o pacote enviado à nuvem ficou bem mais leve`:'Nenhuma foto pesada para mover');
   return n;
 }
+/* fotos de notas fiscais (a foto tirada da nota em papel) também ficavam em base64
+   dentro do objeto — a terceira fonte do mesmo problema das fotos e dos anexos */
+async function migrarFotosNotas(silencioso){
+  let n=0;
+  for(const nota of (DB.notas||[])){
+    if(!nota.img||nota.arqLocal||nota.arqPath)continue;
+    try{
+      const thumb=await reduzirImagem(nota.img,220,.45);
+      await guardarArquivoNota(nota, new File([dataUrlParaBlob(nota.img)], (nota.numero||'nota')+'.jpg', {type:'image/jpeg'}));
+      nota.thumb=thumb; delete nota.img; nota.at=Date.now(); n++;
+    }catch(e){}
+  }
+  if(n)salvar();
+  if(!silencioso) toast(n?`${n} foto(s) de nota movida(s)`:'Nenhuma foto de nota pesada para mover');
+  return n;
+}
 function tamanhoDB(){ try{ return new Blob([JSON.stringify(DB)]).size; }catch(e){ return 0; } }
 function contarAnexosPesados(){
   let n=0;
   DB.lanc.forEach(l=>(l.anexos||[]).forEach(a=>{ if(a.tipo==='imagem'&&a.dado)n++; }));
   DB.cot.forEach(c=>(c.anexos||[]).forEach(a=>{ if(a.tipo==='imagem'&&a.dado)n++; }));
+  (DB.notas||[]).forEach(n2=>{ if(n2.img&&!n2.arqLocal&&!n2.arqPath)n++; });
   return n;
 }
 function verSincronizacao(){
@@ -2835,7 +2926,7 @@ function verSincronizacao(){
     <div class="stat"><span>Tamanho do pacote de dados</span><b class="mono">${kb} KB</b></div>
     <div class="stat"><span>Fotos ainda pesadas</span><b class="mono" style="color:${pesados?'var(--amber)':'var(--green)'}">${pesados}</b></div>
   </div>
-  ${pesados?`<button class="btn" onclick="migrarAnexosPesados().then(verSincronizacao)">Mover essas ${pesados} foto(s) agora</button>`:''}
+  ${pesados?`<button class="btn" onclick="Promise.all([migrarAnexosPesados(true),migrarFotosNotas(true)]).then(()=>{render();verSincronizacao()})">Mover essas ${pesados} foto(s) agora</button>`:''}
   <button class="btn ghost mini" style="margin-top:9px" onclick="ressincronizar(true).then(verSincronizacao)">Forçar sincronização agora</button>
   <p class="hint">Fotos anexadas a gastos e cotações ficavam dentro do próprio pacote enviado à nuvem. Quando esse pacote crescia demais, o envio podia falhar sem avisar. Agora as fotos novas já vão direto para um espaço separado — mais leve e mais confiável.</p>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
@@ -3001,7 +3092,7 @@ function abrirNota(id,daLeitura){
     ${cands.map(l=>`<option value="${l.id}" ${n.lancId===l.id?'selected':''}>${l.data.split('-').reverse().join('/')} · ${l.desc} · ${(+l.total).toLocaleString('pt-BR',{minimumFractionDigits:2})}</option>`).join('')}
   </select>
   <label>Observações</label><textarea id="n_obs">${n.obs||''}</textarea>
-  ${n.img?`<img src="${n.img}" style="width:100%;border-radius:12px;margin-top:10px">`:''}
+  ${(n.img||n.thumb)?`<img src="${n.img||n.thumb}" style="width:100%;border-radius:12px;margin-top:10px">`:''}
   <div style="height:14px"></div>
   <button class="btn" onclick="salvarNota('${id||''}')">Salvar nota</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
@@ -3035,7 +3126,11 @@ function salvarNota(id){
   const arq=base._file||null;
   NOTA_TMP=null; salvar(); fechar(); render(); toast('Nota salva');
   if(arq){
-    guardarArquivoNota(n,arq).then(()=>{
+    guardarArquivoNota(n,arq).then(async()=>{
+      if(n.img&&(n.arqLocal||n.arqPath)){
+        try{ n.thumb=await reduzirImagem(n.img,220,.45); }catch(e){}
+        delete n.img;
+      }
       salvar(); render();
       if(n.arqErro==='bucket') toast('Arquivo guardado neste aparelho. Para abrir no outro, crie o espaço de arquivos no Supabase.');
     });
@@ -3062,7 +3157,7 @@ function verNota(id){
   ${n.obs?`<p class="hint">${n.obs}</p>`:''}
   ${l?`<div class="item" onclick="verGasto('${l.id}')"><div class="mid"><b>Gasto vinculado</b><small>${l.desc}</small></div>
     <div class="val mono">${brl(l.total)}</div></div>`:'<p class="hint">Nenhum gasto vinculado a esta nota.</p>'}
-  ${n.img?`<img src="${n.img}" style="width:100%;border-radius:12px;margin:10px 0">`:''}
+  ${(n.img||n.thumb)?`<img src="${n.img||n.thumb}" style="width:100%;border-radius:12px;margin:10px 0">`:''}
   ${(n.arqLocal||n.arqPath||n.img)?`<button class="btn dark" onclick="verArquivoNota('${n.id}')">📄 Ver arquivo da nota</button>`:''}
   ${l?'':`<button class="btn" style="margin-top:9px" onclick="vincularNotaAGasto('${n.id}')">Vincular a um gasto já lançado</button>`}
   ${(n.itens||[]).length?`<button class="btn ghost mini" style="margin-top:9px" onclick="lancarItensDaNota('${n.id}')">Lançar itens como novos gastos</button>
@@ -4231,6 +4326,8 @@ function abrirGasto(l){
   l=l||{id:'',data:hoje(),desc:'',cat:'c00',forn:'',qtd:1,unit:'',total:'',pag:'Pago',nf:'',link:'',obs:'',ctrl:false,qtdRec:0,baixas:[]};
   abrir(`<h2>${l.id?'Editar gasto':'Lançar gasto'}</h2>
   <p class="sub">O valor entra por inteiro na data do pagamento.</p>
+  <div class="fgrid">
+  <div class="fcol">
   <div id="descUnica"><label>Descrição</label><input id="x_desc" data-cap="1" list="dlProdutos" value="${l.desc}" placeholder="Ex: 100 sacos de cimento 50kg" onblur="sugerirTipo()" onchange="sugerirTipo()"></div>
   <div class="row2">
     <div><label>Data</label><input type="date" id="x_data" value="${l.data}"></div>
@@ -4242,7 +4339,7 @@ function abrirGasto(l){
         oninput="comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
         value="${(l.familia||'').replace(/"/g,'&quot;')}" placeholder="Ex: Ferro, Cimento...">
         <div class="combo-list"></div></div></div>
-    <div id="categoriaUnica"><label>Categoria</label>
+    <div id="categoriaUnica"><label>Etapa / categoria</label>
       <input id="x_cat" list="dlCategorias" value="${(cat(l.cat||'c00').n||'').replace(/"/g,'&quot;')}"
         placeholder="Escolha ou digite" ${l.rateio&&l.rateio.length?'style="display:none"':''}></div>
   </div>
@@ -4263,11 +4360,13 @@ function abrirGasto(l){
   </div>
   <div id="itensMultiplos" style="display:none">
     <label style="margin:12px 0 5px">Itens</label>
-    <div id="itensGasto"></div>
+    <div id="itensGasto" class="lista-itens"></div>
     <button class="btn ghost mini" style="margin-top:8px" onclick="addItem()">+ Adicionar item</button>
-    <div class="stat" style="margin-top:12px;border-top:1px solid var(--line);border-bottom:0;padding-top:11px">
+    <div class="stat" style="margin-top:10px;border-top:1px solid var(--line);border-bottom:0;padding-top:9px">
       <span style="font-weight:700">Total da compra</span><b class="mono" id="x_tot_itens" style="font-size:18px"></b></div>
   </div>
+  </div>
+  <div class="fcol">
   <div class="row2">
     <div><label>Pagamento</label><select id="x_pag">
       ${['A pagar','Pago','Pago adiantado','Parcelado'].map(o=>`<option ${o===l.pag?'selected':''}>${o}</option>`).join('')}</select></div>
@@ -4275,25 +4374,33 @@ function abrirGasto(l){
   </div>
   <label>Anexos</label>
   <div id="anexosGasto"></div>
-  <div class="divider"></div>
-  <label class="chkline">
-    <input type="checkbox" id="x_ctrl" ${l.ctrl?'checked':''}>
-    Vou receber o material aos poucos</label>
-  <div id="ctrlBox" style="display:${l.ctrl?'block':'none'}">
-    <label>Quantidade já recebida</label><input type="number" step="any" id="x_rec" value="${l.qtdRec}">
+  <label>Observações</label><textarea id="x_obs" rows="2">${l.obs}</textarea>
+  <details class="mais" ${l.ctrl?'open':''}>
+    <summary>Mais opções: receber aos poucos${l.id?'':' · repetir todo mês'}</summary>
+    <div class="maisb">
+    <label class="chkline">
+      <input type="checkbox" id="x_ctrl" ${l.ctrl?'checked':''}>
+      Vou receber o material aos poucos</label>
+    <div id="ctrlBox" style="display:${l.ctrl?'block':'none'}">
+      <label>Quantidade já recebida</label><input type="number" step="any" id="x_rec" value="${l.qtdRec}">
+    </div>
+    ${l.id?'':`<label class="chkline" style="margin-top:14px">
+      <input type="checkbox" id="x_rep"> Repetir todo mês</label>
+    <div id="repBox" style="display:none">
+      <label>Quantas vezes no total</label><input type="number" min="2" max="60" id="x_repN" value="8">
+      <p class="hint">A primeira usa a data acima. As seguintes entram como <b>a pagar</b>, no mesmo dia dos meses seguintes.</p>
+    </div>`}
+    </div>
+  </details>
   </div>
-  ${l.id?'':`<div class="divider"></div>
-  <label class="chkline">
-    <input type="checkbox" id="x_rep"> Repetir todo mês</label>
-  <div id="repBox" style="display:none">
-    <label>Quantas vezes no total</label><input type="number" min="2" max="60" id="x_repN" value="8">
-    <p class="hint">A primeira usa a data acima. As seguintes entram como <b>a pagar</b>, no mesmo dia dos meses seguintes.</p>
-  </div>`}
-  <label>Observações</label><textarea id="x_obs">${l.obs}</textarea>
-  <div style="height:14px"></div>
+  </div>
+  <div class="fbar">
   <button class="btn" onclick="salvarGasto('${l.id}')">Salvar</button>
-  ${l.id?`<button class="btn ghost mini" style="margin-top:9px" onclick="excluirGasto('${l.id}')">Excluir lançamento</button>`:''}
-  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  <button class="btn ghost mini" onclick="fechar()">Cancelar</button>
+  ${l.id?`<button class="btn ghost mini" style="color:var(--red)" onclick="excluirGasto('${l.id}')">Cancelar lançamento</button>`:''}
+  </div>`,{form:true});
+  if(!l.id && window.innerWidth>=900) setTimeout(()=>{const d=document.getElementById('x_desc'); if(d)d.focus()},60);
+
 
   const q=document.getElementById('x_qtd'),u=document.getElementById('x_unit'),t=document.getElementById('x_total');
   const calc=()=>{onMoedaInput(u);
@@ -4422,29 +4529,34 @@ function salvarGasto(id){
 const val=i=>document.getElementById(i).value;
 function excluirGasto(id){
   const l=DB.lanc.find(x=>x.id===id);
-  const abertos=l.serie?DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)):[];
+  const abertos=l.serie?DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)&&!x.cancelado):[];
   if(l.serie&&abertos.length>1){
     ACAO_PENDENTE=()=>{
-      DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)).forEach(x=>marcarExcluido(x,'lanc'));
-      DB.lanc=DB.lanc.filter(x=>!(x.serie===l.serie&&!isPago(x)));
-      salvar();fechar();render();toast('Lançamentos em aberto da série excluídos');
+      DB.lanc.filter(x=>x.serie===l.serie&&!isPago(x)&&!x.cancelado)
+        .forEach(x=>{x.cancelado=true; x.canceladoEm=Date.now(); x.at=Date.now();});
+      salvar();fechar();render();toast('Lançamentos em aberto da série cancelados');
     };
     abrir(`<h2>Faz parte de uma série mensal</h2>
-    <p class="sub">"${l.desc}" se repete todo mês. O que você quer excluir?</p>
-    <button class="btn danger" onclick="executarPendente()">Excluir os ${abertos.length} em aberto da série</button>
-    <button class="btn ghost mini" style="margin-top:9px" onclick="excluirSoEste('${id}')">Excluir só este lançamento</button>
-    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+    <p class="sub">"${l.desc}" se repete todo mês. O que você quer cancelar?</p>
+    <button class="btn danger" onclick="executarPendente()">Cancelar os ${abertos.length} em aberto da série</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="excluirSoEste('${id}')">Cancelar só este lançamento</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar operação</button>`);
     return;
   }
   excluirSoEste(id);
 }
 function excluirSoEste(id){
   const l=DB.lanc.find(x=>x.id===id);
-  confirmar('Excluir lançamento',`"${l.desc}" — ${brl(l.total)}. Não é possível desfazer.`,
-    'Excluir',()=>{
-      marcarExcluido(l,'lanc');
-      DB.lanc=DB.lanc.filter(x=>x.id!==id);salvar();fechar();render();toast('Lançamento excluído');
+  confirmar('Cancelar lançamento',`"${l.desc}" — ${brl(l.total)}. Ele sai das contas e dos totais, mas fica guardado — dá para restaurar depois em "Ver cancelados".`,
+    'Cancelar lançamento',()=>{
+      l.cancelado=true; l.canceladoEm=Date.now(); l.at=Date.now();
+      salvar();fechar();render();toast('Lançamento cancelado — pode restaurar em "Ver cancelados"');
     },true);
+}
+function restaurarGasto(id){
+  const l=DB.lanc.find(x=>x.id===id); if(!l)return;
+  l.cancelado=false; delete l.canceladoEm; l.at=Date.now();
+  salvar();fechar();render();toast('Lançamento restaurado');
 }
 
 function verGasto(id){
@@ -4483,13 +4595,16 @@ function verGasto(id){
     <p class="hint">Use para pagar o pedreiro aos poucos. Quando o saldo zerar, vira "Pago" sozinho.</p>`:''}
   ${l.pagamentos&&l.pagamentos.length?'<div class="divider"></div><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)">Pagamentos</h3>'+
     l.pagamentos.map(p=>`<div class="stat"><span>${p.d.split('-').reverse().join('/')}</span><b class="mono">${brl(p.valor)}</b></div>`).join(''):''}
+  ${l.cancelado?`<div class="stat" style="background:rgba(196,83,77,.08);border-radius:10px;padding:9px 11px;border:0"><span style="color:var(--red);font-weight:700">✕ Cancelado</span><b style="font-size:12px;color:var(--ink-2)">${new Date(+l.canceladoEm||0).toLocaleDateString('pt-BR')}</b></div>`:''}
   <div style="height:14px"></div>
-  ${isPago(l)?'':`<button class="btn" onclick="marcarPago('${l.id}')">Marcar tudo como pago</button><div style="height:9px"></div>`}
+  ${isPago(l)||l.cancelado?'':`<button class="btn" onclick="marcarPago('${l.id}')">Marcar tudo como pago</button><div style="height:9px"></div>`}
   <div class="row2">
     <button class="btn ghost mini" onclick="abrirGasto(DB.lanc.find(x=>x.id==='${l.id}'))">Editar</button>
     <button class="btn ghost mini" onclick="duplicar('${l.id}')">Duplicar</button>
   </div>
-  <button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="excluirGasto('${l.id}')">Excluir lançamento</button>
+  ${l.cancelado
+    ?`<button class="btn ghost mini" style="margin-top:9px;color:var(--green)" onclick="restaurarGasto('${l.id}')">↺ Restaurar lançamento</button>`
+    :`<button class="btn ghost mini" style="margin-top:9px;color:var(--red)" onclick="excluirGasto('${l.id}')">Cancelar lançamento</button>`}
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
 }
 function darPagamento(id){
@@ -4531,32 +4646,39 @@ function abrirCot(c){
   panel._cotConc=String(c.conc||'').trim();
   abrir(`<h2>${c.id?'Editar cotação':'Nova cotação'}</h2>
   <p class="sub">Preço de mercado. Ainda não é gasto.</p>
+  <div class="fgrid">
+  <div class="fcol">
   <label>Do que se trata</label><input id="c_item" data-cap="1" value="${c.item||''}" placeholder="Ex: Blocos e canaletas de concreto">
   <div class="row2">
     <div><label>Fornecedor</label><input id="c_forn" data-cap="1" value="${c.forn||''}"></div>
     <div><label>Validade</label><input type="date" id="c_val" value="${c.validade||daquiADias(5)}"></div>
   </div>
-  <p class="hint">Validade preenchida com 5 dias por padrão.</p>
   <label>Anexos</label>
   <div id="anexosCot"></div>
-  <div class="divider"></div>
-  <label style="margin:0">Itens</label>
-  <div id="itens"></div>
+  <label>Observações</label><textarea id="c_obs" rows="3" placeholder="Condições, prazo de entrega, devolução de palete...">${c.obs||''}</textarea>
+  </div>
+  <div class="fcol">
+  <label style="margin-top:12px">Itens</label>
+  <div id="itens" class="lista-itens"></div>
   <button class="btn ghost mini" style="margin-top:8px" onclick="addItem()">+ Adicionar item</button>
-  <div class="stat" style="margin-top:12px;border-top:1px solid var(--line);border-bottom:0;padding-top:11px">
+  <div class="stat" style="margin-top:10px;border-top:1px solid var(--line);border-bottom:0;padding-top:9px">
     <span>Soma dos itens</span><b class="mono" id="c_tot"></b></div>
-  <div class="row2" style="margin-top:6px;align-items:end">
+  <div class="row2" style="margin-top:2px;align-items:end">
     <div><label style="margin-top:0">Desconto negociado</label>
       <input id="c_desc" inputmode="numeric" value="${c.desconto?num2moeda(c.desconto):''}" placeholder="0,00" oninput="onMoedaInput(this);totItens()"></div>
-    <div><button class="btn ghost mini" onclick="arredondarCot()">Arredondar total</button></div>
+    <div><button class="btn ghost mini" style="width:100%" onclick="arredondarCot()">Arredondar total</button></div>
   </div>
   <div class="stat" style="border-bottom:0">
     <span style="font-weight:700">Total da cotação</span><b class="mono" id="c_totfinal" style="font-size:18px"></b></div>
-  <p class="hint">O desconto é dividido entre os itens conforme o valor de cada um, então o preço unitário usado nas comparações e na compra já sai com o desconto embutido.</p>
-  <label>Observações</label><textarea id="c_obs" placeholder="Condições, prazo de entrega, devolução de palete...">${c.obs||''}</textarea>
-  <div style="height:14px"></div>
+  <p class="hint">O desconto é rateado entre os itens pelo valor de cada um; o preço unitário das comparações já sai com ele.</p>
+  </div>
+  </div>
+  <div class="fbar">
   <button class="btn" onclick="salvarCot('${c.id}')">Salvar cotação</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  <button class="btn ghost mini" onclick="fechar()">Cancelar</button>
+  </div>`,{form:true});
+  if(!c.id && window.innerWidth>=900) setTimeout(()=>{const d=document.getElementById('c_item'); if(d)d.focus()},60);
+
   ITENS_DIV='itens'; ITENS_TOT='c_tot'; ITENS_CAT=false;
   pintaItens();
   ANX_ALVO=JSON.parse(JSON.stringify(c.anexos||[]));
@@ -4564,35 +4686,38 @@ function abrirCot(c){
 }
 let ITENS_DIV='itens', ITENS_TOT='c_tot', ITENS_CAT=false;
 function pintaItens(){
+  const q=v=>String(v||'').replace(/"/g,'&quot;');
   document.getElementById(ITENS_DIV).innerHTML=panel._its.map((it,i)=>`
-   <div class="grp" style="background:var(--surface-2);margin-bottom:8px">
-     <div class="row3">
-       <div><label style="margin-top:0">Qtde</label>
+   <div class="grp itm" style="margin-bottom:8px">
+     <div class="itrow1 ${ITENS_CAT?'c3':''}">
+       <div><label>Descrição</label>
+         <input value="${q(it.d)}" list="dlProdutos" data-cap="1" placeholder="Ex: Bloco 14x19x39cm" oninput="chgItem(${i},'d',this.value)"></div>
+       <div><label>Tipo de produto</label>
+         <div class="combo"><input data-item-index="${i}" autocomplete="off"
+           oninput="chgItem(${i},'familia',this.value);comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
+           value="${q(it.familia)}" placeholder="Ex: Ferro, Cimento...">
+           <div class="combo-list"></div></div></div>
+       ${ITENS_CAT?`<div><label>Etapa do item</label>
+         <input list="dlCategorias" value="${q(it.cat||cat('c00').n)}"
+           placeholder="Escolha ou digite" oninput="chgItem(${i},'cat',this.value)"></div>`:''}
+     </div>
+     <div class="itrow2">
+       <div><label>Qtde</label>
          <input type="number" step="any" value="${it.q}" oninput="chgItem(${i},'q',this.value)"></div>
-       <div><label style="margin-top:0">Vlr unitário</label>
+       <div><label>Vlr unitário</label>
          <input ${moedaAttrs(it.u)} oninput="onMoedaInput(this);chgItem(${i},'u',moeda2num(this.value))"></div>
+       <div><label>Total</label><div class="mono itot" id="it_${i}">${brl((+it.q||0)*(+it.u||0))}</div></div>
+       <div>${panel._its.length>1?`<button class="iconbtn" style="background:var(--surface);color:var(--red);width:34px;height:34px" onclick="delItem(${i})">×</button>`:''}</div>
      </div>
-     <label>Descrição</label>
-     <input value="${(it.d||'').replace(/"/g,'&quot;')}" list="dlProdutos" data-cap="1" placeholder="Ex: Bloco 14x19x39cm" oninput="chgItem(${i},'d',this.value)">
-     <label>Tipo de produto (opcional)</label>
-     <div class="combo"><input data-item-index="${i}" autocomplete="off"
-       oninput="chgItem(${i},'familia',this.value);comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
-       value="${(it.familia||'').replace(/"/g,'&quot;')}" placeholder="Ex: Ferro, Cimento...">
-       <div class="combo-list"></div></div>
-     ${ITENS_CAT?`<label>Etapa deste item</label>
-     <input list="dlCategorias" value="${(it.cat||cat('c00').n).replace(/"/g,'&quot;')}"
-       placeholder="Escolha ou digite uma nova" oninput="chgItem(${i},'cat',this.value)">`:''}
-     <div class="row2">
-       <div><label>Cód. (opcional)</label>
-         <input value="${(it.c||'').replace(/"/g,'&quot;')}" oninput="chgItem(${i},'c',this.value)"></div>
-       <div><label>Fornecedor (opcional)</label>
-         <input value="${(it.f||'').replace(/"/g,'&quot;')}" data-cap="1" oninput="chgItem(${i},'f',this.value)"></div>
-     </div>
-     <div class="stat" style="border:0;padding-bottom:0">
-       <span style="font-size:12px">Total do item</span>
-       <span><b class="mono" id="it_${i}">${brl((+it.q||0)*(+it.u||0))}</b>
-       ${panel._its.length>1?`<button class="iconbtn" style="background:var(--surface);color:var(--red);width:28px;height:28px;margin-left:8px;vertical-align:middle" onclick="delItem(${i})">×</button>`:''}</span>
-     </div>
+     <details class="mais" style="margin-top:8px;background:transparent" ${(it.c||it.f)?'open':''}>
+       <summary>Código e fornecedor do item</summary>
+       <div class="maisb"><div class="row2">
+         <div><label style="margin-top:8px">Cód.</label>
+           <input value="${q(it.c)}" oninput="chgItem(${i},'c',this.value)"></div>
+         <div><label style="margin-top:8px">Fornecedor</label>
+           <input value="${q(it.f)}" data-cap="1" oninput="chgItem(${i},'f',this.value)"></div>
+       </div></div>
+     </details>
    </div>`).join('');
   totItens();
 }
@@ -4695,6 +4820,7 @@ function virouCompra(id){
 function abrirConfirmarCompra(c){
   const base=preencherFamilias((c.itens&&c.itens.length)?itensComDesconto(c):[{c:'',d:c.item,q:1,u:c.total,f:''}]);
   panel._itC=JSON.parse(JSON.stringify(base)).map(i=>({...i,cats:[i.cat||'c00']}));
+  panel._itC0Show=false;
   panel._cotOrig=c;
   abrir(`<h2>Lançar compra</h2>
   <p class="sub">${c.conc?`⚖ ${c.conc} · `:''}${c.forn||'Sem fornecedor'}${(+c.at>0)?` · digitada em ${horaDigitada(c)}`:''} · marque em quais etapas cada item entra</p>
@@ -4710,7 +4836,14 @@ function abrirConfirmarCompra(c){
 }
 function pintaItensCompra(){
   const etapasCon=CATS_AZ.filter(x=>x.g==='con');
-  document.getElementById('itensCompra').innerHTML=panel._itC.map((it,i)=>{
+  const banner=(panel._itC0Show&&panel._itC.length>1)?`<div class="card" style="background:rgba(22,163,148,.08);border:1px solid var(--teal);margin-bottom:9px;padding:10px 12px;box-shadow:none">
+     <p style="margin:0;font-size:13px">Usar essas mesmas etapas para os outros ${panel._itC.length-1} item(ns) da compra?</p>
+     <div class="row2" style="margin-top:8px">
+       <button class="btn mini" onclick="aplicarEtapasATodos()">Aplicar a todos</button>
+       <button class="btn ghost mini" onclick="panel._itC0Show=false;pintaItensCompra()">Não, obrigado</button>
+     </div>
+   </div>`:'';
+  document.getElementById('itensCompra').innerHTML=banner+panel._itC.map((it,i)=>{
     const n=it.cats.length, bruto=(+it.q||0)*(+it.u||0), corte=+it.descItem||0;
     const valorItem=+(bruto-corte).toFixed(2);
     return `<div class="grp" style="background:var(--surface-2);margin-bottom:8px">
@@ -4741,13 +4874,26 @@ function toggleEtapaItem(i,catId,checked){
   const it=panel._itC[i];
   if(checked){ if(!it.cats.includes(catId)) it.cats.push(catId); }
   else { it.cats=it.cats.filter(c=>c!==catId); }
+  if(i===0) panel._itC0Show = panel._itC.length>1 && it.cats.length>0;
   pintaItensCompra();
 }
 function marcarTodasEtapas(i){
   panel._itC[i].cats=CATS_AZ.filter(x=>x.g==='con').map(x=>x.id);
+  if(i===0) panel._itC0Show = panel._itC.length>1;
   pintaItensCompra();
 }
-function limparEtapas(i){ panel._itC[i].cats=[]; pintaItensCompra(); }
+function limparEtapas(i){
+  panel._itC[i].cats=[];
+  if(i===0) panel._itC0Show=false;
+  pintaItensCompra();
+}
+function aplicarEtapasATodos(){
+  const base=panel._itC[0].cats.slice();
+  panel._itC.forEach((it,i)=>{ if(i>0) it.cats=base.slice(); });
+  panel._itC0Show=false;
+  pintaItensCompra();
+  toast('Etapas aplicadas aos '+(panel._itC.length-1)+' outros itens — ajuste algum se precisar');
+}
 function confirmarCompra(){
   if(panel._itC.some(it=>it.cats.length===0)){toast('Falta escolher a etapa de algum item.');return}
   const c=panel._cotOrig, pago=document.getElementById('ic_pago').checked;
@@ -5329,6 +5475,23 @@ function parseOrcamentoRelaxado(linhas){
   return out;
 }
 
+function carregarTesseract(){
+  return new Promise((ok,err)=>{
+    if(window.Tesseract){ok();return}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+    s.onload=()=>ok();
+    s.onerror=()=>err(new Error('cdn'));
+    document.head.appendChild(s);
+  });
+}
+/* lê o texto de uma foto de comprovante, no próprio navegador — sem mandar a imagem para lugar nenhum */
+async function linhasDaImagem(file, avisar){
+  await carregarTesseract();
+  if(avisar)avisar('Lendo o texto da imagem...');
+  const {data}=await window.Tesseract.recognize(file,'por');
+  return (data.text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+}
 function carregarPdfJs(){
   return new Promise((ok,err)=>{
     if(window.pdfjsLib){ok();return}
@@ -5537,6 +5700,11 @@ function pagamentosDe(id){
 function pagamentosFiltrados(){
   return DB.lanc.filter(l=>noPeriodoEq(l)&&(!EQ_QUEM||l.trabId===EQ_QUEM)).sort(ordenaEq);
 }
+/* mão de obra lançada sem vincular a nenhum colaborador — some do resumo por pessoa, mas continua nos Gastos */
+function moSemColaborador(){
+  return DB.lanc.filter(l=>!l.cancelado&&!l.trabId&&cat(l.cat).id==='c07'&&noPeriodoEqSemTrab(l));
+}
+const noPeriodoEqSemTrab=l=>(!EQ_INI||dataBaseEq(l)>=EQ_INI)&&(!EQ_FIM||dataBaseEq(l)<=EQ_FIM);
 function rotuloPeriodoEq(){
   const p=(EQ_INI||EQ_FIM)
     ? `${EQ_INI?EQ_INI.split('-').reverse().join('/'):'início'} a ${EQ_FIM?EQ_FIM.split('-').reverse().join('/'):'hoje'}`
@@ -5570,9 +5738,10 @@ function renderEquipe(){
   });
 
   const mo=pagamentosFiltrados();
-  const totalMO=mo.reduce((s,l)=>s+ +l.total,0);
-  const diasMO=mo.reduce((s,l)=>s+(+l.qtd||0),0);
-  const aberto=mo.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
+  const orfaos=EQ_QUEM?[]:moSemColaborador();
+  const totalMO=mo.reduce((s,l)=>s+ +l.total,0)+orfaos.reduce((s,l)=>s+ +l.total,0);
+  const diasMO=mo.reduce((s,l)=>s+(+l.qtd||0),0)+orfaos.reduce((s,l)=>s+(+l.qtd||0),0);
+  const aberto=mo.concat(orfaos).filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0);
   const el=document.getElementById('equipeResumo');
   if(el)el.innerHTML=
     `<div class="stat"><span>${EQ_QUEM?'Pago a '+((eq.find(t=>t.id===EQ_QUEM)||{}).nome||''):'Total investido em equipe'}</span>
@@ -5608,7 +5777,7 @@ function renderEquipe(){
         ${pg.length?pg.map(l=>`<div class="item" data-gasto="${l.id}" ${!isPago(l)?'style="opacity:.72"':''}>
           <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span>${dtDig(l)}</div>
           <div class="mid"><b>${l.desc}</b>
-            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.obs?' · '+l.obs.slice(0,70):''}</small></div>
+            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${rotuloPeriodoLanc(l)}${l.obs?' · '+l.obs.replace(/ · trabalhou de .*$/,'').slice(0,60):''}</small></div>
           <div class="val"><span class="mono">${brl(l.total)}</span>
             ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
           :'<p class="hint">Nenhum pagamento neste período.</p>'}
@@ -5619,6 +5788,25 @@ function renderEquipe(){
       </div></div>`;
   }).join('')
   : '<div class="card"><div class="empty"><b>Nenhum trabalhador cadastrado</b><p>Cadastre o pedreiro, servente ou ajudante e o valor da diária para controlar a mão de obra.</p></div></div>';
+  if(orfaos.length){
+    const totOrf=orfaos.reduce((s,l)=>s+ +l.total,0), k='eq:orfaos';
+    lista.innerHTML += `<div class="acc ${ACC[k]?'on':''}" data-acc="${k}" style="margin-bottom:8px;border-left:3px solid var(--amber)">
+      <div class="acch">
+        <div style="flex:1;min-width:0">
+          <b style="font-size:14.5px">Sem colaborador vinculado</b>
+          <div style="font-size:11.5px;color:var(--ink-2)">${orfaos.length} lançamento(s) em "07 Mão de obra" digitados fora da tela de pagamentos</div>
+        </div>
+        <b class="mono" style="white-space:nowrap">${brl(totOrf)}</b>
+        <span class="arw">▼</span>
+      </div>
+      <div class="accb">
+        ${orfaos.map(l=>`<div class="item" data-gasto="${l.id}" ${!isPago(l)?'style="opacity:.72"':''}>
+          <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+          <div class="mid"><b>${l.desc}</b><small>${l.forn||'sem fornecedor'}</small></div>
+          <div class="val"><span class="mono">${brl(l.total)}</span></div></div>`).join('')}
+        <p class="hint">Contam no total da equipe, mas não em nenhum colaborador específico. Edite cada um em Gastos para vincular a um nome, ou lance de novo por "Lançar pagamentos" e cancele este.</p>
+      </div></div>`;
+  }
 
   /* liga os cliques por código — mais confiável que onclick no HTML */
   lista.querySelectorAll('.acc').forEach(card=>{
@@ -5652,7 +5840,7 @@ function verTodosPagamentos(){
   </div>
   ${L.length?L.map(l=>`<div class="item" onclick="verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
     <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span>${dtDig(l)}</div>
-    <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.obs?' · '+l.obs.slice(0,70):''}</small></div>
+    <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${rotuloPeriodoLanc(l)}${l.obs?' · '+l.obs.replace(/ · trabalhou de .*$/,'').slice(0,60):''}</small></div>
     <div class="val"><span class="mono">${brl(l.total)}</span>
       ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
    :'<p class="hint">Nenhum pagamento neste filtro.</p>'}
@@ -5660,6 +5848,7 @@ function verTodosPagamentos(){
 }
 /* ---------- pagamentos da equipe: uma tela, uma linha por colaborador ---------- */
 let PG={tipo:'semanal',ini:'',fim:'',linhas:{}};
+let PG_MANTER_LINHAS=false;
 const DIA_SEM=['dom','seg','ter','qua','qui','sex','sáb'];
 function diasDoPeriodo(ini,fim){
   const out=[]; if(!ini||!fim)return out;
@@ -5694,6 +5883,384 @@ function periodoPadrao(tipo,base){
 }
 const PG_SEM_DIAS=t=>t==='adiantamento'||t==='compra';
 
+/* ---------- lançar pagamentos a partir de comprovantes de Pix ---------- */
+let COMP_REV=[], COMP_LISTA=[], COMP_LISTA_TXT='';
+function abrirComprovantes(){ document.getElementById('compInput').click(); }
+document.getElementById('compInput').onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=''; if(!files.length)return;
+  toast('Lendo '+files.length+' comprovante(s)...');
+  COMP_REV=[];
+  for(const f of files){
+    const row={file:f,nome:'',doc:'',valor:0,data:hoje(),matchId:'',novo:false,isImage:/^image\//.test(f.type),ocrFalhou:false,lista:null};
+    try{
+      const linhas = /pdf/i.test(f.type) ? await linhasDoPdf(f)
+        : row.isImage ? await linhasDaImagem(f, m=>toast(m))
+        : null;
+      if(linhas){
+        const p=parseComprovantePix(linhas);
+        row.nome=p.nome; row.doc=p.doc; row.chave=p.chave; row.valor=p.valor; if(p.data)row.data=p.data;
+        if(!p.nome&&!p.valor) row.ocrFalhou=true;
+      }
+    }catch(x){ if(row.isImage)row.ocrFalhou=true; }
+    const cand=melhorColaboradorPara(row.nome,row.doc,row.chave);
+    row.matchId=cand?cand.id:'';
+    row.novo=!cand;
+    COMP_REV.push(row);
+  }
+  COMP_LISTA=parseListaSemana(COMP_LISTA_TXT);
+  casarLista();
+  abrirRevisaoComprovantes();
+};
+/* converte "350,00", "R$ 1.700,00", "490.00" e "3.500" em número */
+function moedaTok(t){
+  t=String(t||'').replace(/[^\d.,]/g,'');
+  if(!t)return 0;
+  if(/,\d{1,2}$/.test(t)) return parseFloat(t.replace(/\./g,'').replace(',','.'))||0;
+  if(/^\d+\.\d{2}$/.test(t)) return parseFloat(t)||0;
+  return parseFloat(t.replace(/[.,]/g,''))||0;
+}
+const RE_MOEDA_TOK='\\d{1,3}(?:\\.\\d{3})*,\\d{2}|\\d+\\.\\d{2}|\\d+,\\d{2}|\\d+';
+/* lê valor, data, nome e documento de quem RECEBEU — testado com os comprovantes do Inter e do Next
+   (PDF ou foto) e com o formato em seções "Quem recebeu / Quem pagou" ou "Dados do recebedor / pagador" */
+function parseComprovantePix(linhas){
+  const L=linhas.map(x=>String(x).trim()).filter(Boolean);
+  /* ---- valor ---- */
+  let valor=0;
+  for(let i=0;i<L.length&&!valor;i++){
+    if(/^valor\b|\bvalor\s*:/i.test(L[i])){
+      /* o número pode estar na mesma linha ou na seguinte (PDF separa rótulo e valor) */
+      for(const l of [L[i],L[i+1]||'']){
+        const m=l.match(new RegExp('R\\$\\s*('+RE_MOEDA_TOK+')'))||l.match(new RegExp('(?:^|[\\s:])('+RE_MOEDA_TOK+')\\s*$'));
+        if(m&&moedaTok(m[1])>0){ valor=moedaTok(m[1]); break; }
+      }
+    }
+  }
+  if(!valor){
+    const rs=[...L.join('\n').matchAll(new RegExp('R\\$\\s*('+RE_MOEDA_TOK+')','g'))].map(m=>moedaTok(m[1])).filter(v=>v>0);
+    if(rs.length) valor=rs[0];
+  }
+  /* ---- data (aceita barra trocada por 7/| pelo OCR) ---- */
+  const reData=/(\d{2})\s*[\/.\-|]?\s*(\d{2})\s*[\/.\-|7lI]?\s*(20\d{2})/;
+  const dataValida=m=>m&&+m[1]>=1&&+m[1]<=31&&+m[2]>=1&&+m[2]<=12;
+  let data='';
+  for(let i=0;i<L.length&&!data;i++){
+    if(/data/i.test(L[i])){
+      for(const t of [L[i],L[i+1]||'']){ const m=t.match(reData); if(dataValida(m)){ data=`${m[3]}-${m[2]}-${m[1]}`; break; } }
+    }
+  }
+  if(!data){ for(const l of L){ const m=l.match(reData); if(dataValida(m)){ data=`${m[3]}-${m[2]}-${m[1]}`; break; } } }
+  if(!data){
+    const MESES={janeiro:'01',fevereiro:'02',março:'03',marco:'03',abril:'04',maio:'05',junho:'06',
+      julho:'07',agosto:'08',setembro:'09',outubro:'10',novembro:'11',dezembro:'12'};
+    const dext=L.join(' ').match(/(\d{1,2})\s*de\s*([a-zçã]+)\s*de\s*(\d{4})/i);
+    if(dext&&MESES[dext[2].toLowerCase()]) data=`${dext[3]}-${MESES[dext[2].toLowerCase()]}-${dext[1].padStart(2,'0')}`;
+  }
+  /* ---- seções: quem recebeu x quem pagou ---- */
+  const reRec=/quem\s*receb|dados\s*do\s*(recebedor|favorecido|benefici)|destinat[áa]rio|favorecido|recebedor|benefici[áa]rio|^destino\b/i;
+  const rePag=/quem\s*pag|dados\s*do\s*pagador|pagador|^origem\b|quem\s*enviou/i;
+  const reOutra=/dados\s*do\s*pagamento|sobre\s*a\s*transa|autentica/i;
+  const ehLabel=l=>/pix|comprovante|banco|ag[êe]ncia|conta|transfer|chave|valor|data\b|hor[áa]rio|institui|cpf|cnpj|^nome\b|id\s*da|transa[çc]|quem|sobre|inter\b|dados|descri|tipo|autentic/i.test(l);
+  const soLetras=l=>/^[A-Za-zÀ-ÿ.'’\s]+$/.test(l);
+  const pareceNome=l=>{ const p=l.trim().split(/\s+/); return p.length>=2&&p.length<=7&&soLetras(l)&&!ehLabel(l); };
+  const iRec=L.findIndex(l=>reRec.test(l)&&!/^descri/i.test(l));
+  let nome='', doc='', chave='';
+  if(iRec>=0){
+    let fim=Math.min(L.length,iRec+9);
+    for(let i=iRec+1;i<fim;i++){ if(rePag.test(L[i])||reOutra.test(L[i])){ fim=i; break; } }
+    for(let i=iRec+1;i<fim;i++){
+      const m=L[i].match(/^nome\s*:?\s*(.*)$/i);
+      if(m){
+        let t=m[1].trim();
+        let j=i;
+        if(!t){ t=(L[i+1]||'').trim(); j=i+1; }
+        if(t&&soLetras(t)){
+          nome=t;
+          /* nome que quebrou em duas linhas ("... Soares da" / "Costa") */
+          const prox=(L[j+1]||'').trim();
+          if(prox&&soLetras(prox)&&!ehLabel(prox)&&prox.split(/\s+/).length<=3&&t.split(/\s+/).length>=2) nome+=' '+prox;
+          break;
+        }
+      }
+    }
+    if(!nome){ for(let i=iRec+1;i<fim;i++){ if(pareceNome(L[i])){ nome=L[i]; break; } } }
+    for(let i=iRec+1;i<fim;i++){
+      const m=L[i].match(/(\d{3})\.(\d{3})-\*{2}/); if(m){ doc=m[1]+m[2]; break; }
+    }
+    for(let i=iRec+1;i<fim;i++){
+      const m=L[i].match(/^chave[^:]*:?\s*(.*)$/i);
+      if(m){ const c=(m[1]||L[i+1]||'').trim(); if(c){ chave=normChave(c); } break; }
+    }
+  }
+  if(!nome){
+    const iPag=L.findIndex(l=>rePag.test(l));
+    const cand=L.find((l,i)=>pareceNome(l)&&!(iPag>=0&&i>=iPag));
+    if(cand) nome=cand;
+  }
+  return {valor,data,doc,chave,nome:capNomes(nome.replace(/[^A-Za-zÀ-ÿ\s'’]/g,'').trim())};
+}
+function normChave(s){
+  s=String(s||'').trim(); if(!s)return '';
+  if(s.includes('@')) return s.toLowerCase();
+  if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)) return s.toLowerCase();
+  const d=s.replace(/\D/g,''); if(!d)return s.toLowerCase();
+  return d.length>11?d.slice(-11):d;
+}
+function melhorColaboradorPara(nome,doc,chave){
+  const eq=equipe();
+  if(chave){ const t=eq.find(x=>(x.chavesPix||[]).includes(chave)); if(t)return t; }
+  if(doc){ const t=eq.find(x=>(x.pixDocs||[]).includes(doc)); if(t)return t; }
+  if(!nome)return null;
+  const k=alfa2(nome);
+  const ali=eq.find(x=>(x.nomesPix||[]).includes(k)); if(ali)return ali;
+  const stop=new Set(['de','da','do','dos','das','e']);
+  const alvo=k.split(/\s+/).filter(w=>w&&!stop.has(w));
+  if(alvo.length<2)return null;               /* nome de gente tem 2+ palavras — abaixo disso é ruído de OCR */
+  /* uma palavra "bate" também quando uma das duas é só a inicial da outra —
+     cobre nome cadastrado abreviado ("Anderson S L Fontes") contra o nome completo do comprovante.
+     Nome cadastrado de uma palavra só não casa por letra solta. */
+  const bateTok=(a,b)=> a===b || (a.length<=2&&b[0]===a[0]) || (b.length<=2&&a[0]===b[0]);
+  let melhor=null,melhorScore=0;
+  eq.forEach(t=>{
+    [t.nome,...(t.nomesPix||[])].forEach(nm=>{
+      const meu=alfa2(nm).split(/\s+/).filter(w=>w&&!stop.has(w));
+      if(!meu.length)return;
+      const usaInicial=meu.length>=2;
+      const bate=meu.filter(w=>alvo.some(a=>usaInicial?bateTok(w,a):w===a)).length;
+      const score=bate/meu.length;
+      if(score>melhorScore){melhorScore=score;melhor=t;}
+    });
+  });
+  return melhorScore>=0.6?melhor:null;
+}
+/* grava no colaborador o que identifica quem ele é no Pix */
+function aprenderPix(t,{nome,doc,chave,apelido,funcao,forcar}){
+  const k=alfa2(nome);
+  if(k){ t.nomesPix=t.nomesPix||[]; if(!t.nomesPix.includes(k)) t.nomesPix.push(k); if(!t.nomePix) t.nomePix=capNomes(nome); }
+  if(doc){ t.pixDocs=t.pixDocs||[]; if(!t.pixDocs.includes(doc)) t.pixDocs.push(doc); }
+  const ch=normChave(chave);
+  if(ch){ t.chavesPix=t.chavesPix||[]; if(!t.chavesPix.includes(ch)) t.chavesPix.push(ch); if(!t.chavePix) t.chavePix=String(chave).trim(); }
+  if(apelido&&(forcar||!t.apelido)&&!alfa2(t.nome).split(/\s+/).includes(alfa2(apelido))) t.apelido=capNomes(apelido);
+  if(funcao&&(forcar||!t.funcao)) t.funcao=capNomes(String(funcao).toLowerCase());
+  if(forcar&&nome) t.nomePix=capNomes(nome);
+  t.at=Date.now();
+}
+/* ---------- cadastro rápido: "Apelido | Nome no Pix | função | chave" ---------- */
+function parseCadRapido(txt){
+  return String(txt||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{
+    const p=l.split(/\s*[|;\t]\s*/);
+    return {apelido:capNomes(p[0]||''),nomePix:capNomes(p[1]||''),funcao:(p[2]||'').trim().toLowerCase(),chave:(p[3]||'').trim()};
+  }).filter(r=>r.apelido||r.nomePix);
+}
+function achaColabCad(r){
+  const eq=equipe(), ch=normChave(r.chave);
+  return (ch&&eq.find(t=>(t.chavesPix||[]).includes(ch)))
+    || (r.apelido&&colabDaLista({nome:r.apelido}))
+    || (r.nomePix&&melhorColaboradorPara(r.nomePix,'',''))
+    || null;
+}
+function abrirCadRapido(){
+  abrir(`<h2>Cadastro rápido de colaboradores</h2>
+  <p class="sub">Uma linha por pessoa: <b>Apelido | Nome completo no Pix | função | chave Pix</b>. Só o apelido ou o nome já bastam. Quem já existe é atualizado; quem não existe é criado.</p>
+  <textarea id="cr_txt" rows="8" style="font-size:13px" oninput="prevCadRapido()"
+    placeholder="Zezin | José Otaciano dos Santos Costa Filho | ajudante | 83998043801&#10;Luis | Luis Carlos Soares da Costa | mestre | 83998501875"></textarea>
+  <div id="cr_prev" style="margin-top:8px"></div>
+  <button class="btn" style="margin-top:10px" onclick="aplicarCadRapido()">Aplicar</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+}
+function prevCadRapido(){
+  const R=parseCadRapido(val('cr_txt')), el=document.getElementById('cr_prev'); if(!el)return;
+  el.innerHTML=R.map(r=>{ const t=achaColabCad(r);
+    return `<div class="stat"><span>${r.apelido||r.nomePix}</span><b style="font-size:12.5px;color:${t?'var(--teal)':'var(--ink-2)'}">${t?'atualiza '+t.nome:'novo'}</b></div>`; }).join('');
+}
+function aplicarCadRapido(){
+  const R=parseCadRapido(val('cr_txt'));
+  if(!R.length){toast('Escreva ao menos uma linha.');return}
+  let n=0,c=0;
+  R.forEach(r=>{
+    let t=achaColabCad(r);
+    if(!t){ t={id:uid(),nome:capNomes(r.apelido||r.nomePix),funcao:'',diaria:0}; equipe().push(t); c++; }
+    else{
+      n++;
+      /* cadastro criado só com o apelido (sem lançamentos) acompanha a correção do apelido */
+      if(r.apelido&&t.nome.trim().split(/\s+/).length===1&&alfa2(t.nome)!==alfa2(r.apelido)
+         &&!DB.lanc.some(l=>l.trabId===t.id)) t.nome=capNomes(r.apelido);
+    }
+    aprenderPix(t,{nome:r.nomePix,chave:r.chave,apelido:r.apelido,funcao:r.funcao,forcar:true});
+  });
+  salvar(); fechar(); render();
+  toast(`${n} atualizado(s) · ${c} novo(s)`);
+}
+/* ---------- lista da semana (o "combinado"): "Bruno - 800 reais pedreiro" ---------- */
+function parseListaSemana(txt){
+  const out=[];
+  String(txt||'').split(/\r?\n/).forEach(l=>{
+    l=l.trim(); if(!l||/^total/i.test(alfa2(l)))return;
+    const m=l.match(/^([A-Za-zÀ-ÿ.'’ ]+?)\s*[-–—:=]*\s*(?:R\$\s*)?(\d[\d.]*(?:,\d{1,2})?)\s*(?:reais|real|r\$)?\s*[-–—:]*\s*(.*)$/i);
+    if(!m)return;
+    const nome=m[1].trim(); const valor=moedaTok(m[2]);
+    if(nome.length<2||!(valor>0))return;
+    out.push({nome:capNomes(nome),valor,funcao:capNomes(m[3].trim().toLowerCase()),usado:false});
+  });
+  return out;
+}
+function colabDaLista(e){
+  const n=alfa2(e.nome), eq=equipe();
+  return eq.find(t=>alfa2(t.apelido||'')===n) || eq.find(t=>alfa2(t.nome).split(/\s+/).includes(n)) || null;
+}
+/* casa cada comprovante com uma linha da lista: primeiro por nome/apelido, depois pelo valor */
+function casarLista(){
+  COMP_LISTA.forEach(e=>e.usado=false);
+  COMP_REV.forEach(r=>r.lista=null);
+  /* 1ª passada: comprovante já ligado a um colaborador que está na lista */
+  COMP_REV.forEach(r=>{
+    if(!r.matchId)return;
+    const e=COMP_LISTA.find(x=>!x.usado&&(colabDaLista(x)||{}).id===r.matchId);
+    if(e){ e.usado=true; r.lista=e; }
+  });
+  /* 2ª passada: o que sobrou casa pelo valor, se só houver uma possibilidade */
+  COMP_REV.forEach(r=>{
+    if(r.lista||!(r.valor>0))return;
+    const c=COMP_LISTA.filter(x=>!x.usado&&Math.abs(x.valor-r.valor)<0.005&&!colabDaLista(x));
+    if(c.length===1){
+      c[0].usado=true; r.lista=c[0];
+      if(!r.matchId){ const t=colabDaLista(c[0]); if(t){ r.matchId=t.id; r.novo=false; } }
+    }
+  });
+  /* comprovante sem colaborador, mas a lista aponta quem é pelo apelido+valor */
+  COMP_REV.forEach(r=>{
+    if(r.matchId||!(r.valor>0))return;
+    const e=COMP_LISTA.find(x=>!x.usado&&Math.abs(x.valor-r.valor)<0.005&&colabDaLista(x));
+    if(e){ const t=colabDaLista(e); e.usado=true; r.lista=e; r.matchId=t.id; r.novo=false; }
+  });
+}
+function mudarListaComp(txt){
+  COMP_LISTA_TXT=txt; COMP_LISTA=parseListaSemana(txt);
+  casarLista(); abrirRevisaoComprovantes();
+}
+/* período trabalhado = do pagamento anterior deste colaborador até este */
+function periodoAuto(trabId,data,extras){
+  if(!trabId||!data)return null;
+  let prev='';
+  DB.lanc.forEach(l=>{ if(!l.cancelado&&l.trabId===trabId&&l.data<data&&l.data>prev) prev=l.data; });
+  (extras||[]).forEach(x=>{ if(x.matchId===trabId&&x.data<data&&x.data>prev) prev=x.data; });
+  return prev?{ini:prev,fim:data}:null;
+}
+const ddmm=d=>d.split('-').reverse().slice(0,2).join('/');
+function rotuloPeriodoLanc(l){
+  const p=(l.perIni&&l.perFim)?{ini:l.perIni,fim:l.perFim}:(l.trabId?periodoAuto(l.trabId,l.data):null);
+  return p?` · trabalhou de ${ddmm(p.ini)} a ${ddmm(p.fim)}`:'';
+}
+/* o mesmo pagamento (colaborador + data + valor) não entra duas vezes */
+function dupDe(r){
+  if(!r.matchId||!(r.valor>0))return null;
+  return DB.lanc.find(l=>!l.cancelado&&l.trabId===r.matchId&&l.data===r.data&&Math.abs((+l.total||0)-r.valor)<0.005)||null;
+}
+const pularRow=r=>r.pular!==undefined?r.pular:!!dupDe(r);
+let COMP_PER={ini:'',fim:'',pago:true};
+function abrirRevisaoComprovantes(){
+  const eq=equipe(), esc=x=>String(x||'').replace(/"/g,'&quot;');
+  const ativos=COMP_REV.filter(r=>!pularRow(r));
+  const somaAtiv=ativos.reduce((s,r)=>s+(+r.valor||0),0);
+  const faltam=COMP_LISTA.filter(e=>!e.usado);
+  const totLista=COMP_LISTA.reduce((s,e)=>s+e.valor,0);
+  abrir(`<h2>Conferir comprovantes</h2>
+  <p class="sub">${COMP_REV.length} arquivo(s)${COMP_REV.some(r=>r.ocrFalhou)?' — em alguma foto não consegui ler direito, preencha à mão':''}. O comprovante fica anexado ao pagamento.</p>
+  <div class="fgrid w2">
+  <div class="fcol">
+  <div class="lista-comp">
+  ${COMP_REV.map((r,i)=>{
+    const dup=dupDe(r), pula=pularRow(r);
+    const dif=r.lista&&Math.abs(r.lista.valor-r.valor)>=0.005;
+    return `<div class="crow" style="${pula?'opacity:.55':''}">
+    <div class="cnome" style="grid-column:1/-1"><b>${r.nome||'Nome não identificado'}</b>
+      <small>${r.file.name}</small></div>
+    <div><label>Data</label><input type="date" value="${r.data}" onchange="COMP_REV[${i}].data=this.value;abrirRevisaoComprovantes()"></div>
+    <div><label>Valor</label><input inputmode="numeric" value="${r.valor?num2moeda(r.valor):''}" placeholder="0,00" oninput="onMoedaInput(this);COMP_REV[${i}].valor=moeda2num(this.value)" onchange="casarLista();abrirRevisaoComprovantes()"></div>
+    <div><label>Colaborador</label>
+      <select onchange="mudarMatchComp(${i},this.value)">
+        <option value="">+ Novo colaborador</option>
+        ${eq.map(t=>`<option value="${t.id}" ${r.matchId===t.id?'selected':''}>${t.nome}</option>`).join('')}
+      </select></div>
+    ${!r.matchId?`<div style="grid-column:1/-1"><input data-cap="1" value="${esc(r.nome)}" placeholder="Nome do novo colaborador"
+      oninput="COMP_REV[${i}].nome=this.value"></div>`:''}
+    ${r.lista?`<div class="hint" style="grid-column:1/-1;margin:0;color:${dif?'var(--red)':'var(--teal)'}">
+      ${dif?'⚠ A lista diz':'✓ Lista:'} ${r.lista.nome} ${brl(r.lista.valor)}${r.lista.funcao?' · '+r.lista.funcao:''}${dif?', mas o comprovante é de '+brl(r.valor):''}</div>`:''}
+    ${r.matchId?(()=>{const pa=periodoAuto(r.matchId,r.data,COMP_REV.filter(x=>x!==r&&!pularRow(x)));
+      return `<div class="hint" style="grid-column:1/-1;margin:0">${pa?'Trabalhou de '+ddmm(pa.ini)+' a '+ddmm(pa.fim)+' (desde o último pagamento)':'Primeiro pagamento dele: sem período anterior.'}</div>`})():''}
+    ${dup?`<label class="chkline" style="grid-column:1/-1;margin:0;color:var(--red)"><input type="checkbox" ${pula?'checked':''} onchange="COMP_REV[${i}].pular=this.checked;abrirRevisaoComprovantes()"> Já lançado em ${dup.data.split('-').reverse().join('/')} — pular este</label>`:''}
+    </div>`}).join('')}
+  </div>
+  </div>
+  <div class="fcol">
+    <label style="margin-top:12px">Lista da semana (opcional)</label>
+    <textarea id="comp_lista" rows="6" style="font-size:13px" placeholder="Bruno - 800 reais pedreiro&#10;Pedro - 800 reais pedreiro&#10;Zezin - 490 reais ajudante"
+      onchange="mudarListaComp(this.value)">${COMP_LISTA_TXT}</textarea>
+    <p class="hint">Cole ou digite o combinado. O sistema confere cada comprovante com a lista e avisa quem ainda não recebeu. Na primeira vez ele aprende que "Zezin" é o nome que aparece no Pix.</p>
+    ${COMP_LISTA.length?`<div class="card" style="box-shadow:none;margin-top:9px">
+      <div class="stat"><span>Lista</span><b class="mono">${brl(totLista)}</b></div>
+      <div class="stat"><span>Comprovantes</span><b class="mono">${brl(somaAtiv)}</b></div>
+      ${faltam.length?`<p class="hint" style="color:var(--red);margin-top:6px">Sem comprovante: ${faltam.map(e=>e.nome+' '+brl(e.valor)).join(' · ')}</p>`
+        :'<p class="hint" style="color:var(--teal);margin-top:6px">✓ Todos da lista têm comprovante.</p>'}
+    </div>`:''}
+    <p class="hint" style="margin-top:12px">O período trabalhado é calculado sozinho: vai do último pagamento de cada pessoa até este.</p>
+    <label class="chkline" style="margin-top:10px"><input type="checkbox" id="comp_pago" ${COMP_PER.pago?'checked':''} onchange="COMP_PER.pago=this.checked"> Já pago (o comprovante prova)</label>
+  </div>
+  </div>
+  <div class="fbar">
+  <button class="btn" onclick="lancarComprovantes()">Lançar ${ativos.length} pagamento(s) · ${brl(somaAtiv)}</button>
+  <button class="btn ghost mini" onclick="fechar()">Cancelar</button>
+  </div>`,{form:true});
+}
+function mudarMatchComp(i,id){
+  COMP_REV[i].matchId=id; COMP_REV[i].pular=undefined;
+  casarLista(); abrirRevisaoComprovantes();
+}
+async function lancarComprovantes(){
+  const L=COMP_REV.filter(r=>!pularRow(r));
+  if(!L.length){toast('Nada para lançar.');return}
+  if(L.some(r=>!(r.valor>0))){toast('Falta o valor de algum comprovante.');return}
+  if(L.some(r=>!r.matchId&&!r.nome.trim())){toast('Falta o nome de algum colaborador.');return}
+  const fmt=d=>d.split('-').reverse().slice(0,2).join('/');
+  L.sort((a,b)=>a.data<b.data?-1:a.data>b.data?1:0);
+  const paraAnexar=[]; let soma=0;
+  L.forEach(r=>{
+    let t;
+    if(r.matchId) t=equipe().find(x=>x.id===r.matchId);
+    else{ t={id:uid(),nome:capNomes(r.nome),funcao:'',diaria:0,at:Date.now()}; equipe().push(t); }
+    /* aprende: o nome do Pix, o documento, a chave e o apelido da lista valem para os próximos comprovantes */
+    aprenderPix(t,{nome:r.nome,doc:r.doc,chave:r.chave,apelido:r.lista&&r.lista.nome,funcao:r.lista&&r.lista.funcao});
+    t.at=Date.now();
+    const per=periodoAuto(t.id,r.data);
+    const id=uid();
+    DB.lanc.push({id,at:Date.now(),trabId:t.id,perIni:per?per.ini:'',perFim:per?per.fim:'',
+      data:r.data, desc:`${t.nome} · pago via Pix ${fmt(r.data)}`,
+      familia:'Mão de obra', cat:'c07', forn:t.nome,
+      qtd:1, unit:r.valor, total:r.valor,
+      pag:COMP_PER.pago?'Pago':'A pagar', nf:'', anexos:[],
+      obs:`Comprovante de Pix${per?` · trabalhou de ${ddmm(per.ini)} a ${ddmm(per.fim)}`:''}`,
+      tipoPg:'pix', ctrl:false,qtdRec:0,baixas:[],pagamentos:[]});
+    paraAnexar.push({id,file:r.file});
+    soma+=r.valor;
+  });
+  salvar(); fechar(); render();
+  toast(`${L.length} pagamento(s) lançado(s) · ${brl(soma)}`);
+  COMP_REV=[]; COMP_LISTA=[]; COMP_LISTA_TXT=''; COMP_PER={ini:'',fim:'',pago:true};
+  for(const {id,file} of paraAnexar){
+    try{
+      const dataUrl=await comprimirImagem(file,1100,.62).catch(()=>null);
+      const thumb=dataUrl?await reduzirImagem(dataUrl,220,.45):null;
+      const aid=uid();
+      const meta=await salvarArquivoAnexo('anx:'+aid,file);
+      const l=DB.lanc.find(x=>x.id===id); if(!l)continue;
+      l.anexos=l.anexos||[];
+      l.anexos.push({id:aid,tipo:/^image\//.test(file.type)?'imagem':'arquivo',nome:file.name||'Comprovante Pix',
+        thumb,mime:meta.mime,path:meta.path,local:meta.local});
+      l.at=Date.now();
+    }catch(e){}
+  }
+  if(paraAnexar.length) salvar();
+}
+
 function abrirPagamentos(){
   if(!equipe().length){
     abrir(`<h2>Pagamentos da equipe</h2>
@@ -5704,7 +6271,8 @@ function abrirPagamentos(){
   }
   const p=periodoPadrao(PG.tipo);
   if(!PG.ini){PG.ini=p.ini;PG.fim=p.fim}
-  PG.linhas={};
+  if(!PG_MANTER_LINHAS) PG.linhas={};
+  PG_MANTER_LINHAS=false;
   desenharPagamentos();
 }
 function mudarTipoPg(){
@@ -5910,39 +6478,58 @@ function valorLinhaPg(id,txt){
   const sn=document.getElementById('pgQtd');
   if(sn)sn.textContent=Object.values(PG.linhas).filter(x=>x.on&&(+x.valor>0)).length+' pagamento(s) a lançar';
 }
-function salvarPagamentos(){
+async function salvarPagamentos(){
   const pago=document.getElementById('pg_pago').checked;
   const semDias=PG_SEM_DIAS(PG.tipo);
   const obs=semDias?capNomes(val('pg_obs')):'';
   const rot={diario:'diária',semanal:'semana',quinzenal:'quinzena',mensal:'mês',
     adiantamento:'adiantamento',compra:'pedido de compra'}[PG.tipo];
   const fmt=d=>d.split('-').reverse().slice(0,2).join('/');
-  let n=0,soma=0;
+  let n=0,soma=0; const paraAnexar=[];
   equipe().forEach(t=>{
     const L=PG.linhas[t.id];
     if(!L||!L.on)return;
     const total=+L.valor||0;
     if(!(total>0))return;
     const marcados=Object.keys(L.dias).filter(k=>+L.dias[k]>0).sort();
-    const qtd=semDias?1:+somaDias(L).toFixed(2);
-    if(!semDias&&!qtd)return;
-    const dataLanc=semDias?PG.ini:marcados[marcados.length-1];
+    const viaComprovante=!!L._anexoFile;
+    if(!semDias&&!marcados.length&&!viaComprovante)return;
+    const qtd=semDias?1:(marcados.length?+somaDias(L).toFixed(2):1);
+    const dataLanc=semDias?PG.ini:(marcados.length?marcados[marcados.length-1]:(L._anexoData||PG.ini));
     const desc=semDias
       ? `${t.nome} · ${rot}${obs?' · '+obs:''} ${fmt(PG.ini)}`
-      : (PG.tipo==='diario'
+      : !marcados.length
+        ? `${t.nome} · pago via Pix ${fmt(dataLanc)}`
+        : (PG.tipo==='diario'
           ? `${t.nome} · ${rot} ${fmt(marcados[0])}`
           : `${t.nome} · ${rot} ${fmt(marcados[0])} a ${fmt(marcados[marcados.length-1])}`);
-    DB.lanc.push({id:uid(),at:Date.now(),trabId:t.id,
+    const id=uid();
+    DB.lanc.push({id,at:Date.now(),trabId:t.id,
       data:dataLanc, desc, familia:'Mão de obra', cat:'c07', forn:t.nome,
       qtd, unit:+(total/qtd).toFixed(2), total,
       pag:pago?'Pago':'A pagar', nf:'', anexos:[],
-      obs:semDias?obs:`${qtd} diária(s) em ${marcados.length} dia(s): ${marcados.map(k=>fmt(k)+(+L.dias[k]===.5?' (½)':'')).join(', ')}`,
+      obs:semDias?obs:(marcados.length?`${qtd} diária(s) em ${marcados.length} dia(s): ${marcados.map(k=>fmt(k)+(+L.dias[k]===.5?' (½)':'')).join(', ')}`:'Comprovante de Pix'),
       tipoPg:PG.tipo, ctrl:false,qtdRec:0,baixas:[],pagamentos:[]});
+    if(viaComprovante) paraAnexar.push({id,file:L._anexoFile});
     n++; soma+=total;
   });
   if(!n){toast('Marque ao menos um colaborador com valor.');return}
   salvar(); fechar(); render();
   toast(`${n} pagamento(s) lançado(s) · ${brl(soma)}`);
+  for(const {id,file} of paraAnexar){
+    try{
+      const dataUrl=await comprimirImagem(file,1100,.62).catch(()=>null);
+      const thumb=dataUrl?await reduzirImagem(dataUrl,220,.45):null;
+      const aid=uid();
+      const meta=await salvarArquivoAnexo('anx:'+aid,file);
+      const l=DB.lanc.find(x=>x.id===id); if(!l)continue;
+      l.anexos=l.anexos||[];
+      l.anexos.push({id:aid,tipo:/^image\//.test(file.type)?'imagem':'arquivo',nome:file.name||'Comprovante Pix',
+        thumb,mime:meta.mime,path:meta.path,local:meta.local});
+      l.at=Date.now();
+    }catch(e){}
+  }
+  if(paraAnexar.length) salvar();
 }
 
 /* ---------- pagamento recorrente (engenheiro, mestre de obra, mensalistas) ---------- */
@@ -6020,6 +6607,14 @@ function abrirTrabalhador(id){
   abrir(`<h2>${id?'Editar trabalhador':'Novo trabalhador'}</h2>
   <label>Nome</label><input id="t_nome" data-cap="1" value="${t.nome}" placeholder="Ex: João">
   <label>Função</label><input id="t_func" data-cap="1" value="${t.funcao||''}" placeholder="Pedreiro, servente, ajudante...">
+  <details class="mais" ${(t.apelido||t.nomePix||t.chavePix)?'open':''}>
+    <summary>Pix e apelido (para reconhecer os comprovantes sozinho)</summary>
+    <div class="maisb">
+      <label>Apelido (como aparece na lista da semana)</label><input id="t_apel" data-cap="1" value="${(t.apelido||'').replace(/"/g,'&quot;')}" placeholder="Ex: Zezin">
+      <label>Nome completo no Pix</label><input id="t_nomepix" data-cap="1" value="${(t.nomePix||'').replace(/"/g,'&quot;')}" placeholder="Como o banco mostra">
+      <label>Chave Pix</label><input id="t_chave" value="${(t.chavePix||'').replace(/"/g,'&quot;')}" placeholder="Telefone, e-mail, CPF ou chave aleatória">
+    </div>
+  </details>
   <label>Valor da diária</label><input id="t_diaria" inputmode="numeric" value="${t.diaria?num2moeda(t.diaria):''}" placeholder="0,00" oninput="onMoedaInput(this)">
   <p class="hint">Deixe em branco para quem é pago por período fixo, e use o pagamento recorrente abaixo.</p>
   <div class="divider"></div>
@@ -6058,6 +6653,7 @@ function salvarTrabalhador(id){
   if(!nome){toast('Informe o nome.');return}
   const recOn=document.getElementById('t_rec')&&document.getElementById('t_rec').checked;
   const dados={nome:capNomes(nome),funcao:capNomes(val('t_func')),diaria:moeda2num(val('t_diaria')),at:Date.now(),
+    apelido:capNomes(val('t_apel')),
     rec:recOn?{on:true,valor:moeda2num(val('t_rval')),freq:val('t_freq'),ini:val('t_rini'),
       fim:val('t_rfim'),cat:val('t_rcat')||'c07',obs:capNomes(val('t_robs'))}:{on:false}};
   let renomeados=0;
@@ -6076,6 +6672,8 @@ function salvarTrabalhador(id){
     }
   }
   else{equipe().push({id:uid(),...dados})}
+  { const tt=id?equipe().find(x=>x.id===id):equipe()[equipe().length-1];
+    if(tt) aprenderPix(tt,{nome:val('t_nomepix'),chave:val('t_chave')}); }
   salvar();
   const nRec=gerarRecorrentes();
   if(PG_ABERTO){ PG_ABERTO=false; render(); desenharPagamentos(true); }
@@ -6085,12 +6683,27 @@ function salvarTrabalhador(id){
 let PG_ABERTO=false;
 function editarColabDaGrade(id){ PG_ABERTO=true; abrirTrabalhador(id); }
 function excluirTrabalhador(id){
-  const temLanc=DB.lanc.some(l=>l.trabId===id);
-  confirmar('Excluir trabalhador',
-    temLanc?'As semanas já lançadas continuam nos gastos, apenas o cadastro sai daqui.':'Não é possível desfazer.',
+  const t=equipe().find(x=>x.id===id); if(!t)return;
+  const ativos=DB.lanc.filter(l=>l.trabId===id&&!l.cancelado);
+  if(ativos.length){
+    const soma=ativos.reduce((s,l)=>s+ +l.total,0);
+    abrir(`<h2>Não dá para excluir agora</h2>
+    <p class="sub">"${t.nome}" tem ${ativos.length} gasto(s) lançado(s), somando ${brl(soma)}.</p>
+    <p class="hint">Cancele (ou mude o colaborador desses lançamentos) antes de excluir — assim o histórico de pagamentos não some sem querer.</p>
+    <button class="btn" onclick="fechar();EQ_QUEM='${id}';document.querySelector('nav button[data-v=equipe]').click();setTimeout(verTodosPagamentos,60)">Ver esses gastos</button>
+    <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+    return;
+  }
+  confirmar('Excluir trabalhador',`"${t.nome}" não tem gastos vinculados. Ele sai da lista, mas fica guardado — dá para restaurar em "Ver cancelados".`,
     'Excluir',()=>{
-      DB.equipe=equipe().filter(x=>x.id!==id);salvar();fechar();render();toast('Trabalhador excluído');
+      t.cancelado=true; t.canceladoEm=Date.now(); t.at=Date.now();
+      salvar();fechar();render();toast('Trabalhador removido — pode restaurar em "Ver cancelados"');
     },true);
+}
+function restaurarTrabalhador(id){
+  const t=equipe().find(x=>x.id===id); if(!t)return;
+  t.cancelado=false; delete t.canceladoEm; t.at=Date.now();
+  salvar();fechar();render();toast('Trabalhador restaurado');
 }
 function abrirSemana(trabId){
   const t=equipe().find(x=>x.id===trabId); if(!t)return;
