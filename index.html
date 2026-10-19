@@ -321,6 +321,46 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .sheet .panel{position:absolute;left:0;right:0;bottom:0;max-height:92vh;overflow:auto;
  background:var(--surface);border-radius:20px 20px 0 0;padding:8px 16px calc(24px + var(--safe));
  animation:up .22s cubic-bezier(.2,.8,.3,1)}
+/* telas de digitação: sem rolagem no computador, barra de ações sempre à vista */
+.sheet .panel.form{padding-bottom:0}
+.fgrid{display:grid;grid-template-columns:1fr;gap:0 24px}
+.fcol{min-width:0}
+.fbar{position:sticky;bottom:0;z-index:3;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+ background:var(--surface);border-top:1px solid var(--line);margin:12px -16px 0;
+ padding:10px 16px calc(10px + var(--safe))}
+.fbar .btn{width:auto;flex:1 1 auto;min-width:120px}
+.fbar .btn.ghost{flex:0 0 auto;min-width:0}
+details.mais{margin-top:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+details.mais>summary{cursor:pointer;padding:9px 12px;font-size:13px;font-weight:600;color:var(--ink-2);list-style:none}
+details.mais>summary::-webkit-details-marker{display:none}
+details.mais>summary::before{content:'▸ '}
+details.mais[open]>summary::before{content:'▾ '}
+details.mais>.maisb{padding:0 12px 12px}
+.itrow1{display:grid;gap:9px;grid-template-columns:1fr}
+.itrow2{display:grid;gap:9px;grid-template-columns:1fr 1.3fr 1.3fr auto;align-items:end;margin-top:8px}
+.itrow2 .itot{padding:11px 4px;font-weight:700;font-size:14px;white-space:nowrap}
+.grp.itm{padding:9px 10px}
+.grp.itm label{margin-top:0;font-size:10.5px}
+@media(min-width:620px){.itrow1{grid-template-columns:2fr 1.2fr}.itrow1.c3{grid-template-columns:2fr 1.2fr 1.2fr}}
+@media(min-width:900px){
+ .sheet .panel{left:0;right:0;top:0;bottom:0;margin:auto;height:fit-content;width:min(820px,94vw);
+  border-radius:16px;max-height:94vh}
+ .sheet .panel.form{width:min(1080px,95vw)}
+ .sheet .panel .grab{display:none}
+ .fgrid{grid-template-columns:1fr 1fr}
+ .lista-itens{max-height:calc(94vh - 420px);min-height:170px;overflow:auto;padding-right:4px}
+}
+.crow{display:grid;gap:8px;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:8px;background:var(--surface-2)}
+.crow label{margin-top:0;font-size:10.5px}
+.crow .cnome small{display:block;color:var(--ink-2);font-size:11px;word-break:break-all}
+.crow>div:nth-child(4){grid-column:1/-1}
+.lista-comp{max-height:none}
+@media(min-width:900px){
+ .fgrid.w2{grid-template-columns:1.5fr 1fr}
+ .lista-comp{max-height:calc(94vh - 230px);overflow:auto;padding-right:4px}
+ .crow{grid-template-columns:.9fr .8fr 1.5fr}
+ .crow>div:nth-child(4){grid-column:auto}
+}
 @keyframes up{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
 .grab{width:38px;height:4px;border-radius:3px;background:var(--line);margin:6px auto 12px}
 .sheet .panel{touch-action:pan-y}
@@ -436,10 +476,17 @@ svg.chart{width:100%;height:auto;display:block;overflow:visible}
 .anx .rm{width:26px;height:26px;flex:none;border-radius:8px;border:0;background:transparent;color:var(--red);font-size:15px;cursor:pointer}
 .combo{position:relative}
 .combo-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:35;background:var(--surface);
- border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);max-height:216px;overflow-y:auto;display:none}
+ border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);max-height:264px;overflow-y:auto;display:none}
 .combo-list div{padding:10px 12px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--line)}
 .combo-list div:last-child{border-bottom:0}
 .combo-list div:active{background:var(--surface-2)}
+.combo-list.pcima{top:auto;bottom:calc(100% + 4px)}
+.combo-list div.hl{background:var(--teal);color:#fff}
+.combo.seta>input{padding-right:32px}
+.combo.seta::after{content:'';position:absolute;right:13px;top:calc(50% - 6px);width:7px;height:7px;pointer-events:none;
+ border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);transform:rotate(45deg)}
+.selopt.hl{background:var(--surface-2);box-shadow:inset 0 0 0 2px var(--teal)}
+.selopt.sel.hl{background:var(--teal);color:#fff}
 .combo-empty{padding:9px 12px;font-size:12.5px;color:var(--ink-2)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + var(--safe));z-index:80;
  background:var(--navy);color:#fff;padding:11px 18px;border-radius:11px;font-size:13.5px;font-weight:600;
@@ -685,6 +732,7 @@ a{color:var(--teal)}
   <div class="acoes">
     <button class="btn soft" onclick="abrirComprovantes()"><span class="ic">📄</span>Por comprovante Pix</button>
     <button class="btn soft" onclick="abrirTrabalhador()"><span class="ic">＋</span>Novo trabalhador</button>
+    <button class="btn soft" onclick="abrirCadRapido()"><span class="ic">📋</span>Cadastro rápido</button>
   </div>
   <div class="card" style="margin-top:12px">
     <label style="margin-top:0">A data do período é</label>
@@ -1178,9 +1226,9 @@ function pintaAnexos(elId){
       <div class="nm">${a.nome||(a.tipo==='imagem'?'Foto do documento':'Link')}</div>
       <button class="rm" onclick="event.stopPropagation();rmAnexo(${i},'${elId}')">×</button>
     </div>`).join('')
-    +`<div class="row2" style="margin-top:2px">
-      <input id="anx_link" placeholder="Colar link (Drive, foto...)" style="flex:2">
-      <button class="btn mini ghost" style="flex:0 0 auto;padding:11px 14px" onclick="addAnexoLink('${elId}')">+ Link</button>
+    +`<div style="display:flex;gap:8px;margin-top:2px">
+      <input id="anx_link" placeholder="Colar link (Drive, foto...)" style="flex:1;min-width:0">
+      <button class="btn mini ghost" style="flex:0 0 auto;width:auto;padding:11px 14px" onclick="addAnexoLink('${elId}')">+ Link</button>
     </div>
     <button class="btn mini ghost" style="margin-top:7px;width:100%" onclick="abrirAnexoFoto('${elId}')">📎 Anexar PDF ou foto (pode escolher vários)</button>`;
 }
@@ -1710,6 +1758,25 @@ function aplicarSelects(root){
     btn.onclick=e=>{e.preventDefault();e.stopPropagation();
       if(sel.disabled)return;
       lista.classList.contains('on')?fechar():abrirL();};
+    /* teclado: setas percorrem as opções, Enter/espaço escolhem, Esc fecha */
+    btn.addEventListener('keydown',e=>{
+      if(sel.disabled)return;
+      const aberta=lista.classList.contains('on');
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+        e.preventDefault();
+        if(!aberta){ abrirL(); return; }
+        const ops=[...lista.querySelectorAll('.selopt')];
+        let i=ops.findIndex(o=>o.classList.contains('hl'));
+        if(i<0) i=ops.findIndex(o=>o.classList.contains('sel'));
+        i=e.key==='ArrowDown'?Math.min(ops.length-1,i+1):Math.max(0,i-1);
+        ops.forEach(o=>o.classList.remove('hl')); ops[i].classList.add('hl'); ops[i].scrollIntoView({block:'nearest'});
+      }else if((e.key==='Enter'||e.key===' ')&&aberta){
+        e.preventDefault();
+        const o=lista.querySelector('.selopt.hl'); if(o) o.click(); else fechar();
+      }else if(e.key==='Escape'&&aberta){ e.preventDefault(); e.stopPropagation(); fechar(); }
+      else if(e.key==='Tab'&&aberta){ const o=lista.querySelector('.selopt.hl'); if(o) o.click(); else fechar(); }
+      else if((e.key==='Enter'||e.key===' ')&&!aberta){ e.preventDefault(); abrirL(); }
+    });
     lista.onclick=e=>{
       const op=e.target.closest('.selopt'); if(!op)return;
       e.stopPropagation();
@@ -1733,9 +1800,90 @@ document.addEventListener('click',()=>{
     if(l.previousElementSibling)l.previousElementSibling.classList.remove('aberto')});
 });
 
-function abrir(html){
+/* ---------- campo com lista do sistema (no lugar do datalist do navegador) ---------- */
+function aplicarCombos(root){
+  (root||document).querySelectorAll('input[list]').forEach(inp=>{
+    const id=inp.getAttribute('list'); if(!id||inp.closest('.combo'))return;
+    const wrap=document.createElement('div');
+    wrap.className='combo'+(id==='dlCategorias'||id==='dlTipos'||id==='dlFuncoes'?' seta':'');
+    wrap.dataset.lista=id;
+    inp.parentNode.insertBefore(wrap,inp);
+    wrap.appendChild(inp);
+    inp.removeAttribute('list');
+    inp.autocomplete='off';
+    const lst=document.createElement('div'); lst.className='combo-list'; wrap.appendChild(lst);
+    /* categoria, tipo e função abrem ao focar; descrição e fornecedor só ao digitar (ou seta para baixo) */
+    inp.addEventListener('focus',()=>{ if(wrap.classList.contains('seta')) comboListaFiltrar(inp,true); });
+    inp.addEventListener('input',()=>comboListaFiltrar(inp,false));
+    inp.addEventListener('blur',()=>comboFechar(inp));
+    if(wrap.classList.contains('seta')) inp.addEventListener('mousedown',()=>{ if(document.activeElement===inp) setTimeout(()=>comboListaFiltrar(inp,true),0); });
+  });
+}
+/* abre para cima quando não cabe para baixo dentro da janela */
+function posCombo(lst){
+  lst.classList.remove('pcima'); lst.style.maxHeight='';
+  const pr=panel.getBoundingClientRect(), fb=panel.querySelector('.fbar');
+  const limite=Math.min(window.innerHeight,pr.bottom)-(fb?fb.offsetHeight:0)-6;
+  const r=lst.parentElement.getBoundingClientRect();
+  const abaixo=limite-r.bottom-4, acima=r.top-Math.max(pr.top,0)-6;
+  if(abaixo<190&&acima>abaixo){ lst.classList.add('pcima'); lst.style.maxHeight=Math.min(264,acima)+'px'; }
+  else lst.style.maxHeight=Math.min(264,Math.max(abaixo,120))+'px';
+}
+function comboListaFiltrar(inp,todas){
+  const wrap=inp.closest('.combo'); if(!wrap)return;
+  const lst=wrap.querySelector('.combo-list');
+  const dl=document.getElementById(wrap.dataset.lista);
+  const fonte=dl?[...dl.options].map(o=>o.value):[];
+  const q=todas?'':alfa2(inp.value);
+  const f=(q?fonte.filter(o=>alfa2(o).includes(q)):fonte).slice(0,60);
+  if(!f.length){ lst.style.display='none'; lst.innerHTML=''; return; }
+  lst.innerHTML=f.map(o=>`<div data-v="${o.replace(/"/g,'&quot;')}">${o.replace(/</g,'&lt;')}</div>`).join('');
+  lst.style.display='block'; posCombo(lst);
+  /* abre já no item atual, se for um dos da lista */
+  const at=[...lst.children].find(d=>alfa2(d.dataset.v)===alfa2(inp.value));
+  if(at&&todas){ at.classList.add('hl'); at.scrollIntoView({block:'nearest'}); }
+}
+document.addEventListener('mousedown',e=>{
+  const it=e.target.closest&&e.target.closest('.combo[data-lista] .combo-list div[data-v]');
+  if(!it)return;
+  e.preventDefault();
+  const wrap=it.closest('.combo'), inp=wrap.querySelector('input');
+  inp.value=it.dataset.v;
+  wrap.querySelector('.combo-list').style.display='none';
+  inp.dispatchEvent(new Event('input',{bubbles:true}));
+  inp.dispatchEvent(new Event('change',{bubbles:true}));
+});
+/* teclado: seta para baixo/cima percorre e marca, Enter ou Tab confirma, Esc fecha */
+document.addEventListener('keydown',e=>{
+  const inp=e.target; if(!inp||inp.tagName!=='INPUT')return;
+  const wrap=inp.closest('.combo'); if(!wrap)return;
+  const lst=wrap.querySelector('.combo-list'); if(!lst)return;
+  const aberta=lst.style.display==='block';
+  const itens=[...lst.querySelectorAll('div:not(.combo-empty)')];
+  const atual=itens.findIndex(d=>d.classList.contains('hl'));
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    if(!aberta||!itens.length){
+      if(wrap.dataset.lista) comboListaFiltrar(inp,!inp.value); else comboFamiliaFiltrar(inp);
+      return;
+    }
+    const n=itens.length;
+    const prox=e.key==='ArrowDown'?(atual+1)%n:(atual<=0?n-1:atual-1);
+    itens.forEach(d=>d.classList.remove('hl'));
+    itens[prox].classList.add('hl'); itens[prox].scrollIntoView({block:'nearest'});
+  }else if((e.key==='Enter'||e.key==='Tab')&&aberta&&atual>=0){
+    if(e.key==='Enter') e.preventDefault();
+    itens[atual].dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true}));
+  }else if(e.key==='Escape'&&aberta){
+    e.preventDefault(); e.stopPropagation(); lst.style.display='none';
+  }
+},true);
+
+function abrir(html,opts){
+  panel.classList.toggle('form',!!(opts&&opts.form));
   panel.innerHTML='<div class="grab"></div>'+html;
   aplicarSelects(panel);
+  aplicarCombos(panel);
   panel.style.transition=''; panel.style.transform='';
   panel.scrollTop=0;
   sheet.classList.add('on');
@@ -3940,7 +4088,7 @@ function comboFamiliaFiltrar(input){
     list.innerHTML=filtradas.slice(0,10).map(o=>
       `<div onmousedown="comboEscolherFamilia(this,'${o.replace(/'/g,"\\'")}')">${o}</div>`).join('');
   }
-  list.style.display='block';
+  list.style.display='block'; posCombo(list);
 }
 function comboEscolherFamilia(el,valor){
   const wrap=el.closest('.combo'), input=wrap.querySelector('input');
@@ -4284,10 +4432,12 @@ function abrirGasto(l){
   l=l||{id:'',data:hoje(),desc:'',cat:'c00',forn:'',qtd:1,unit:'',total:'',pag:'Pago',nf:'',link:'',obs:'',ctrl:false,qtdRec:0,baixas:[]};
   abrir(`<h2>${l.id?'Editar gasto':'Lançar gasto'}</h2>
   <p class="sub">O valor entra por inteiro na data do pagamento.</p>
+  <div class="fgrid">
+  <div class="fcol">
   <div id="descUnica"><label>Descrição</label><input id="x_desc" data-cap="1" list="dlProdutos" value="${l.desc}" placeholder="Ex: 100 sacos de cimento 50kg" onblur="sugerirTipo()" onchange="sugerirTipo()"></div>
   <div class="row2">
     <div><label>Data</label><input type="date" id="x_data" value="${l.data}"></div>
-    <div><label>Fornecedor</label><input id="x_forn" data-cap="1" value="${l.forn}" placeholder="Ex: Lumar Bananeiras"></div>
+    <div><label>Fornecedor</label><input id="x_forn" data-cap="1" list="dlForn" value="${l.forn}" placeholder="Ex: Lumar Bananeiras"></div>
   </div>
   <div class="row2">
     <div id="descFam"><label>Tipo de produto</label>
@@ -4295,8 +4445,8 @@ function abrirGasto(l){
         oninput="comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
         value="${(l.familia||'').replace(/"/g,'&quot;')}" placeholder="Ex: Ferro, Cimento...">
         <div class="combo-list"></div></div></div>
-    <div id="categoriaUnica"><label>Categoria</label>
-      <input id="x_cat" list="dlCategorias" value="${(cat(l.cat||'c00').n||'').replace(/"/g,'&quot;')}"
+    <div id="categoriaUnica"><label>Etapa / categoria</label>
+      <input id="x_cat" list="dlCategorias" value="${l.id?(cat(l.cat||'c00').n||'').replace(/"/g,'&quot;'):''}"
         placeholder="Escolha ou digite" ${l.rateio&&l.rateio.length?'style="display:none"':''}></div>
   </div>
   <div id="blocoRateio">
@@ -4316,11 +4466,13 @@ function abrirGasto(l){
   </div>
   <div id="itensMultiplos" style="display:none">
     <label style="margin:12px 0 5px">Itens</label>
-    <div id="itensGasto"></div>
+    <div id="itensGasto" class="lista-itens"></div>
     <button class="btn ghost mini" style="margin-top:8px" onclick="addItem()">+ Adicionar item</button>
-    <div class="stat" style="margin-top:12px;border-top:1px solid var(--line);border-bottom:0;padding-top:11px">
+    <div class="stat" style="margin-top:10px;border-top:1px solid var(--line);border-bottom:0;padding-top:9px">
       <span style="font-weight:700">Total da compra</span><b class="mono" id="x_tot_itens" style="font-size:18px"></b></div>
   </div>
+  </div>
+  <div class="fcol">
   <div class="row2">
     <div><label>Pagamento</label><select id="x_pag">
       ${['A pagar','Pago','Pago adiantado','Parcelado'].map(o=>`<option ${o===l.pag?'selected':''}>${o}</option>`).join('')}</select></div>
@@ -4328,25 +4480,33 @@ function abrirGasto(l){
   </div>
   <label>Anexos</label>
   <div id="anexosGasto"></div>
-  <div class="divider"></div>
-  <label class="chkline">
-    <input type="checkbox" id="x_ctrl" ${l.ctrl?'checked':''}>
-    Vou receber o material aos poucos</label>
-  <div id="ctrlBox" style="display:${l.ctrl?'block':'none'}">
-    <label>Quantidade já recebida</label><input type="number" step="any" id="x_rec" value="${l.qtdRec}">
+  <label>Observações</label><textarea id="x_obs" rows="2">${l.obs}</textarea>
+  <details class="mais" ${l.ctrl?'open':''}>
+    <summary>Mais opções: receber aos poucos${l.id?'':' · repetir todo mês'}</summary>
+    <div class="maisb">
+    <label class="chkline">
+      <input type="checkbox" id="x_ctrl" ${l.ctrl?'checked':''}>
+      Vou receber o material aos poucos</label>
+    <div id="ctrlBox" style="display:${l.ctrl?'block':'none'}">
+      <label>Quantidade já recebida</label><input type="number" step="any" id="x_rec" value="${l.qtdRec}">
+    </div>
+    ${l.id?'':`<label class="chkline" style="margin-top:14px">
+      <input type="checkbox" id="x_rep"> Repetir todo mês</label>
+    <div id="repBox" style="display:none">
+      <label>Quantas vezes no total</label><input type="number" min="2" max="60" id="x_repN" value="8">
+      <p class="hint">A primeira usa a data acima. As seguintes entram como <b>a pagar</b>, no mesmo dia dos meses seguintes.</p>
+    </div>`}
+    </div>
+  </details>
   </div>
-  ${l.id?'':`<div class="divider"></div>
-  <label class="chkline">
-    <input type="checkbox" id="x_rep"> Repetir todo mês</label>
-  <div id="repBox" style="display:none">
-    <label>Quantas vezes no total</label><input type="number" min="2" max="60" id="x_repN" value="8">
-    <p class="hint">A primeira usa a data acima. As seguintes entram como <b>a pagar</b>, no mesmo dia dos meses seguintes.</p>
-  </div>`}
-  <label>Observações</label><textarea id="x_obs">${l.obs}</textarea>
-  <div style="height:14px"></div>
+  </div>
+  <div class="fbar">
   <button class="btn" onclick="salvarGasto('${l.id}')">Salvar</button>
-  ${l.id?`<button class="btn ghost mini" style="margin-top:9px" onclick="excluirGasto('${l.id}')">Cancelar lançamento</button>`:''}
-  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  <button class="btn ghost mini" onclick="fechar()">Cancelar</button>
+  ${l.id?`<button class="btn ghost mini" style="color:var(--red)" onclick="excluirGasto('${l.id}')">Cancelar lançamento</button>`:''}
+  </div>`,{form:true});
+  if(!l.id && window.innerWidth>=900) setTimeout(()=>{const d=document.getElementById('x_desc'); if(d)d.focus()},60);
+
 
   const q=document.getElementById('x_qtd'),u=document.getElementById('x_unit'),t=document.getElementById('x_total');
   const calc=()=>{onMoedaInput(u);
@@ -4362,7 +4522,7 @@ function abrirGasto(l){
   pintaAnexos('anexosGasto');
 
   const catSel=document.getElementById('x_cat'), ratChk=document.getElementById('x_rat');
-  panel._ratCats=(l.rateio&&l.rateio.length)?l.rateio.map(r=>r.cat):[cat(l.cat||'c00').g==='con'?(l.cat||'c00'):'c00'];
+  panel._ratCats=(l.rateio&&l.rateio.length)?l.rateio.map(r=>r.cat):(l.id?[cat(l.cat||'c00').g==='con'?(l.cat||'c00'):'c00']:[]);
   ratChk.onchange=e=>{
     catSel.style.display=e.target.checked?'none':'';
     document.getElementById('rateioBox').style.display=e.target.checked?'block':'none';
@@ -4371,7 +4531,7 @@ function abrirGasto(l){
   if(ratChk.checked) pintaRateio();
 
   const multiChk=document.getElementById('x_multi');
-  panel._its=[{c:'',d:'',q:1,u:0,f:'',cat:cat(l.cat||'c00').n}];
+  panel._its=[{c:'',d:'',q:1,u:0,f:'',cat:l.id?cat(l.cat||'c00').n:''}];
   if(multiChk){
     multiChk.onchange=e=>{
       const on=e.target.checked;
@@ -4427,6 +4587,7 @@ function salvarGasto(id){
   if(usaMulti){
     const its=(panel._its||[]).filter(i=>String(i.d||'').trim()&&+i.u>0);
     if(!its.length){toast('Preencha ao menos um item com descrição e valor.');return}
+    if(its.some(i=>!String(i.cat||'').trim())){toast('Falta escolher a etapa de algum item.');return}
     const data=val('x_data'), forn0=val('x_forn').trim(), pag=val('x_pag'), obs=val('x_obs').trim();
     const anexos=ANX_ALVO||[], at=Date.now();
     its.forEach(it=>{
@@ -4439,7 +4600,11 @@ function salvarGasto(id){
 
   const usaRat=document.getElementById('x_rat').checked;
   const totalVal=moeda2num(val('x_total'));
-  let rat=[], catPrincipal=garantirCategoria(val('x_cat'),'con');
+  if(!usaRat&&!val('x_cat').trim()){
+    toast('Escolha a etapa / categoria.');
+    const c=document.getElementById('x_cat'); if(c)c.focus(); return;
+  }
+  let rat=[], catPrincipal=usaRat?'c00':garantirCategoria(val('x_cat'),'con');
   if(usaRat){
     const cats=panel._ratCats||[];
     if(!cats.length){toast('Escolha ao menos uma etapa para dividir.');return}
@@ -4592,32 +4757,39 @@ function abrirCot(c){
   panel._cotConc=String(c.conc||'').trim();
   abrir(`<h2>${c.id?'Editar cotação':'Nova cotação'}</h2>
   <p class="sub">Preço de mercado. Ainda não é gasto.</p>
+  <div class="fgrid">
+  <div class="fcol">
   <label>Do que se trata</label><input id="c_item" data-cap="1" value="${c.item||''}" placeholder="Ex: Blocos e canaletas de concreto">
   <div class="row2">
-    <div><label>Fornecedor</label><input id="c_forn" data-cap="1" value="${c.forn||''}"></div>
+    <div><label>Fornecedor</label><input id="c_forn" data-cap="1" list="dlForn" value="${c.forn||''}"></div>
     <div><label>Validade</label><input type="date" id="c_val" value="${c.validade||daquiADias(5)}"></div>
   </div>
-  <p class="hint">Validade preenchida com 5 dias por padrão.</p>
   <label>Anexos</label>
   <div id="anexosCot"></div>
-  <div class="divider"></div>
-  <label style="margin:0">Itens</label>
-  <div id="itens"></div>
+  <label>Observações</label><textarea id="c_obs" rows="3" placeholder="Condições, prazo de entrega, devolução de palete...">${c.obs||''}</textarea>
+  </div>
+  <div class="fcol">
+  <label style="margin-top:12px">Itens</label>
+  <div id="itens" class="lista-itens"></div>
   <button class="btn ghost mini" style="margin-top:8px" onclick="addItem()">+ Adicionar item</button>
-  <div class="stat" style="margin-top:12px;border-top:1px solid var(--line);border-bottom:0;padding-top:11px">
+  <div class="stat" style="margin-top:10px;border-top:1px solid var(--line);border-bottom:0;padding-top:9px">
     <span>Soma dos itens</span><b class="mono" id="c_tot"></b></div>
-  <div class="row2" style="margin-top:6px;align-items:end">
+  <div class="row2" style="margin-top:2px;align-items:end">
     <div><label style="margin-top:0">Desconto negociado</label>
       <input id="c_desc" inputmode="numeric" value="${c.desconto?num2moeda(c.desconto):''}" placeholder="0,00" oninput="onMoedaInput(this);totItens()"></div>
-    <div><button class="btn ghost mini" onclick="arredondarCot()">Arredondar total</button></div>
+    <div><button class="btn ghost mini" style="width:100%" onclick="arredondarCot()">Arredondar total</button></div>
   </div>
   <div class="stat" style="border-bottom:0">
     <span style="font-weight:700">Total da cotação</span><b class="mono" id="c_totfinal" style="font-size:18px"></b></div>
-  <p class="hint">O desconto é dividido entre os itens conforme o valor de cada um, então o preço unitário usado nas comparações e na compra já sai com o desconto embutido.</p>
-  <label>Observações</label><textarea id="c_obs" placeholder="Condições, prazo de entrega, devolução de palete...">${c.obs||''}</textarea>
-  <div style="height:14px"></div>
+  <p class="hint">O desconto é rateado entre os itens pelo valor de cada um; o preço unitário das comparações já sai com ele.</p>
+  </div>
+  </div>
+  <div class="fbar">
   <button class="btn" onclick="salvarCot('${c.id}')">Salvar cotação</button>
-  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
+  <button class="btn ghost mini" onclick="fechar()">Cancelar</button>
+  </div>`,{form:true});
+  if(!c.id && window.innerWidth>=900) setTimeout(()=>{const d=document.getElementById('c_item'); if(d)d.focus()},60);
+
   ITENS_DIV='itens'; ITENS_TOT='c_tot'; ITENS_CAT=false;
   pintaItens();
   ANX_ALVO=JSON.parse(JSON.stringify(c.anexos||[]));
@@ -4625,36 +4797,40 @@ function abrirCot(c){
 }
 let ITENS_DIV='itens', ITENS_TOT='c_tot', ITENS_CAT=false;
 function pintaItens(){
+  const q=v=>String(v||'').replace(/"/g,'&quot;');
   document.getElementById(ITENS_DIV).innerHTML=panel._its.map((it,i)=>`
-   <div class="grp" style="background:var(--surface-2);margin-bottom:8px">
-     <div class="row3">
-       <div><label style="margin-top:0">Qtde</label>
+   <div class="grp itm" style="margin-bottom:8px">
+     <div class="itrow1 ${ITENS_CAT?'c3':''}">
+       <div><label>Descrição</label>
+         <input value="${q(it.d)}" list="dlProdutos" data-cap="1" placeholder="Ex: Bloco 14x19x39cm" oninput="chgItem(${i},'d',this.value)"></div>
+       <div><label>Tipo de produto</label>
+         <div class="combo"><input data-item-index="${i}" autocomplete="off"
+           oninput="chgItem(${i},'familia',this.value);comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
+           value="${q(it.familia)}" placeholder="Ex: Ferro, Cimento...">
+           <div class="combo-list"></div></div></div>
+       ${ITENS_CAT?`<div><label>Etapa do item</label>
+         <input list="dlCategorias" value="${q(it.cat)}"
+           placeholder="Escolha ou digite" oninput="chgItem(${i},'cat',this.value)"></div>`:''}
+     </div>
+     <div class="itrow2">
+       <div><label>Qtde</label>
          <input type="number" step="any" value="${it.q}" oninput="chgItem(${i},'q',this.value)"></div>
-       <div><label style="margin-top:0">Vlr unitário</label>
+       <div><label>Vlr unitário</label>
          <input ${moedaAttrs(it.u)} oninput="onMoedaInput(this);chgItem(${i},'u',moeda2num(this.value))"></div>
+       <div><label>Total</label><div class="mono itot" id="it_${i}">${brl((+it.q||0)*(+it.u||0))}</div></div>
+       <div>${panel._its.length>1?`<button class="iconbtn" style="background:var(--surface);color:var(--red);width:34px;height:34px" onclick="delItem(${i})">×</button>`:''}</div>
      </div>
-     <label>Descrição</label>
-     <input value="${(it.d||'').replace(/"/g,'&quot;')}" list="dlProdutos" data-cap="1" placeholder="Ex: Bloco 14x19x39cm" oninput="chgItem(${i},'d',this.value)">
-     <label>Tipo de produto (opcional)</label>
-     <div class="combo"><input data-item-index="${i}" autocomplete="off"
-       oninput="chgItem(${i},'familia',this.value);comboFamiliaFiltrar(this)" onfocus="comboFamiliaFiltrar(this)" onblur="comboFechar(this)"
-       value="${(it.familia||'').replace(/"/g,'&quot;')}" placeholder="Ex: Ferro, Cimento...">
-       <div class="combo-list"></div></div>
-     ${ITENS_CAT?`<label>Etapa deste item</label>
-     <input list="dlCategorias" value="${(it.cat||cat('c00').n).replace(/"/g,'&quot;')}"
-       placeholder="Escolha ou digite uma nova" oninput="chgItem(${i},'cat',this.value)">`:''}
-     <div class="row2">
-       <div><label>Cód. (opcional)</label>
-         <input value="${(it.c||'').replace(/"/g,'&quot;')}" oninput="chgItem(${i},'c',this.value)"></div>
-       <div><label>Fornecedor (opcional)</label>
-         <input value="${(it.f||'').replace(/"/g,'&quot;')}" data-cap="1" oninput="chgItem(${i},'f',this.value)"></div>
-     </div>
-     <div class="stat" style="border:0;padding-bottom:0">
-       <span style="font-size:12px">Total do item</span>
-       <span><b class="mono" id="it_${i}">${brl((+it.q||0)*(+it.u||0))}</b>
-       ${panel._its.length>1?`<button class="iconbtn" style="background:var(--surface);color:var(--red);width:28px;height:28px;margin-left:8px;vertical-align:middle" onclick="delItem(${i})">×</button>`:''}</span>
-     </div>
+     <details class="mais" style="margin-top:8px;background:transparent" ${(it.c||it.f)?'open':''}>
+       <summary>Código e fornecedor do item</summary>
+       <div class="maisb"><div class="row2">
+         <div><label style="margin-top:8px">Cód.</label>
+           <input value="${q(it.c)}" oninput="chgItem(${i},'c',this.value)"></div>
+         <div><label style="margin-top:8px">Fornecedor</label>
+           <input value="${q(it.f)}" list="dlForn" data-cap="1" oninput="chgItem(${i},'f',this.value)"></div>
+       </div></div>
+     </details>
    </div>`).join('');
+  aplicarCombos(document.getElementById(ITENS_DIV));
   totItens();
 }
 function chgItem(i,campo,v){
@@ -4685,7 +4861,7 @@ function arredondarCot(){
   toast('Desconto de '+brl(d)+' aplicado');
 }
 function addItem(){
-  const catPadrao=document.getElementById('x_cat')?(val('x_cat')||cat('c00').n):cat('c00').n;
+  const catPadrao=document.getElementById('x_cat')?val('x_cat'):'';
   panel._its.push({c:'',d:'',q:1,u:0,f:'',cat:catPadrao});
   pintaItens();
 }
@@ -5692,10 +5868,13 @@ function renderEquipe(){
     return {t,pg,tot:pg.reduce((s,l)=>s+ +l.total,0),dd:pg.reduce((s,l)=>s+(+l.qtd||0),0),
       ab:pg.filter(l=>!isPago(l)).reduce((s,l)=>s+saldoAPagar(l),0)};
   }).sort((a,b)=>b.tot-a.tot);
+  /* quem não recebeu nada no período não entra na lista (a menos que tenha sido escolhido no filtro) */
+  const visiveis=linhas.filter(x=>EQ_QUEM||x.pg.length>0||x.tot!==0);
+  const ocultos=linhas.length-visiveis.length;
 
   const lista=document.getElementById('equipeList');
   if(!lista)return;
-  lista.innerHTML= eq.length? linhas.map(({t,pg,tot,dd,ab})=>{
+  lista.innerHTML= eq.length? (visiveis.length?visiveis.map(({t,pg,tot,dd,ab})=>{
     const k='eq:'+t.id, pc=totalMO>0?(tot/totalMO*100):0;
     return `<div class="acc ${ACC[k]?'on':''}" data-acc="${k}" style="margin-bottom:8px">
       <div class="acch">
@@ -5713,7 +5892,7 @@ function renderEquipe(){
         ${pg.length?pg.map(l=>`<div class="item" data-gasto="${l.id}" ${!isPago(l)?'style="opacity:.72"':''}>
           <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span>${dtDig(l)}</div>
           <div class="mid"><b>${l.desc}</b>
-            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.obs?' · '+l.obs.slice(0,70):''}</small></div>
+            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${rotuloPeriodoLanc(l)}${l.obs?' · '+l.obs.replace(/ · trabalhou de .*$/,'').slice(0,60):''}</small></div>
           <div class="val"><span class="mono">${brl(l.total)}</span>
             ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
           :'<p class="hint">Nenhum pagamento neste período.</p>'}
@@ -5722,7 +5901,8 @@ function renderEquipe(){
           <button class="btn ghost mini" data-acao="editar" data-id="${t.id}">Editar cadastro</button>
         </div>
       </div></div>`;
-  }).join('')
+  }).join(''):'<div class="card"><div class="empty"><b>Nenhum pagamento neste período</b><p>Mude o período acima para ver outros pagamentos.</p></div></div>')
+    +(ocultos?`<p class="hint" style="text-align:center;margin-top:4px">${ocultos} cadastro(s) sem pagamento neste período não aparecem aqui.</p>`:'')
   : '<div class="card"><div class="empty"><b>Nenhum trabalhador cadastrado</b><p>Cadastre o pedreiro, servente ou ajudante e o valor da diária para controlar a mão de obra.</p></div></div>';
   if(orfaos.length){
     const totOrf=orfaos.reduce((s,l)=>s+ +l.total,0), k='eq:orfaos';
@@ -5776,7 +5956,7 @@ function verTodosPagamentos(){
   </div>
   ${L.length?L.map(l=>`<div class="item" onclick="verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
     <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span>${dtDig(l)}</div>
-    <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.obs?' · '+l.obs.slice(0,70):''}</small></div>
+    <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${rotuloPeriodoLanc(l)}${l.obs?' · '+l.obs.replace(/ · trabalhou de .*$/,'').slice(0,60):''}</small></div>
     <div class="val"><span class="mono">${brl(l.total)}</span>
       ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
    :'<p class="hint">Nenhum pagamento neste filtro.</p>'}
@@ -5820,155 +6000,367 @@ function periodoPadrao(tipo,base){
 const PG_SEM_DIAS=t=>t==='adiantamento'||t==='compra';
 
 /* ---------- lançar pagamentos a partir de comprovantes de Pix ---------- */
-let COMP_REV=[];
+let COMP_REV=[], COMP_LISTA=[], COMP_LISTA_TXT='';
 function abrirComprovantes(){ document.getElementById('compInput').click(); }
 document.getElementById('compInput').onchange=async e=>{
   const files=[...e.target.files]; e.target.value=''; if(!files.length)return;
   toast('Lendo '+files.length+' comprovante(s)...');
   COMP_REV=[];
   for(const f of files){
-    const row={file:f,nome:'',valor:0,data:hoje(),matchId:'',novo:false,isImage:/^image\//.test(f.type),ocrFalhou:false};
+    const row={file:f,nome:'',doc:'',valor:0,data:hoje(),matchId:'',novo:false,isImage:/^image\//.test(f.type),ocrFalhou:false,lista:null};
     try{
       const linhas = /pdf/i.test(f.type) ? await linhasDoPdf(f)
         : row.isImage ? await linhasDaImagem(f, m=>toast(m))
         : null;
       if(linhas){
         const p=parseComprovantePix(linhas);
-        row.nome=p.nome; row.valor=p.valor; if(p.data)row.data=p.data;
-        if(row.isImage&&!p.nome&&!p.valor) row.ocrFalhou=true;
+        row.nome=p.nome; row.doc=p.doc; row.chave=p.chave; row.valor=p.valor; if(p.data)row.data=p.data;
+        if(!p.nome&&!p.valor) row.ocrFalhou=true;
       }
     }catch(x){ if(row.isImage)row.ocrFalhou=true; }
-    const cand=melhorColaboradorPara(row.nome);
+    const cand=melhorColaboradorPara(row.nome,row.doc,row.chave);
     row.matchId=cand?cand.id:'';
     row.novo=!cand;
     COMP_REV.push(row);
   }
+  COMP_LISTA=parseListaSemana(COMP_LISTA_TXT);
+  casarLista();
   abrirRevisaoComprovantes();
 };
-/* tenta achar valor, data e nome do destinatário no texto do comprovante — formatos variam bastante entre bancos */
-function parseComprovantePix(linhas){
-  const texto=linhas.join(' \n ');
-  let valor=0;
-  const comLabel=texto.match(/valor[^\n\d]{0,15}(R\$\s*[\d.,]+)/i);
-  const qualquer=[...texto.matchAll(/R\$\s*([\d.,]+)/g)];
-  if(comLabel) valor=nBR(comLabel[1].replace('R$','').trim());
-  else if(qualquer.length) valor=Math.max(...qualquer.map(m=>nBR(m[1])));
-  let data='';
-  const dm=texto.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  const MESES={janeiro:'01',fevereiro:'02',março:'03',marco:'03',abril:'04',maio:'05',junho:'06',
-    julho:'07',agosto:'08',setembro:'09',outubro:'10',novembro:'11',dezembro:'12'};
-  const dext=texto.match(/(\d{1,2})\s*de\s*([a-zçã]+)\s*de\s*(\d{4})/i);
-  if(dm) data=`${dm[3]}-${dm[2]}-${dm[1]}`;
-  else if(dext&&MESES[dext[2].toLowerCase()]) data=`${dext[3]}-${MESES[dext[2].toLowerCase()]}-${dext[1].padStart(2,'0')}`;
-  const ehLabel=l=>/pix|comprovante|banco|ag[êe]ncia|conta|transfer|chave|valor|data|hor[áa]rio|institui[çc][ãa]o|cpf|cnpj|nome|id\s*da|transa[çc][ãa]o|quem|sobre|inter\b/i.test(l);
-  const pareceNome=l=>{
-    const p=l.trim().split(/\s+/);
-    return p.length>=2 && p.length<=6 && /^[A-Za-zÀ-ÿ.\s]+$/.test(l) && !ehLabel(l);
-  };
-  let nome='';
-  for(let i=0;i<linhas.length;i++){
-    if(/destinat[áa]rio|favorecido|recebedor|nome\s*do\s*recebedor|para\s*quem|^para$|^pago\s*a$/i.test(linhas[i].trim())){
-      const mesma=linhas[i].split(':').slice(1).join(':').trim();
-      nome=(mesma&&pareceNome(mesma))?mesma:(pareceNome(linhas[i+1]||'')?linhas[i+1]:'');
-      if(nome)break;
-    }
-  }
-  if(!nome){
-    /* formato em duas seções ("Quem recebeu" / "Quem pagou") — o nome sai de dentro da seção de
-       quem recebeu, nunca da de quem pagou (que é o próprio usuário). O OCR raramente entrega a
-       palavra "Nome" isolada numa linha própria, então aceita a primeira linha da seção que parece
-       um nome de gente, mesmo sem o rótulo exato na frente. */
-    const iRec=linhas.findIndex(l=>/quem\s*receb/i.test(l));
-    const iPag=linhas.findIndex(l=>/quem\s*pag/i.test(l));
-    if(iRec>=0){
-      const fim=(iPag>iRec)?iPag:Math.min(linhas.length,iRec+8);
-      for(let i=iRec+1;i<fim;i++){ if(pareceNome(linhas[i])){ nome=linhas[i]; break; } }
-    }
-  }
-  if(!nome){
-    const cand=linhas.find(pareceNome);
-    if(cand) nome=cand.trim();
-  }
-  return {valor,data,nome:capNomes(nome.replace(/[^\wÀ-ÿ\s]/g,'').trim())};
+/* converte "350,00", "R$ 1.700,00", "490.00" e "3.500" em número */
+function moedaTok(t){
+  t=String(t||'').replace(/[^\d.,]/g,'');
+  if(!t)return 0;
+  if(/,\d{1,2}$/.test(t)) return parseFloat(t.replace(/\./g,'').replace(',','.'))||0;
+  if(/^\d+\.\d{2}$/.test(t)) return parseFloat(t)||0;
+  return parseFloat(t.replace(/[.,]/g,''))||0;
 }
-function melhorColaboradorPara(nome){
+const RE_MOEDA_TOK='\\d{1,3}(?:\\.\\d{3})*,\\d{2}|\\d+\\.\\d{2}|\\d+,\\d{2}|\\d+';
+/* lê valor, data, nome e documento de quem RECEBEU — testado com os comprovantes do Inter e do Next
+   (PDF ou foto) e com o formato em seções "Quem recebeu / Quem pagou" ou "Dados do recebedor / pagador" */
+function parseComprovantePix(linhas){
+  const L=linhas.map(x=>String(x).trim()).filter(Boolean);
+  /* ---- valor ---- */
+  let valor=0;
+  for(let i=0;i<L.length&&!valor;i++){
+    if(/^valor\b|\bvalor\s*:/i.test(L[i])){
+      /* o número pode estar na mesma linha ou na seguinte (PDF separa rótulo e valor) */
+      for(const l of [L[i],L[i+1]||'']){
+        const m=l.match(new RegExp('R\\$\\s*('+RE_MOEDA_TOK+')'))||l.match(new RegExp('(?:^|[\\s:])('+RE_MOEDA_TOK+')\\s*$'));
+        if(m&&moedaTok(m[1])>0){ valor=moedaTok(m[1]); break; }
+      }
+    }
+  }
+  if(!valor){
+    const rs=[...L.join('\n').matchAll(new RegExp('R\\$\\s*('+RE_MOEDA_TOK+')','g'))].map(m=>moedaTok(m[1])).filter(v=>v>0);
+    if(rs.length) valor=rs[0];
+  }
+  /* ---- data (aceita barra trocada por 7/| pelo OCR) ---- */
+  const reData=/(\d{2})\s*[\/.\-|]?\s*(\d{2})\s*[\/.\-|7lI]?\s*(20\d{2})/;
+  const dataValida=m=>m&&+m[1]>=1&&+m[1]<=31&&+m[2]>=1&&+m[2]<=12;
+  let data='';
+  for(let i=0;i<L.length&&!data;i++){
+    if(/data/i.test(L[i])){
+      for(const t of [L[i],L[i+1]||'']){ const m=t.match(reData); if(dataValida(m)){ data=`${m[3]}-${m[2]}-${m[1]}`; break; } }
+    }
+  }
+  if(!data){ for(const l of L){ const m=l.match(reData); if(dataValida(m)){ data=`${m[3]}-${m[2]}-${m[1]}`; break; } } }
+  if(!data){
+    const MESES={janeiro:'01',fevereiro:'02',março:'03',marco:'03',abril:'04',maio:'05',junho:'06',
+      julho:'07',agosto:'08',setembro:'09',outubro:'10',novembro:'11',dezembro:'12'};
+    const dext=L.join(' ').match(/(\d{1,2})\s*de\s*([a-zçã]+)\s*de\s*(\d{4})/i);
+    if(dext&&MESES[dext[2].toLowerCase()]) data=`${dext[3]}-${MESES[dext[2].toLowerCase()]}-${dext[1].padStart(2,'0')}`;
+  }
+  /* ---- seções: quem recebeu x quem pagou ---- */
+  const reRec=/quem\s*receb|dados\s*do\s*(recebedor|favorecido|benefici)|destinat[áa]rio|favorecido|recebedor|benefici[áa]rio|^destino\b/i;
+  const rePag=/quem\s*pag|dados\s*do\s*pagador|pagador|^origem\b|quem\s*enviou/i;
+  const reOutra=/dados\s*do\s*pagamento|sobre\s*a\s*transa|autentica/i;
+  const ehLabel=l=>/pix|comprovante|banco|ag[êe]ncia|conta|transfer|chave|valor|data\b|hor[áa]rio|institui|cpf|cnpj|^nome\b|id\s*da|transa[çc]|quem|sobre|inter\b|dados|descri|tipo|autentic/i.test(l);
+  const soLetras=l=>/^[A-Za-zÀ-ÿ.'’\s]+$/.test(l);
+  const pareceNome=l=>{ const p=l.trim().split(/\s+/); return p.length>=2&&p.length<=7&&soLetras(l)&&!ehLabel(l); };
+  const iRec=L.findIndex(l=>reRec.test(l)&&!/^descri/i.test(l));
+  let nome='', doc='', chave='';
+  if(iRec>=0){
+    let fim=Math.min(L.length,iRec+9);
+    for(let i=iRec+1;i<fim;i++){ if(rePag.test(L[i])||reOutra.test(L[i])){ fim=i; break; } }
+    for(let i=iRec+1;i<fim;i++){
+      const m=L[i].match(/^nome\s*:?\s*(.*)$/i);
+      if(m){
+        let t=m[1].trim();
+        let j=i;
+        if(!t){ t=(L[i+1]||'').trim(); j=i+1; }
+        if(t&&soLetras(t)){
+          nome=t;
+          /* nome que quebrou em duas linhas ("... Soares da" / "Costa") */
+          const prox=(L[j+1]||'').trim();
+          if(prox&&soLetras(prox)&&!ehLabel(prox)&&prox.split(/\s+/).length<=3&&t.split(/\s+/).length>=2) nome+=' '+prox;
+          break;
+        }
+      }
+    }
+    if(!nome){ for(let i=iRec+1;i<fim;i++){ if(pareceNome(L[i])){ nome=L[i]; break; } } }
+    for(let i=iRec+1;i<fim;i++){
+      const m=L[i].match(/(\d{3})\.(\d{3})-\*{2}/); if(m){ doc=m[1]+m[2]; break; }
+    }
+    for(let i=iRec+1;i<fim;i++){
+      const m=L[i].match(/^chave[^:]*:?\s*(.*)$/i);
+      if(m){ const c=(m[1]||L[i+1]||'').trim(); if(c){ chave=normChave(c); } break; }
+    }
+  }
+  if(!nome){
+    const iPag=L.findIndex(l=>rePag.test(l));
+    const cand=L.find((l,i)=>pareceNome(l)&&!(iPag>=0&&i>=iPag));
+    if(cand) nome=cand;
+  }
+  return {valor,data,doc,chave,nome:capNomes(nome.replace(/[^A-Za-zÀ-ÿ\s'’]/g,'').trim())};
+}
+function normChave(s){
+  s=String(s||'').trim(); if(!s)return '';
+  if(s.includes('@')) return s.toLowerCase();
+  if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)) return s.toLowerCase();
+  const d=s.replace(/\D/g,''); if(!d)return s.toLowerCase();
+  return d.length>11?d.slice(-11):d;
+}
+function melhorColaboradorPara(nome,doc,chave){
+  const eq=equipe();
+  if(chave){ const t=eq.find(x=>(x.chavesPix||[]).includes(chave)); if(t)return t; }
+  if(doc){ const t=eq.find(x=>(x.pixDocs||[]).includes(doc)); if(t)return t; }
   if(!nome)return null;
+  const k=alfa2(nome);
+  const ali=eq.find(x=>(x.nomesPix||[]).includes(k)); if(ali)return ali;
   const stop=new Set(['de','da','do','dos','das','e']);
-  const alvo=alfa2(nome).split(/\s+/).filter(w=>w&&!stop.has(w));
+  const alvo=k.split(/\s+/).filter(w=>w&&!stop.has(w));
   if(alvo.length<2)return null;               /* nome de gente tem 2+ palavras — abaixo disso é ruído de OCR */
   /* uma palavra "bate" também quando uma das duas é só a inicial da outra —
-     cobre nome cadastrado abreviado ("Anderson S L Fontes") contra o nome
-     completo do comprovante ("Anderson dos Santos Lourenço de Fontes").
-     Só vale para nome cadastrado com 2+ palavras: um nome de uma palavra só
-     (ex. "Augusto") não pode casar por causa de uma letra solta e ambígua. */
+     cobre nome cadastrado abreviado ("Anderson S L Fontes") contra o nome completo do comprovante.
+     Nome cadastrado de uma palavra só não casa por letra solta. */
   const bateTok=(a,b)=> a===b || (a.length<=2&&b[0]===a[0]) || (b.length<=2&&a[0]===b[0]);
   let melhor=null,melhorScore=0;
-  equipe().forEach(t=>{
-    const meu=alfa2(t.nome).split(/\s+/).filter(w=>w&&!stop.has(w));
-    if(!meu.length)return;
-    const usaInicial=meu.length>=2;
-    const bate=meu.filter(w=>alvo.some(a=>usaInicial?bateTok(w,a):w===a)).length;
-    const score=bate/meu.length;
-    if(score>melhorScore){melhorScore=score;melhor=t;}
+  eq.forEach(t=>{
+    [t.nome,...(t.nomesPix||[])].forEach(nm=>{
+      const meu=alfa2(nm).split(/\s+/).filter(w=>w&&!stop.has(w));
+      if(!meu.length)return;
+      const usaInicial=meu.length>=2;
+      const bate=meu.filter(w=>alvo.some(a=>usaInicial?bateTok(w,a):w===a)).length;
+      const score=bate/meu.length;
+      if(score>melhorScore){melhorScore=score;melhor=t;}
+    });
   });
   return melhorScore>=0.6?melhor:null;
 }
-let COMP_PER={ini:'',fim:'',pago:true};
-function abrirRevisaoComprovantes(){
-  const eq=equipe();
-  abrir(`<h2>Conferir comprovantes</h2>
-  <p class="sub">${COMP_REV.length} arquivo(s). Confira nome, valor e data${COMP_REV.some(r=>r.ocrFalhou)?' — em alguma foto não consegui ler direito, preencha à mão nesse(s) caso(s)':''} — o comprovante fica anexado ao pagamento.</p>
-  <div style="max-height:48vh;overflow:auto">
-  ${COMP_REV.map((r,i)=>`<div class="card" style="box-shadow:none;margin-top:9px;border:1px solid var(--line)">
-    <b style="font-size:13px">${r.file.name}</b>
-    <div class="row2" style="margin-top:7px">
-      <div><label style="margin-top:0">Data</label><input type="date" value="${r.data}" onchange="COMP_REV[${i}].data=this.value"></div>
-      <div><label style="margin-top:0">Valor</label><input inputmode="numeric" value="${r.valor?num2moeda(r.valor):''}" placeholder="0,00" oninput="onMoedaInput(this);COMP_REV[${i}].valor=moeda2num(this.value)"></div>
-    </div>
-    <label style="margin-top:8px">Colaborador</label>
-    <select onchange="mudarMatchComp(${i},this.value)">
-      <option value="">+ Novo colaborador com este nome</option>
-      ${eq.map(t=>`<option value="${t.id}" ${r.matchId===t.id?'selected':''}>${t.nome}</option>`).join('')}
-    </select>
-    ${!r.matchId?`<input style="margin-top:7px" data-cap="1" value="${r.nome.replace(/"/g,'&quot;')}" placeholder="Nome do colaborador"
-      oninput="COMP_REV[${i}].nome=this.value">`:''}
-  </div>`).join('')}
-  </div>
-  <label style="margin-top:11px">Período de trabalho (opcional)</label>
-  <div class="row2">
-    <input type="date" value="${COMP_PER.ini}" placeholder="Início" onchange="COMP_PER.ini=this.value">
-    <input type="date" value="${COMP_PER.fim}" placeholder="Fim" onchange="COMP_PER.fim=this.value">
-  </div>
-  <p class="hint">Só entra como observação no lançamento — não precisa marcar dia por dia. Deixe em branco se não fizer diferença.</p>
-  <label class="chkline" style="margin-top:9px"><input type="checkbox" id="comp_pago" ${COMP_PER.pago?'checked':''} onchange="COMP_PER.pago=this.checked"> Já pago (é o que o comprovante já prova)</label>
-  <button class="btn" style="margin-top:12px" onclick="lancarComprovantes()">Lançar ${COMP_REV.length} pagamento(s)</button>
+/* grava no colaborador o que identifica quem ele é no Pix */
+function aprenderPix(t,{nome,doc,chave,apelido,funcao,forcar}){
+  const k=alfa2(nome);
+  if(k){ t.nomesPix=t.nomesPix||[]; if(!t.nomesPix.includes(k)) t.nomesPix.push(k); if(!t.nomePix) t.nomePix=capNomes(nome); }
+  if(doc){ t.pixDocs=t.pixDocs||[]; if(!t.pixDocs.includes(doc)) t.pixDocs.push(doc); }
+  const ch=normChave(chave);
+  if(ch){ t.chavesPix=t.chavesPix||[]; if(!t.chavesPix.includes(ch)) t.chavesPix.push(ch); if(!t.chavePix) t.chavePix=String(chave).trim(); }
+  if(apelido&&(forcar||!t.apelido)&&!alfa2(t.nome).split(/\s+/).includes(alfa2(apelido))) t.apelido=capNomes(apelido);
+  if(funcao&&(forcar||!t.funcao)) t.funcao=capNomes(String(funcao).toLowerCase());
+  if(forcar&&nome) t.nomePix=capNomes(nome);
+  t.at=Date.now();
+}
+/* ---------- cadastro rápido: "Apelido | Nome no Pix | função | chave" ---------- */
+function parseCadRapido(txt){
+  return String(txt||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{
+    const p=l.split(/\s*[|;\t]\s*/);
+    return {apelido:capNomes(p[0]||''),nomePix:capNomes(p[1]||''),funcao:(p[2]||'').trim().toLowerCase(),chave:(p[3]||'').trim()};
+  }).filter(r=>r.apelido||r.nomePix);
+}
+function achaColabCad(r){
+  const eq=equipe(), ch=normChave(r.chave);
+  return (ch&&eq.find(t=>(t.chavesPix||[]).includes(ch)))
+    || (r.apelido&&colabDaLista({nome:r.apelido}))
+    || (r.nomePix&&melhorColaboradorPara(r.nomePix,'',''))
+    || null;
+}
+function abrirCadRapido(){
+  abrir(`<h2>Cadastro rápido de colaboradores</h2>
+  <p class="sub">Uma linha por pessoa: <b>Apelido | Nome completo no Pix | função | chave Pix</b>. Só o apelido ou o nome já bastam. Quem já existe é atualizado; quem não existe é criado.</p>
+  <textarea id="cr_txt" rows="8" style="font-size:13px" oninput="prevCadRapido()"
+    placeholder="Zezin | José Otaciano dos Santos Costa Filho | ajudante | 83998043801&#10;Luis | Luis Carlos Soares da Costa | mestre | 83998501875"></textarea>
+  <div id="cr_prev" style="margin-top:8px"></div>
+  <button class="btn" style="margin-top:10px" onclick="aplicarCadRapido()">Aplicar</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Cancelar</button>`);
 }
-function mudarMatchComp(i,id){ COMP_REV[i].matchId=id; abrirRevisaoComprovantes(); }
-async function lancarComprovantes(){
-  if(COMP_REV.some(r=>!(r.valor>0))){toast('Falta o valor de algum comprovante.');return}
-  if(COMP_REV.some(r=>!r.matchId&&!r.nome.trim())){toast('Falta o nome de algum colaborador.');return}
-  const fmt=d=>d.split('-').reverse().slice(0,2).join('/');
-  const perTxto=(COMP_PER.ini||COMP_PER.fim)?` · período ${COMP_PER.ini?fmt(COMP_PER.ini):'?'} a ${COMP_PER.fim?fmt(COMP_PER.fim):'?'}`:'';
-  const paraAnexar=[]; let soma=0;
+function prevCadRapido(){
+  const R=parseCadRapido(val('cr_txt')), el=document.getElementById('cr_prev'); if(!el)return;
+  el.innerHTML=R.map(r=>{ const t=achaColabCad(r);
+    return `<div class="stat"><span>${r.apelido||r.nomePix}</span><b style="font-size:12.5px;color:${t?'var(--teal)':'var(--ink-2)'}">${t?'atualiza '+t.nome:'novo'}</b></div>`; }).join('');
+}
+function aplicarCadRapido(){
+  const R=parseCadRapido(val('cr_txt'));
+  if(!R.length){toast('Escreva ao menos uma linha.');return}
+  let n=0,c=0;
+  R.forEach(r=>{
+    let t=achaColabCad(r);
+    if(!t){ t={id:uid(),nome:capNomes(r.apelido||r.nomePix),funcao:'',diaria:0}; equipe().push(t); c++; }
+    else{
+      n++;
+      /* cadastro criado só com o apelido (sem lançamentos) acompanha a correção do apelido */
+      if(r.apelido&&t.nome.trim().split(/\s+/).length===1&&alfa2(t.nome)!==alfa2(r.apelido)
+         &&!DB.lanc.some(l=>l.trabId===t.id)) t.nome=capNomes(r.apelido);
+    }
+    aprenderPix(t,{nome:r.nomePix,chave:r.chave,apelido:r.apelido,funcao:r.funcao,forcar:true});
+  });
+  salvar(); fechar(); render();
+  toast(`${n} atualizado(s) · ${c} novo(s)`);
+}
+/* ---------- lista da semana (o "combinado"): "Bruno - 800 reais pedreiro" ---------- */
+function parseListaSemana(txt){
+  const out=[];
+  String(txt||'').split(/\r?\n/).forEach(l=>{
+    l=l.trim(); if(!l||/^total/i.test(alfa2(l)))return;
+    const m=l.match(/^([A-Za-zÀ-ÿ.'’ ]+?)\s*[-–—:=]*\s*(?:R\$\s*)?(\d[\d.]*(?:,\d{1,2})?)\s*(?:reais|real|r\$)?\s*[-–—:]*\s*(.*)$/i);
+    if(!m)return;
+    const nome=m[1].trim(); const valor=moedaTok(m[2]);
+    if(nome.length<2||!(valor>0))return;
+    out.push({nome:capNomes(nome),valor,funcao:capNomes(m[3].trim().toLowerCase()),usado:false});
+  });
+  return out;
+}
+function colabDaLista(e){
+  const n=alfa2(e.nome), eq=equipe();
+  return eq.find(t=>alfa2(t.apelido||'')===n) || eq.find(t=>alfa2(t.nome).split(/\s+/).includes(n)) || null;
+}
+/* casa cada comprovante com uma linha da lista: primeiro por nome/apelido, depois pelo valor */
+function casarLista(){
+  COMP_LISTA.forEach(e=>e.usado=false);
+  COMP_REV.forEach(r=>r.lista=null);
+  /* 1ª passada: comprovante já ligado a um colaborador que está na lista */
   COMP_REV.forEach(r=>{
+    if(!r.matchId)return;
+    const e=COMP_LISTA.find(x=>!x.usado&&(colabDaLista(x)||{}).id===r.matchId);
+    if(e){ e.usado=true; r.lista=e; }
+  });
+  /* 2ª passada: o que sobrou casa pelo valor, se só houver uma possibilidade */
+  COMP_REV.forEach(r=>{
+    if(r.lista||!(r.valor>0))return;
+    const c=COMP_LISTA.filter(x=>!x.usado&&Math.abs(x.valor-r.valor)<0.005&&!colabDaLista(x));
+    if(c.length===1){
+      c[0].usado=true; r.lista=c[0];
+      if(!r.matchId){ const t=colabDaLista(c[0]); if(t){ r.matchId=t.id; r.novo=false; } }
+    }
+  });
+  /* comprovante sem colaborador, mas a lista aponta quem é pelo apelido+valor */
+  COMP_REV.forEach(r=>{
+    if(r.matchId||!(r.valor>0))return;
+    const e=COMP_LISTA.find(x=>!x.usado&&Math.abs(x.valor-r.valor)<0.005&&colabDaLista(x));
+    if(e){ const t=colabDaLista(e); e.usado=true; r.lista=e; r.matchId=t.id; r.novo=false; }
+  });
+}
+function mudarListaComp(txt){
+  COMP_LISTA_TXT=txt; COMP_LISTA=parseListaSemana(txt);
+  casarLista(); abrirRevisaoComprovantes();
+}
+/* período trabalhado = do pagamento anterior deste colaborador até este */
+function periodoAuto(trabId,data,extras){
+  if(!trabId||!data)return null;
+  let prev='';
+  DB.lanc.forEach(l=>{ if(!l.cancelado&&l.trabId===trabId&&l.data<data&&l.data>prev) prev=l.data; });
+  (extras||[]).forEach(x=>{ if(x.matchId===trabId&&x.data<data&&x.data>prev) prev=x.data; });
+  return prev?{ini:prev,fim:data}:null;
+}
+const ddmm=d=>d.split('-').reverse().slice(0,2).join('/');
+function rotuloPeriodoLanc(l){
+  const p=(l.perIni&&l.perFim)?{ini:l.perIni,fim:l.perFim}:(l.trabId?periodoAuto(l.trabId,l.data):null);
+  return p?` · trabalhou de ${ddmm(p.ini)} a ${ddmm(p.fim)}`:'';
+}
+/* o mesmo pagamento (colaborador + data + valor) não entra duas vezes */
+function dupDe(r){
+  if(!r.matchId||!(r.valor>0))return null;
+  return DB.lanc.find(l=>!l.cancelado&&l.trabId===r.matchId&&l.data===r.data&&Math.abs((+l.total||0)-r.valor)<0.005)||null;
+}
+const pularRow=r=>r.pular!==undefined?r.pular:!!dupDe(r);
+let COMP_PER={ini:'',fim:'',pago:true};
+function abrirRevisaoComprovantes(){
+  const eq=equipe(), esc=x=>String(x||'').replace(/"/g,'&quot;');
+  const ativos=COMP_REV.filter(r=>!pularRow(r));
+  const somaAtiv=ativos.reduce((s,r)=>s+(+r.valor||0),0);
+  const faltam=COMP_LISTA.filter(e=>!e.usado);
+  const totLista=COMP_LISTA.reduce((s,e)=>s+e.valor,0);
+  abrir(`<h2>Conferir comprovantes</h2>
+  <p class="sub">${COMP_REV.length} arquivo(s)${COMP_REV.some(r=>r.ocrFalhou)?' — em alguma foto não consegui ler direito, preencha à mão':''}. O comprovante fica anexado ao pagamento.</p>
+  <div class="fgrid w2">
+  <div class="fcol">
+  <div class="lista-comp">
+  ${COMP_REV.map((r,i)=>{
+    const dup=dupDe(r), pula=pularRow(r);
+    const dif=r.lista&&Math.abs(r.lista.valor-r.valor)>=0.005;
+    return `<div class="crow" style="${pula?'opacity:.55':''}">
+    <div class="cnome" style="grid-column:1/-1"><b>${r.nome||'Nome não identificado'}</b>
+      <small>${r.file.name}</small></div>
+    <div><label>Data</label><input type="date" value="${r.data}" onchange="COMP_REV[${i}].data=this.value;abrirRevisaoComprovantes()"></div>
+    <div><label>Valor</label><input inputmode="numeric" value="${r.valor?num2moeda(r.valor):''}" placeholder="0,00" oninput="onMoedaInput(this);COMP_REV[${i}].valor=moeda2num(this.value)" onchange="casarLista();abrirRevisaoComprovantes()"></div>
+    <div><label>Colaborador</label>
+      <select onchange="mudarMatchComp(${i},this.value)">
+        <option value="">+ Novo colaborador</option>
+        ${eq.map(t=>`<option value="${t.id}" ${r.matchId===t.id?'selected':''}>${t.nome}</option>`).join('')}
+      </select></div>
+    ${!r.matchId?`<div style="grid-column:1/-1"><input data-cap="1" value="${esc(r.nome)}" placeholder="Nome do novo colaborador"
+      oninput="COMP_REV[${i}].nome=this.value"></div>`:''}
+    ${r.lista?`<div class="hint" style="grid-column:1/-1;margin:0;color:${dif?'var(--red)':'var(--teal)'}">
+      ${dif?'⚠ A lista diz':'✓ Lista:'} ${r.lista.nome} ${brl(r.lista.valor)}${r.lista.funcao?' · '+r.lista.funcao:''}${dif?', mas o comprovante é de '+brl(r.valor):''}</div>`:''}
+    ${r.matchId?(()=>{const pa=periodoAuto(r.matchId,r.data,COMP_REV.filter(x=>x!==r&&!pularRow(x)));
+      return `<div class="hint" style="grid-column:1/-1;margin:0">${pa?'Trabalhou de '+ddmm(pa.ini)+' a '+ddmm(pa.fim)+' (desde o último pagamento)':'Primeiro pagamento dele: sem período anterior.'}</div>`})():''}
+    ${dup?`<label class="chkline" style="grid-column:1/-1;margin:0;color:var(--red)"><input type="checkbox" ${pula?'checked':''} onchange="COMP_REV[${i}].pular=this.checked;abrirRevisaoComprovantes()"> Já lançado em ${dup.data.split('-').reverse().join('/')} — pular este</label>`:''}
+    </div>`}).join('')}
+  </div>
+  </div>
+  <div class="fcol">
+    <label style="margin-top:12px">Lista da semana (opcional)</label>
+    <textarea id="comp_lista" rows="6" style="font-size:13px" placeholder="Bruno - 800 reais pedreiro&#10;Pedro - 800 reais pedreiro&#10;Zezin - 490 reais ajudante"
+      onchange="mudarListaComp(this.value)">${COMP_LISTA_TXT}</textarea>
+    <p class="hint">Cole ou digite o combinado. O sistema confere cada comprovante com a lista e avisa quem ainda não recebeu. Na primeira vez ele aprende que "Zezin" é o nome que aparece no Pix.</p>
+    ${COMP_LISTA.length?`<div class="card" style="box-shadow:none;margin-top:9px">
+      <div class="stat"><span>Lista</span><b class="mono">${brl(totLista)}</b></div>
+      <div class="stat"><span>Comprovantes</span><b class="mono">${brl(somaAtiv)}</b></div>
+      ${faltam.length?`<p class="hint" style="color:var(--red);margin-top:6px">Sem comprovante: ${faltam.map(e=>e.nome+' '+brl(e.valor)).join(' · ')}</p>`
+        :'<p class="hint" style="color:var(--teal);margin-top:6px">✓ Todos da lista têm comprovante.</p>'}
+    </div>`:''}
+    <p class="hint" style="margin-top:12px">O período trabalhado é calculado sozinho: vai do último pagamento de cada pessoa até este.</p>
+    <label class="chkline" style="margin-top:10px"><input type="checkbox" id="comp_pago" ${COMP_PER.pago?'checked':''} onchange="COMP_PER.pago=this.checked"> Já pago (o comprovante prova)</label>
+  </div>
+  </div>
+  <div class="fbar">
+  <button class="btn" onclick="lancarComprovantes()">Lançar ${ativos.length} pagamento(s) · ${brl(somaAtiv)}</button>
+  <button class="btn ghost mini" onclick="fechar()">Cancelar</button>
+  </div>`,{form:true});
+}
+function mudarMatchComp(i,id){
+  COMP_REV[i].matchId=id; COMP_REV[i].pular=undefined;
+  casarLista(); abrirRevisaoComprovantes();
+}
+async function lancarComprovantes(){
+  const L=COMP_REV.filter(r=>!pularRow(r));
+  if(!L.length){toast('Nada para lançar.');return}
+  if(L.some(r=>!(r.valor>0))){toast('Falta o valor de algum comprovante.');return}
+  if(L.some(r=>!r.matchId&&!r.nome.trim())){toast('Falta o nome de algum colaborador.');return}
+  const fmt=d=>d.split('-').reverse().slice(0,2).join('/');
+  L.sort((a,b)=>a.data<b.data?-1:a.data>b.data?1:0);
+  const paraAnexar=[]; let soma=0;
+  L.forEach(r=>{
     let t;
     if(r.matchId) t=equipe().find(x=>x.id===r.matchId);
     else{ t={id:uid(),nome:capNomes(r.nome),funcao:'',diaria:0,at:Date.now()}; equipe().push(t); }
+    /* aprende: o nome do Pix, o documento, a chave e o apelido da lista valem para os próximos comprovantes */
+    aprenderPix(t,{nome:r.nome,doc:r.doc,chave:r.chave,apelido:r.lista&&r.lista.nome,funcao:r.lista&&r.lista.funcao});
+    t.at=Date.now();
+    const per=periodoAuto(t.id,r.data);
     const id=uid();
-    DB.lanc.push({id,at:Date.now(),trabId:t.id,
+    DB.lanc.push({id,at:Date.now(),trabId:t.id,perIni:per?per.ini:'',perFim:per?per.fim:'',
       data:r.data, desc:`${t.nome} · pago via Pix ${fmt(r.data)}`,
       familia:'Mão de obra', cat:'c07', forn:t.nome,
       qtd:1, unit:r.valor, total:r.valor,
       pag:COMP_PER.pago?'Pago':'A pagar', nf:'', anexos:[],
-      obs:`Comprovante de Pix${perTxto}`,
+      obs:`Comprovante de Pix${per?` · trabalhou de ${ddmm(per.ini)} a ${ddmm(per.fim)}`:''}`,
       tipoPg:'pix', ctrl:false,qtdRec:0,baixas:[],pagamentos:[]});
     paraAnexar.push({id,file:r.file});
     soma+=r.valor;
   });
   salvar(); fechar(); render();
-  toast(`${COMP_REV.length} pagamento(s) lançado(s) · ${brl(soma)}`);
-  COMP_REV=[]; COMP_PER={ini:'',fim:'',pago:true};
+  toast(`${L.length} pagamento(s) lançado(s) · ${brl(soma)}`);
+  COMP_REV=[]; COMP_LISTA=[]; COMP_LISTA_TXT=''; COMP_PER={ini:'',fim:'',pago:true};
   for(const {id,file} of paraAnexar){
     try{
       const dataUrl=await comprimirImagem(file,1100,.62).catch(()=>null);
@@ -6331,6 +6723,14 @@ function abrirTrabalhador(id){
   abrir(`<h2>${id?'Editar trabalhador':'Novo trabalhador'}</h2>
   <label>Nome</label><input id="t_nome" data-cap="1" value="${t.nome}" placeholder="Ex: João">
   <label>Função</label><input id="t_func" data-cap="1" value="${t.funcao||''}" placeholder="Pedreiro, servente, ajudante...">
+  <details class="mais" ${(t.apelido||t.nomePix||t.chavePix)?'open':''}>
+    <summary>Pix e apelido (para reconhecer os comprovantes sozinho)</summary>
+    <div class="maisb">
+      <label>Apelido (como aparece na lista da semana)</label><input id="t_apel" data-cap="1" value="${(t.apelido||'').replace(/"/g,'&quot;')}" placeholder="Ex: Zezin">
+      <label>Nome completo no Pix</label><input id="t_nomepix" data-cap="1" value="${(t.nomePix||'').replace(/"/g,'&quot;')}" placeholder="Como o banco mostra">
+      <label>Chave Pix</label><input id="t_chave" value="${(t.chavePix||'').replace(/"/g,'&quot;')}" placeholder="Telefone, e-mail, CPF ou chave aleatória">
+    </div>
+  </details>
   <label>Valor da diária</label><input id="t_diaria" inputmode="numeric" value="${t.diaria?num2moeda(t.diaria):''}" placeholder="0,00" oninput="onMoedaInput(this)">
   <p class="hint">Deixe em branco para quem é pago por período fixo, e use o pagamento recorrente abaixo.</p>
   <div class="divider"></div>
@@ -6369,6 +6769,7 @@ function salvarTrabalhador(id){
   if(!nome){toast('Informe o nome.');return}
   const recOn=document.getElementById('t_rec')&&document.getElementById('t_rec').checked;
   const dados={nome:capNomes(nome),funcao:capNomes(val('t_func')),diaria:moeda2num(val('t_diaria')),at:Date.now(),
+    apelido:capNomes(val('t_apel')),
     rec:recOn?{on:true,valor:moeda2num(val('t_rval')),freq:val('t_freq'),ini:val('t_rini'),
       fim:val('t_rfim'),cat:val('t_rcat')||'c07',obs:capNomes(val('t_robs'))}:{on:false}};
   let renomeados=0;
@@ -6387,6 +6788,8 @@ function salvarTrabalhador(id){
     }
   }
   else{equipe().push({id:uid(),...dados})}
+  { const tt=id?equipe().find(x=>x.id===id):equipe()[equipe().length-1];
+    if(tt) aprenderPix(tt,{nome:val('t_nomepix'),chave:val('t_chave')}); }
   salvar();
   const nRec=gerarRecorrentes();
   if(PG_ABERTO){ PG_ABERTO=false; render(); desenharPagamentos(true); }
