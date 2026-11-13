@@ -353,6 +353,21 @@ details.mais>.maisb{padding:0 12px 12px}
  .fgrid{grid-template-columns:1fr 1fr}
  .lista-itens{max-height:calc(94vh - 420px);min-height:170px;overflow:auto;padding-right:4px}
 }
+.qrow{border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:8px;background:var(--surface-2);display:grid;gap:8px;grid-template-columns:1fr 1fr 1fr}
+.qrow .qd{grid-column:1/-1;min-width:0}
+.qrow .qd b{font-size:13.5px;line-height:1.25;display:block}
+.qrow .qd small{display:block;color:var(--ink-2);font-size:11px}
+.qrow label{margin-top:0;font-size:10.5px}
+.qrow .qa{grid-column:1/-1;font-size:11.5px;margin:0}
+.qrow.ok{opacity:.8;border-color:var(--teal)}
+.qmot{display:inline-block;font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 7px;margin-top:3px;background:var(--surface);border:1px solid var(--line)}
+.chipbar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.chipbar .btn{width:auto;flex:0 0 auto;padding:7px 12px;font-size:12.5px}
+@media(min-width:900px){
+ .qrow{grid-template-columns:2.6fr .8fr 1fr 1.1fr;align-items:end}
+ .qrow .qd{grid-column:auto}
+ .lista-qtd{max-height:calc(94vh - 330px);overflow:auto;padding-right:4px}
+}
 .crow{display:grid;gap:8px;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:8px;background:var(--surface-2)}
 .crow label{margin-top:0;font-size:10.5px}
 .crow .cnome small{display:block;color:var(--ink-2);font-size:11px;word-break:break-all}
@@ -725,6 +740,7 @@ a{color:var(--teal)}
     <button class="btn soft" onclick="verTipos()"><span class="ic">🗂️</span>Tipos de produto</button>
     <button class="btn soft" onclick="abrirPreencherTipos()"><span class="ic">🏷️</span>Preencher tipos</button>
     <button class="btn soft" onclick="abrirOrganizarGenericos()"><span class="ic">🧾</span>Organizar genéricos</button>
+    <button class="btn soft" onclick="abrirSemQtd()"><span class="ic">📏</span>Sem quantidade</button>
   </div>
   <div id="itensObra"></div>
 </section>
@@ -2611,6 +2627,120 @@ function gerarRelatorioObra(){
   setTimeout(()=>{ window.print(); setTimeout(()=>document.documentElement.classList.remove('imprimindo'),400); },80);
 }
 
+/* ================= LANÇAMENTOS SEM QUANTIDADE / VALOR UNITÁRIO ================= */
+function qtdPendentes(){
+  return DB.lanc.filter(l=>!l.cancelado&&!ehDesconto(l)).map(l=>{
+    const q=+l.qtd||0,u=+l.unit||0,t=+l.total||0;
+    let m='';
+    if(!(q>0)) m='qtd';
+    else if(!(u>0)&&t>0) m='unit';
+    else if(u>0&&t>0&&Math.abs(q*u-t)>0.01+0.005*q) m='conta';
+    return m?{l,m}:null;
+  }).filter(Boolean);
+}
+let QT_ROWS=[], QT_FILTRO='todos';
+const QT_MOT={qtd:'Sem quantidade',unit:'Sem valor unitário',conta:'Quantidade × unitário não bate com o total'};
+function abrirSemQtd(){
+  QT_FILTRO='todos';
+  QT_ROWS=qtdPendentes().sort((a,b)=>a.l.data.localeCompare(b.l.data)||alfa(a.l.desc,b.l.desc)).map(({l,m})=>({
+    id:l.id,m,q:+l.qtd||0,u:+l.unit||0,t:+l.total||0,ult:(+l.total>0?'t':'u'),
+    o:{q:+l.qtd||0,u:+l.unit||0,t:+l.total||0}}));
+  desenharSemQtd();
+}
+function desenharSemQtd(){
+  const n={todos:QT_ROWS.length,qtd:0,unit:0,conta:0};
+  QT_ROWS.forEach(r=>n[r.m]++);
+  if(!QT_ROWS.length){
+    abrir(`<h2>Quantidade e valor unitário</h2>
+    <p class="sub">Todos os lançamentos estão com quantidade e valor unitário.</p>
+    <button class="btn ghost mini" style="margin-top:10px" onclick="fechar()">Fechar</button>`); return;
+  }
+  abrir(`<h2>Lançamentos para ajustar</h2>
+  <p class="sub">${QT_ROWS.length} lançamento(s). Preencha a quantidade e o valor unitário e o total é calculado; se já houver total, digite a quantidade e o unitário é calculado.</p>
+  <div class="chipbar" id="qt_chips"></div>
+  <div class="lista-qtd" id="qt_lista"></div>
+  <div class="fbar">
+    <button class="btn" onclick="salvarSemQtd()">Salvar ajustes</button>
+    <button class="btn ghost" onclick="qtdUmEmTodos()">Quantidade 1 nos vazios</button>
+    <button class="btn ghost mini" onclick="fechar()">Fechar</button>
+  </div>`,{form:true});
+  pintaChipsQtd(n); pintaListaQtd();
+}
+function pintaChipsQtd(n){
+  const el=document.getElementById('qt_chips'); if(!el)return;
+  n=n||(()=>{const x={todos:QT_ROWS.length,qtd:0,unit:0,conta:0};QT_ROWS.forEach(r=>x[r.m]++);return x})();
+  el.innerHTML=[['todos','Todos'],['qtd','Sem quantidade'],['unit','Sem unitário'],['conta','Não bate']].filter(([k])=>k==='todos'||n[k]>0)
+    .map(([k,t])=>`<button class="btn ${QT_FILTRO===k?'':'ghost'}" onclick="QT_FILTRO='${k}';pintaChipsQtd();pintaListaQtd()">${t} (${n[k]})</button>`).join('');
+}
+function pintaListaQtd(){
+  const el=document.getElementById('qt_lista'); if(!el)return;
+  const q=v=>String(v||'').replace(/"/g,'&quot;');
+  el.innerHTML=QT_ROWS.map((r,i)=>({r,i})).filter(x=>QT_FILTRO==='todos'||x.r.m===QT_FILTRO).map(({r,i})=>{
+    const l=DB.lanc.find(z=>z.id===r.id)||{};
+    return `<div class="qrow" id="qr_${i}">
+      <div class="qd"><b>${escRel(l.desc)}</b>
+        <small>${fmtDRel(l.data)}${l.forn?' · '+escRel(l.forn):''} · ${escRel(cat(l.cat).n)}${(l.rateio&&l.rateio.length>1)?' · dividido entre etapas':''}</small>
+        <span class="qmot">${QT_MOT[r.m]}</span>
+        <button class="btn ghost mini" style="width:auto;padding:2px 9px;margin-left:6px" onclick="verGasto('${r.id}')">Abrir</button></div>
+      <div><label>Qtde</label><input id="qq_${i}" type="number" step="any" min="0" value="${r.q>0?r.q:''}" placeholder="0" oninput="qtdEdit(${i},'q',this)"></div>
+      <div><label>Vlr unitário</label><input id="qu_${i}" inputmode="numeric" value="${r.u>0?num2moeda(r.u):''}" placeholder="0,00" oninput="qtdEdit(${i},'u',this)"></div>
+      <div><label>Total</label><input id="qt_${i}" inputmode="numeric" value="${r.t>0?num2moeda(r.t):''}" placeholder="0,00" oninput="qtdEdit(${i},'t',this)"></div>
+      <div class="qa" id="qa_${i}"></div></div>`;
+  }).join('');
+  QT_ROWS.forEach((_,i)=>qtdAviso(i));
+}
+function qtdEdit(i,campo,el){
+  const r=QT_ROWS[i];
+  if(campo==='q'){
+    r.q=parseFloat(String(el.value).replace(',','.'))||0;
+    if(r.q>0){ if(r.ult==='t'&&r.t>0) r.u=r.t/r.q; else if(r.u>0) r.t=+(r.q*r.u).toFixed(2); }
+  }else if(campo==='u'){
+    onMoedaInput(el); r.u=moeda2num(el.value); r.ult='u';
+    if(r.q>0) r.t=+(r.q*r.u).toFixed(2);
+  }else{
+    onMoedaInput(el); r.t=moeda2num(el.value); r.ult='t';
+    if(r.q>0&&r.t>0) r.u=r.t/r.q;
+  }
+  const set=(id,v,moeda)=>{ const e=document.getElementById(id); if(e&&e!==el) e.value=v>0?(moeda?num2moeda(v):v):''; };
+  if(campo!=='u') set('qu_'+i,r.u,true);
+  if(campo!=='t') set('qt_'+i,r.t,true);
+  qtdAviso(i);
+}
+function qtdAviso(i){
+  const r=QT_ROWS[i], el=document.getElementById('qa_'+i), row=document.getElementById('qr_'+i); if(!el)return;
+  const pronto=r.q>0&&r.t>0;
+  const mudaTotal=pronto&&Math.abs(r.t-r.o.t)>0.01;
+  row.classList.toggle('ok',pronto&&!mudaTotal&&(r.q!==r.o.q||Math.abs(r.u-r.o.u)>0.0001));
+  el.innerHTML=!pronto?'<span style="color:var(--ink-2)">Falta preencher.</span>'
+    :mudaTotal?`<span style="color:var(--red)">⚠ O total deste lançamento muda de ${rmRel(r.o.t)} para ${rmRel(r.t)}.</span>`
+    :`<span style="color:var(--teal)">✓ ${r.q.toLocaleString('pt-BR')} × ${rmRel(r.u)} = ${rmRel(r.t)}</span>`;
+}
+function qtdUmEmTodos(){
+  QT_ROWS.forEach((r,i)=>{
+    if(r.q>0||!(r.t>0))return;
+    r.q=1; r.u=r.t; r.ult='t';
+  });
+  pintaListaQtd();
+  toast('Quantidade 1 nos vazios que já têm total. Confira e salve.');
+}
+function salvarSemQtd(){
+  let n=0, mud=0;
+  QT_ROWS.forEach(r=>{
+    if(!(r.q>0)||!(r.t>0))return;
+    const l=DB.lanc.find(z=>z.id===r.id); if(!l)return;
+    const unit=r.ult==='t'?+(r.t/r.q).toFixed(4):+r.u.toFixed(4);
+    const mudou=(+l.qtd||0)!==r.q||Math.abs((+l.unit||0)-unit)>0.00005||Math.abs((+l.total||0)-r.t)>0.005;
+    if(!mudou)return;
+    if(Math.abs((+l.total||0)-r.t)>0.01) mud++;
+    l.qtd=r.q; l.unit=unit; l.total=r.t; l.at=Date.now(); n++;
+  });
+  if(!n){toast('Nada preenchido para salvar.');return}
+  salvar(); render();
+  const resta=qtdPendentes().length;
+  toast(`${n} ajustado(s)${mud?` · ${mud} com total alterado`:''}${resta?` · faltam ${resta}`:' · tudo certo'}`);
+  abrirSemQtd();
+}
+
 /* ================= RELATÓRIO PERSONALIZADO ================= */
 const REL_COLS=[
   {id:'data',n:'Data',cls:'c',v:r=>fmtDRel(r.data),csv:r=>fmtDRel(r.data)},
@@ -2757,12 +2887,13 @@ function linhasRel(cfg){
     const ps=partes(l).map(p=>({cat:p.cat,valor:+(p.valor*f).toFixed(2)}));
     const t=l.trabId&&eq[l.trabId];
     const pessoa=cfg.exclPessoas&&rx.test([l.desc,l.forn,l.familia,t&&t.funcao,t&&t.nome].filter(Boolean).join(' '));
+    const somaP=ps.reduce((a,p)=>a+p.valor,0);
     ps.forEach(p=>{
       if(pessoa){ fora.n++; fora.v+=p.valor; fora.pessoas+=p.valor; return; }
       if(cfg.catsFora.includes(p.cat)){ fora.n++; fora.v+=p.valor; fora.cats[p.cat]=(fora.cats[p.cat]||0)+p.valor; return; }
       const c=cat(p.cat);
       rows.push({l,cat:p.cat,etapa:c.n,valor:p.valor,dividido:ps.length>1,data:l.data,desc:l.desc||'',forn:l.forn||'',
-        tipo:l.familia||'',qtd:ps.length>1?'':(l.qtd==null?'':l.qtd),unit:ps.length>1?'':(l.unit===''||l.unit==null?'':l.unit),
+        tipo:l.familia||'',qtd:(l.qtd==null||l.qtd==='')?'':(ps.length>1&&somaP?+((+l.qtd)*p.valor/somaP).toFixed(3):l.qtd),unit:(l.unit===''||l.unit==null)?'':l.unit,
         sit:isPago(l)?'Pago':(pagoParcial(l)>0?'Parcial':'A pagar'),nf:l.nf||'',obs:l.obs||'',
         dig:l.at?new Date(l.at).toLocaleDateString('pt-BR'):''});
     });
@@ -4464,6 +4595,7 @@ function renderRel(){
       ${kpi('Vencido',brl(somaV),venc.length+' em atraso',somaV>0?'alert':'good',venc.length?"verPendencia('vencido')":'')}
       ${kpi('Parado com fornecedor',brl(parado),'material pago e não entregue',parado>0?'alert':'',parado>0?"verPendencia('parado')":'')}
       ${kpi('Itens sem preço',semPreco,'de '+cotAb.length+' cotações abertas',semPreco>0?'alert':'good',semPreco?"verPendencia('sempreco')":'')}
+      ${kpi('Sem quantidade',qtdPendentes().length,'lançamentos para ajustar',qtdPendentes().length?'alert':'good',qtdPendentes().length?'abrirSemQtd()':'')}
     </div>
     <p class="hint">"Parado com fornecedor" é dinheiro seu que já saiu e ainda não virou material no canteiro.</p>`;
 
@@ -4879,7 +5011,9 @@ function salvarGasto(id){
     qtdRec:document.getElementById('x_ctrl').checked?(+val('x_rec')||0):0,
     baixas:(DB.lanc.find(l=>l.id===id)||{}).baixas||[]};
   if(!g.desc){toast('Escreva uma descrição.');return}
+  if(!g.total&&g.unit>0) g.total=+(g.qtd*g.unit).toFixed(2);
   if(!g.total){toast('Informe o valor total.');return}
+  if(!(g.unit>0)) g.unit=+(g.total/g.qtd).toFixed(4);
   if(id){DB.lanc[DB.lanc.findIndex(l=>l.id===id)]=g;salvar();fechar();render();toast('Gasto atualizado');return}
 
   const rep=document.getElementById('x_rep');
@@ -6004,6 +6138,9 @@ function renderAvisos(){
     avisos.push({ic:'🟡',t:`${l.desc} — ${brl(saldoAPagar(l))}`,
       s:d===0?'vence hoje':`vence em ${d} dia${d>1?'s':''}`,go:`verGasto('${l.id}')`});
   });
+  const semQ=qtdPendentes().length;
+  if(semQ) avisos.push({ic:'📏',t:`${semQ} lançamento(s) sem quantidade ou valor unitário`,
+    s:'sem isso não há preço médio por material — toque para ajustar',go:'abrirSemQtd()'});
   const semTipo=tiposFaltando().length;
   if(semTipo) avisos.push({ic:'🏷️',t:`${semTipo} lançamento(s) sem tipo de produto`,
     s:'sem isso o resumo por tipo fica incompleto — toque para preencher',go:'abrirPreencherTipos()'});

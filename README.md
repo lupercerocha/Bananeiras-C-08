@@ -140,3 +140,12 @@ Antes de qualquer mudança grande, exporte o backup em **Configurações → Exp
 Se algo der errado depois de uma importação, **Configurações → Pontos de restauração** volta os dados para como estavam em qualquer um dos últimos 7 dias.
 
 Se aparecerem lançamentos repetidos, **Configurações → Verificar duplicados** compara por conteúdo (data, descrição e valor) e remove as cópias, mantendo a versão mais completa.
+
+## Sem quantidade / valor unitário
+
+Lançamentos antigos podem estar sem quantidade ou valor unitário. Há um aviso 📏 no Painel, um card "Sem quantidade" em Indicadores e um botão em Itens; todos abrem a lista para ajuste.
+- Na lista você digita a quantidade e o valor unitário: o total é calculado (qtd × unitário).
+- Se o lançamento já tem total, digite só a quantidade: o unitário é calculado (total ÷ qtd).
+- Filtros por motivo (sem quantidade, sem unitário, conta não bate) e o botão "Quantidade 1 nos vazios".
+- Nenhum lançamento fica sem quantidade: ao salvar, o sistema completa o que faltar.
+- O relatório personalizado agora mostra quantidade e unitário proporcionais nas compras divididas (rateio).
