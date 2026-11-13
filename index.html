@@ -117,6 +117,9 @@ main{padding:16px 14px 20px;max-width:760px;margin:0 auto}
   .pr-sec td.c{white-space:nowrap;color:#444}
   .pr-sec tr.tot td{border-top:1.2px solid #999;font-weight:700;font-size:9.5pt;padding-top:5px;background:#fafafa}
   .pr-sec tr{page-break-inside:avoid}
+  .pr-sec tr.gh td{background:#dde6e8;font-weight:700;font-size:9.5pt;border-top:1.2px solid #8aa;padding:4px 5px}
+  .pr-sec tr.sub td{font-weight:700;border-top:1px solid #999;background:#f6f8f8}
+  .pr-sec thead{display:table-header-group}
   .sub2{font-size:7pt;color:#777;margin-top:1px}
   .sub2.vermelho{color:#C4534D;font-weight:600}
   .pr-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px}
@@ -603,6 +606,7 @@ a{color:var(--teal)}
   <button class="btn" onclick="abrirGasto()">+ Lançar gasto</button>
   <div class="acoes">
     <button class="btn soft" onclick="abrirRelatorioObra()"><span class="ic">📊</span>Relatório em PDF</button>
+    <button class="btn soft" onclick="abrirRelCustom()"><span class="ic">🧾</span>Relatório personalizado</button>
     <button class="btn soft" onclick="exportCSV()"><span class="ic">⬇</span>Planilha CSV</button>
   </div>
   <div class="card" style="margin-top:12px">
@@ -2605,6 +2609,259 @@ function gerarRelatorioObra(){
   fechar();
   document.documentElement.classList.add('imprimindo');
   setTimeout(()=>{ window.print(); setTimeout(()=>document.documentElement.classList.remove('imprimindo'),400); },80);
+}
+
+/* ================= RELATÓRIO PERSONALIZADO ================= */
+const REL_COLS=[
+  {id:'data',n:'Data',cls:'c',v:r=>fmtDRel(r.data),csv:r=>fmtDRel(r.data)},
+  {id:'desc',n:'Descrição',v:r=>escRel(r.desc)+(r.dividido?'<div class="sub2">parte de compra dividida entre etapas</div>':''),csv:r=>r.desc},
+  {id:'forn',n:'Fornecedor',cls:'c',v:r=>escRel(r.forn),csv:r=>r.forn},
+  {id:'tipo',n:'Tipo de produto',cls:'c',v:r=>escRel(r.tipo),csv:r=>r.tipo},
+  {id:'etapa',n:'Etapa da obra',cls:'c',v:r=>escRel(r.etapa),csv:r=>r.etapa},
+  {id:'qtd',n:'Qtde',cls:'r',v:r=>r.qtd===''?'':(+r.qtd||0).toLocaleString('pt-BR'),csv:r=>r.qtd===''?'':String(r.qtd).replace('.',',')},
+  {id:'unit',n:'Vlr unitário',cls:'r',v:r=>r.unit===''?'':rmRel(r.unit),csv:r=>r.unit===''?'':(+r.unit).toFixed(2).replace('.',',')},
+  {id:'sit',n:'Situação',cls:'c',v:r=>r.sit,csv:r=>r.sit},
+  {id:'nf',n:'Nota fiscal',cls:'c',v:r=>escRel(r.nf),csv:r=>r.nf},
+  {id:'obs',n:'Observações',v:r=>escRel(r.obs),csv:r=>r.obs},
+  {id:'dig',n:'Digitado em',cls:'c',v:r=>r.dig,csv:r=>r.dig},
+  {id:'valor',n:'Valor',cls:'r',fixa:true,v:r=>rmRel(r.valor),csv:r=>r.valor.toFixed(2).replace('.',',')}
+];
+const escRel=x=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const rmRel=n=>'R$ '+(+n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtDRel=d=>d?d.split('-').reverse().join('/'):'';
+function relPadrao(){
+  return {titulo:'Relatório de gastos da obra',sit:'pago',ini:'',fim:'',
+    catsFora:['terreno','projetos'],exclPessoas:true,
+    cols:['data','desc','forn','tipo','etapa','qtd','unit','valor'],
+    ordemCols:REL_COLS.map(c=>c.id),
+    grupo:'etapa',ordem:'data',sub:true,resumo:true,orient:'auto'};
+}
+function relCfgSalva(){
+  const base=relPadrao(), sv=(DB.cfg&&DB.cfg.relCustom)||{};
+  const c={...base,...sv};
+  /* colunas novas que surgirem depois entram no fim da ordem */
+  REL_COLS.forEach(k=>{ if(!c.ordemCols.includes(k.id)) c.ordemCols.push(k.id); });
+  return c;
+}
+let REL_ORD=[], REL_ON=new Set();
+function abrirRelCustom(){
+  const c=relCfgSalva();
+  REL_ORD=c.ordemCols.slice(); REL_ON=new Set(c.cols.concat(['valor']));
+  const fora=new Set(c.catsFora);
+  const grp=g=>CATS_AZ.filter(x=>x.g===g).map(x=>`<label class="chkline"><input type="checkbox" class="rl2cat" value="${x.id}" ${fora.has(x.id)?'':'checked'} onchange="prevRel()"> ${escRel(x.n)}</label>`).join('');
+  abrir(`<h2>Relatório personalizado</h2>
+  <p class="sub">Escolha o que entra, as colunas e como organizar. Sai em PDF ou planilha.</p>
+  <div class="fgrid">
+  <div class="fcol">
+    <label>Título</label><input id="rl2_tit" value="${escRel(c.titulo)}">
+    <div class="row2">
+      <div><label>Situação</label><select id="rl2_sit" onchange="prevRel()">
+        <option value="pago" ${c.sit==='pago'?'selected':''}>O que já paguei</option>
+        <option value="todos" ${c.sit==='todos'?'selected':''}>Tudo (pago + a pagar)</option>
+        <option value="apagar" ${c.sit==='apagar'?'selected':''}>Só o que falta pagar</option></select></div>
+      <div></div>
+    </div>
+    <div class="row2">
+      <div><label>De (data da compra)</label><input type="date" id="rl2_ini" value="${c.ini}" onchange="prevRel()"></div>
+      <div><label>Até</label><input type="date" id="rl2_fim" value="${c.fim}" onchange="prevRel()"></div>
+    </div>
+    <label>Categorias que entram</label>
+    <div class="acoes" style="margin:2px 0 6px">
+      <button class="btn ghost mini" onclick="relMarcar('con')">Só construção</button>
+      <button class="btn ghost mini" onclick="relMarcar('todas')">Todas</button>
+      <button class="btn ghost mini" onclick="relMarcar('padrao')">Sem terreno e projetos</button>
+    </div>
+    <div class="lista-itens" style="max-height:230px">
+      <div class="hint" style="margin:2px 0">Administrativas</div>${grp('adm')}
+      <div class="hint" style="margin:8px 0 2px">Construção</div>${grp('con')}
+    </div>
+    <label class="chkline" style="margin-top:10px"><input type="checkbox" id="rl2_pes" ${c.exclPessoas?'checked':''} onchange="prevRel()">
+      Deixar de fora engenheiro, arquiteto e projetos (pelo nome, descrição ou função do colaborador)</label>
+    <div id="rl2_prev" class="card" style="box-shadow:none;margin-top:10px;font-size:13px"></div>
+  </div>
+  <div class="fcol">
+    <label>Colunas (marque e use ↑ ↓ para mudar a ordem)</label>
+    <div id="rl2_cols"></div>
+    <div class="row2">
+      <div><label>Agrupar por</label><select id="rl2_grp" onchange="prevRel()">
+        <option value="" ${!c.grupo?'selected':''}>Não agrupar (lista única)</option>
+        <option value="etapa" ${c.grupo==='etapa'?'selected':''}>Etapa da obra</option>
+        <option value="tipo" ${c.grupo==='tipo'?'selected':''}>Tipo de produto</option>
+        <option value="forn" ${c.grupo==='forn'?'selected':''}>Fornecedor</option>
+        <option value="mes" ${c.grupo==='mes'?'selected':''}>Mês</option></select></div>
+      <div><label>Ordenar por</label><select id="rl2_ord">
+        <option value="data" ${c.ordem==='data'?'selected':''}>Data (mais antiga primeiro)</option>
+        <option value="data_desc" ${c.ordem==='data_desc'?'selected':''}>Data (mais recente primeiro)</option>
+        <option value="alfa" ${c.ordem==='alfa'?'selected':''}>Ordem alfabética (descrição)</option>
+        <option value="valor" ${c.ordem==='valor'?'selected':''}>Valor (maior primeiro)</option></select></div>
+    </div>
+    <label class="chkline" style="margin-top:10px"><input type="checkbox" id="rl2_sub" ${c.sub?'checked':''}> Subtotal de cada grupo</label>
+    <label class="chkline"><input type="checkbox" id="rl2_res" ${c.resumo?'checked':''}> Resumo dos grupos no início (com %)</label>
+    <label>Folha</label>
+    <select id="rl2_or">
+      <option value="auto" ${c.orient==='auto'?'selected':''}>Automática (paisagem se tiver muitas colunas)</option>
+      <option value="retrato" ${c.orient==='retrato'?'selected':''}>Retrato</option>
+      <option value="paisagem" ${c.orient==='paisagem'?'selected':''}>Paisagem</option></select>
+    <p class="hint">Suas escolhas ficam salvas para a próxima vez.</p>
+  </div>
+  </div>
+  <div class="fbar">
+    <button class="btn" onclick="gerarRelCustom('pdf')">🖨 Gerar PDF</button>
+    <button class="btn ghost" onclick="gerarRelCustom('csv')">⬇ Planilha</button>
+    <button class="btn ghost mini" onclick="fechar()">Cancelar</button>
+  </div>`,{form:true});
+  pintaColsRel(); prevRel();
+}
+function pintaColsRel(){
+  const el=document.getElementById('rl2_cols'); if(!el)return;
+  el.innerHTML=REL_ORD.map((id,i)=>{
+    const c=REL_COLS.find(x=>x.id===id); if(!c)return '';
+    return `<div class="stat" style="padding:2px 0;gap:6px">
+      <label class="chkline" style="margin:0;flex:1"><input type="checkbox" ${REL_ON.has(id)?'checked':''} ${c.fixa?'disabled':''} onchange="relToggleCol('${id}',this.checked)"> ${c.n}${c.fixa?' (sempre)':''}</label>
+      <button class="btn ghost mini" style="width:34px;padding:4px" ${i===0?'disabled':''} onclick="relMoverCol(${i},-1)">↑</button>
+      <button class="btn ghost mini" style="width:34px;padding:4px" ${i===REL_ORD.length-1?'disabled':''} onclick="relMoverCol(${i},1)">↓</button></div>`;
+  }).join('');
+}
+function relToggleCol(id,on){ if(on)REL_ON.add(id); else REL_ON.delete(id); }
+function relMoverCol(i,d){
+  const j=i+d; if(j<0||j>=REL_ORD.length)return;
+  [REL_ORD[i],REL_ORD[j]]=[REL_ORD[j],REL_ORD[i]]; pintaColsRel();
+}
+function relMarcar(modo){
+  document.querySelectorAll('.rl2cat').forEach(cb=>{
+    const c=CATS_AZ.find(x=>x.id===cb.value)||{};
+    cb.checked = modo==='todas' ? true : modo==='con' ? c.g==='con' : !['terreno','projetos'].includes(cb.value);
+  });
+  prevRel();
+}
+function lerCfgRel(){
+  const fora=[...document.querySelectorAll('.rl2cat')].filter(c=>!c.checked).map(c=>c.value);
+  return {titulo:val('rl2_tit').trim()||'Relatório de gastos da obra',sit:val('rl2_sit'),ini:val('rl2_ini'),fim:val('rl2_fim'),
+    catsFora:fora,exclPessoas:document.getElementById('rl2_pes').checked,
+    cols:REL_ORD.filter(id=>REL_ON.has(id)),ordemCols:REL_ORD.slice(),
+    grupo:val('rl2_grp'),ordem:val('rl2_ord'),sub:document.getElementById('rl2_sub').checked,
+    resumo:document.getElementById('rl2_res').checked,orient:val('rl2_or')};
+}
+/* monta as linhas do relatório (uma por fatia de etapa) e o que ficou de fora */
+function linhasRel(cfg){
+  const rx=/engenheir|arquitet|\bart\b|\brrt\b|\bprojet/i;
+  const eq={}; (DB.equipe||[]).forEach(t=>eq[t.id]=t);
+  const rows=[], fora={n:0,v:0,pessoas:0,cats:{}};
+  DB.lanc.forEach(l=>{
+    if(l.cancelado)return;
+    if(cfg.ini&&l.data<cfg.ini)return; if(cfg.fim&&l.data>cfg.fim)return;
+    const tot=+l.total||0;
+    const v=cfg.sit==='pago'?valorPago(l):cfg.sit==='apagar'?saldoAPagar(l):tot;
+    if(Math.abs(v)<0.005)return;
+    const f=tot?v/tot:0;
+    const ps=partes(l).map(p=>({cat:p.cat,valor:+(p.valor*f).toFixed(2)}));
+    const t=l.trabId&&eq[l.trabId];
+    const pessoa=cfg.exclPessoas&&rx.test([l.desc,l.forn,l.familia,t&&t.funcao,t&&t.nome].filter(Boolean).join(' '));
+    ps.forEach(p=>{
+      if(pessoa){ fora.n++; fora.v+=p.valor; fora.pessoas+=p.valor; return; }
+      if(cfg.catsFora.includes(p.cat)){ fora.n++; fora.v+=p.valor; fora.cats[p.cat]=(fora.cats[p.cat]||0)+p.valor; return; }
+      const c=cat(p.cat);
+      rows.push({l,cat:p.cat,etapa:c.n,valor:p.valor,dividido:ps.length>1,data:l.data,desc:l.desc||'',forn:l.forn||'',
+        tipo:l.familia||'',qtd:ps.length>1?'':(l.qtd==null?'':l.qtd),unit:ps.length>1?'':(l.unit===''||l.unit==null?'':l.unit),
+        sit:isPago(l)?'Pago':(pagoParcial(l)>0?'Parcial':'A pagar'),nf:l.nf||'',obs:l.obs||'',
+        dig:l.at?new Date(l.at).toLocaleDateString('pt-BR'):''});
+    });
+  });
+  return {rows,fora};
+}
+function prevRel(){
+  const el=document.getElementById('rl2_prev'); if(!el)return;
+  const cfg=lerCfgRel(), {rows,fora}=linhasRel(cfg);
+  const tot=rows.reduce((s,r)=>s+r.valor,0);
+  const nomesFora=Object.keys(fora.cats).map(id=>`${cat(id).n} ${rmRel(fora.cats[id])}`);
+  if(fora.pessoas) nomesFora.push(`engenheiro/arquiteto/projetos ${rmRel(fora.pessoas)}`);
+  el.innerHTML=`<div class="stat"><span>Entram no relatório</span><b class="mono">${rows.length} linhas · ${rmRel(tot)}</b></div>
+    <div class="hint" style="margin:4px 0 0">${fora.n?'Ficam de fora: '+nomesFora.join(' · '):'Nada ficou de fora.'}</div>`;
+}
+function dadosRelCustom(cfg){
+  const {rows,fora}=linhasRel(cfg);
+  const ordenar=a=>{
+    const f={data:(x,y)=>x.data.localeCompare(y.data)||alfa(x.desc,y.desc),
+      data_desc:(x,y)=>y.data.localeCompare(x.data)||alfa(x.desc,y.desc),
+      alfa:(x,y)=>alfa(x.desc,y.desc)||x.data.localeCompare(y.data),
+      valor:(x,y)=>y.valor-x.valor}[cfg.ordem]||((x,y)=>x.data.localeCompare(y.data));
+    return a.slice().sort(f);
+  };
+  const MESES_L=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const rk=id=>{const c=cat(id);return (c.g==='con'?0:1000)+((CATS.findIndex(x=>x.id===id)+1)||999);};
+  const chave={etapa:r=>({k:r.cat,n:r.etapa,o:rk(r.cat)}),
+    tipo:r=>({k:r.tipo||'Sem tipo',n:r.tipo||'Sem tipo',o:0}),
+    forn:r=>({k:r.forn||'Sem fornecedor',n:r.forn||'Sem fornecedor',o:0}),
+    mes:r=>({k:r.data.slice(0,7),n:MESES_L[+r.data.slice(5,7)-1]+' de '+r.data.slice(0,4),o:0})}[cfg.grupo];
+  if(!chave) return {grupos:[{n:'',rows:ordenar(rows),v:rows.reduce((s,r)=>s+r.valor,0)}],fora,rows,agrupado:false};
+  const m=new Map();
+  rows.forEach(r=>{ const g=chave(r); if(!m.has(g.k))m.set(g.k,{n:g.n,o:g.o,k:g.k,rows:[],v:0}); const x=m.get(g.k); x.rows.push(r); x.v+=r.valor; });
+  let grupos=[...m.values()];
+  if(cfg.grupo==='etapa') grupos.sort((a,b)=>a.o-b.o);
+  else if(cfg.grupo==='mes') grupos.sort((a,b)=>a.k.localeCompare(b.k));
+  else grupos.sort((a,b)=>alfa(a.n,b.n));
+  grupos.forEach(g=>g.rows=ordenar(g.rows));
+  return {grupos,fora,rows,agrupado:true};
+}
+function gerarRelCustom(modo){
+  const cfg=lerCfgRel();
+  DB.cfg=DB.cfg||{}; DB.cfg.relCustom=cfg; salvar();
+  const D=dadosRelCustom(cfg);
+  if(!D.rows.length){toast('Nenhum lançamento com essas escolhas.');return}
+  const cols=cfg.ordemCols.filter(id=>cfg.cols.includes(id)||id==='valor').map(id=>REL_COLS.find(c=>c.id===id)).filter(Boolean);
+  /* o valor fica sempre por último */
+  const ci=cols.findIndex(c=>c.id==='valor'); if(ci>=0&&ci!==cols.length-1) cols.push(cols.splice(ci,1)[0]);
+  const total=D.rows.reduce((s,r)=>s+r.valor,0);
+  const sitTxt={pago:'Somente o que já foi pago',todos:'Pago e a pagar',apagar:'Somente o que falta pagar'}[cfg.sit];
+  const periodo=(cfg.ini||cfg.fim)?`${cfg.ini?fmtDRel(cfg.ini):'início'} a ${cfg.fim?fmtDRel(cfg.fim):'hoje'}`:'Toda a obra';
+  const nomesFora=Object.keys(D.fora.cats).map(id=>cat(id).n);
+  const foraTxt=[...cfg.catsFora.map(id=>cat(id).n),...(cfg.exclPessoas?['engenheiro, arquiteto e projetos (por nome/função)']:[])];
+
+  if(modo==='csv'){
+    const cab=cols.map(c=>c.n);
+    const linhas=[];
+    D.grupos.forEach(g=>g.rows.forEach(r=>{
+      const cel=cols.map(c=>String(c.csv(r)==null?'':c.csv(r)).replace(/[;\r\n]+/g,' '));
+      linhas.push(cel.join(';'));
+    }));
+    baixar('relatorio-obra-'+hoje()+'.csv','﻿'+cab.join(';')+'\n'+linhas.join('\n')+'\n'+
+      cols.map((c,i)=>i===0?'TOTAL':(c.id==='valor'?total.toFixed(2).replace('.',','):'')).join(';')+'\n','text/csv');
+    toast('Planilha gerada'); return;
+  }
+
+  const tabHead=`<thead><tr>${cols.map(c=>`<th class="${c.cls==='r'?'r':''}">${c.n}</th>`).join('')}</tr></thead>`;
+  const linhaTr=r=>`<tr>${cols.map(c=>`<td class="${c.cls||''}">${c.v(r)}</td>`).join('')}</tr>`;
+  const ncol=cols.length;
+  const corpo=D.grupos.map(g=>
+    (D.agrupado?`<tr class="gh"><td colspan="${Math.max(1,ncol-1)}">${escRel(g.n)} <span style="font-weight:400">· ${g.rows.length} lançamento(s)</span></td><td class="r">${rmRel(g.v)}</td></tr>`:'')
+    +g.rows.map(linhaTr).join('')
+    +(D.agrupado&&cfg.sub?`<tr class="sub"><td colspan="${Math.max(1,ncol-1)}">Subtotal · ${escRel(g.n)}</td><td class="r">${rmRel(g.v)}</td></tr>`:'')
+  ).join('')
+  +`<tr class="tot"><td colspan="${Math.max(1,ncol-1)}">TOTAL</td><td class="r">${rmRel(total)}</td></tr>`;
+  const resumo=(D.agrupado&&cfg.resumo)?`<div class="pr-sec"><h2>Resumo por ${{etapa:'etapa da obra',tipo:'tipo de produto',forn:'fornecedor',mes:'mês'}[cfg.grupo]}</h2>
+    <table><thead><tr><th>${{etapa:'Etapa',tipo:'Tipo',forn:'Fornecedor',mes:'Mês'}[cfg.grupo]}</th><th class="r">Lançamentos</th><th class="r">Valor</th><th class="r">%</th></tr></thead><tbody>
+    ${D.grupos.map(g=>`<tr><td>${escRel(g.n)}</td><td class="r">${g.rows.length}</td><td class="r">${rmRel(g.v)}</td><td class="r">${(total?g.v/total*100:0).toFixed(1)}%</td></tr>`).join('')}
+    <tr class="tot"><td>Total</td><td class="r">${D.rows.length}</td><td class="r">${rmRel(total)}</td><td class="r">100%</td></tr></tbody></table></div>`:'';
+  const dt=new Date().toLocaleDateString('pt-BR');
+  document.getElementById('printArea').innerHTML=`<div class="pf">
+    <div class="pf-top">
+      <div><h1>${escRel(cfg.titulo)}</h1>
+        <div class="pf-sub">Obra Bananeiras C08 · Monte das Cerejeiras, Quadra B, Lote 08 · Bananeiras-PB<br>
+        ${periodo} · ${sitTxt}${foraTxt.length?'<br>Não inclui: '+escRel(foraTxt.join(', ')):''}</div></div>
+      <div class="pf-data">Emitido em ${dt}<br>${D.rows.length} lançamentos · ${rmRel(total)}</div>
+    </div>
+    ${resumo}
+    <div class="pr-sec"><h2>Lançamentos</h2><table>${tabHead}<tbody>${corpo}</tbody></table></div>
+    <p class="pf-rod">Relatório gerado pelo sistema de gestão da obra em ${dt}. Documento de controle interno.</p>
+  </div>`;
+  const paisagem=cfg.orient==='paisagem'||(cfg.orient==='auto'&&cols.length>6);
+  let st=document.getElementById('relPage'); if(st)st.remove();
+  st=document.createElement('style'); st.id='relPage';
+  st.textContent=`@media print{@page{size:A4 ${paisagem?'landscape':'portrait'};margin:12mm 10mm}}`;
+  document.head.appendChild(st);
+  fechar();
+  document.documentElement.classList.add('imprimindo');
+  setTimeout(()=>{ window.print(); setTimeout(()=>{document.documentElement.classList.remove('imprimindo');const x=document.getElementById('relPage');if(x)x.remove();},600); },80);
 }
 
 function abrirImpressaoCot(){
