@@ -164,3 +164,9 @@ Em Unificar nomes, tocar em "N reg. ›" abre a lista dos registros que usam aqu
 **Sem nomes repetidos:** ao salvar gasto, cotação, nota ou tipo, fornecedor e tipo digitados que já existem (ignorando maiúscula, acento, espaços e pontuação) passam a usar a grafia já cadastrada. Ex.: "bazar da serra" vira "Bazar da Serra". Criar um tipo que já existe é bloqueado. Para juntar nomes diferentes (ex.: "Bazar" e "Bazar da Serra"), use Unificar nomes.
 
 **Relatório personalizado — "Conferir com o Painel":** na prévia do relatório há um bloco que parte do total de Construção do Painel e mostra, linha a linha, o que ficou de fora (período De/Até, engenheiro/arquiteto/projetos pelo nome, categorias desmarcadas) até chegar ao valor do relatório. Lista também os lançamentos que saíram pelo nome e tem o atalho "Tirar a data final".
+
+**Conferir entradas — "Conferido, está certo":** cada grupo de "mesma descrição e mesmo valor" tem o botão para marcar que a repetição é correta (mesmo produto comprado em dias diferentes). O grupo some da lista e do contador; se um novo lançamento igual aparecer, o grupo volta a ser avisado. "Rever" no fim da tela desfaz todas as marcações.
+
+**Número (#) fixo em cada gasto:** cada lançamento tem um número que nasce uma vez e não muda (nem com gasto de data antiga, nem se outro for apagado). Os números que você já via foram mantidos. Dá para buscar em Gastos digitando `#123`; o número aparece em Conferir entradas, nas listas de Configurações, em Unificar nomes e no relatório (coluna "Nº", desligada por padrão). Em Conferir entradas, tocar num gasto abre a edição direto; gasto sem etapa aparece em vermelho.
+
+**Notas fiscais:** removido o vínculo com gastos (campo na nota, botões "Vincular", avisos "sem gasto vinculado", cards e a lista em Conferir entradas). As notas ficam só como arquivo/registro.
