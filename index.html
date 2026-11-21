@@ -2876,21 +2876,23 @@ function lerCfgRel(){
 function linhasRel(cfg){
   const rx=/engenheir|arquitet|\bart\b|\brrt\b|\bprojet/i;
   const eq={}; (DB.equipe||[]).forEach(t=>eq[t.id]=t);
-  const rows=[], fora={n:0,v:0,pessoas:0,cats:{}};
+  const rows=[], fora={n:0,v:0,pessoas:0,cats:{},base:{con:0,adm:0},dat:{con:0,adm:0},pesG:{con:0,adm:0},catG:{con:0,adm:0},listaPes:[]};
+  const G=p=>cat(p.cat).g==='con'?'con':'adm';
   DB.lanc.forEach(l=>{
     if(l.cancelado)return;
-    if(cfg.ini&&l.data<cfg.ini)return; if(cfg.fim&&l.data>cfg.fim)return;
     const tot=+l.total||0;
     const v=cfg.sit==='pago'?valorPago(l):cfg.sit==='apagar'?saldoAPagar(l):tot;
     if(Math.abs(v)<0.005)return;
     const f=tot?v/tot:0;
     const ps=partes(l).map(p=>({cat:p.cat,valor:+(p.valor*f).toFixed(2)}));
+    ps.forEach(p=>{ fora.base[G(p)]+=p.valor; });
+    if((cfg.ini&&l.data<cfg.ini)||(cfg.fim&&l.data>cfg.fim)){ ps.forEach(p=>{ fora.dat[G(p)]+=p.valor; }); return; }
     const t=l.trabId&&eq[l.trabId];
     const pessoa=cfg.exclPessoas&&rx.test([l.desc,l.forn,l.familia,t&&t.funcao,t&&t.nome].filter(Boolean).join(' '));
     const somaP=ps.reduce((a,p)=>a+p.valor,0);
     ps.forEach(p=>{
-      if(pessoa){ fora.n++; fora.v+=p.valor; fora.pessoas+=p.valor; return; }
-      if(cfg.catsFora.includes(p.cat)){ fora.n++; fora.v+=p.valor; fora.cats[p.cat]=(fora.cats[p.cat]||0)+p.valor; return; }
+      if(pessoa){ fora.n++; fora.v+=p.valor; fora.pessoas+=p.valor; fora.pesG[G(p)]+=p.valor; fora.listaPes.push({l,valor:p.valor,g:G(p)}); return; }
+      if(cfg.catsFora.includes(p.cat)){ fora.n++; fora.v+=p.valor; fora.cats[p.cat]=(fora.cats[p.cat]||0)+p.valor; fora.catG[G(p)]+=p.valor; return; }
       const c=cat(p.cat);
       rows.push({l,cat:p.cat,etapa:c.n,valor:p.valor,dividido:ps.length>1,data:l.data,desc:l.desc||'',forn:l.forn||'',
         tipo:l.familia||'',qtd:(l.qtd==null||l.qtd==='')?'':(ps.length>1&&somaP?+((+l.qtd)*p.valor/somaP).toFixed(3):l.qtd),unit:(l.unit===''||l.unit==null)?'':l.unit,
@@ -2906,8 +2908,24 @@ function prevRel(){
   const tot=rows.reduce((s,r)=>s+r.valor,0);
   const nomesFora=Object.keys(fora.cats).map(id=>`${cat(id).n} ${rmRel(fora.cats[id])}`);
   if(fora.pessoas) nomesFora.push(`engenheiro/arquiteto/projetos ${rmRel(fora.pessoas)}`);
+  const totG=g=>rows.filter(r=>cat(r.cat).g===g).reduce((s,r)=>s+r.valor,0);
+  const conf=g=>{
+    const ln=[[`${g==='con'?'Construção':'Administrativas'} (todas as datas, ${cfg.sit==='pago'?'igual ao Painel':'na situação escolhida'})`,fora.base[g],''],
+      ['− fora do período (De/Até)',-fora.dat[g],fora.dat[g]],
+      ['− engenheiro/arquiteto/projetos pelo nome',-fora.pesG[g],fora.pesG[g]],
+      ['− categorias desmarcadas',-fora.catG[g],fora.catG[g]]]
+      .filter((x,i)=>i===0||Math.abs(x[2])>=0.005);
+    return ln.map(x=>`<div class="stat" style="font-size:12.5px"><span>${x[0]}</span><b class="mono">${rmRel(Math.abs(x[1]))}</b></div>`).join('')
+      +`<div class="stat" style="font-size:12.5px"><span><b>= entra no relatório</b></span><b class="mono">${rmRel(totG(g))}</b></div>`;
+  };
+  const listaP=fora.listaPes.filter(x=>x.g==='con');
   el.innerHTML=`<div class="stat"><span>Entram no relatório</span><b class="mono">${rows.length} linhas · ${rmRel(tot)}</b></div>
-    <div class="hint" style="margin:4px 0 0">${fora.n?'Ficam de fora: '+nomesFora.join(' · '):'Nada ficou de fora.'}</div>`;
+    <div class="hint" style="margin:4px 0 0">${fora.n?'Ficam de fora: '+nomesFora.join(' · '):'Nada ficou de fora.'}</div>
+    <details class="mais" style="margin-top:8px"><summary>Conferir com o Painel (de onde vem a diferença)</summary>
+      ${conf('con')}
+      ${(Math.abs(fora.dat.con)>=0.005&&cfg.fim)?`<div class="hint">O campo "Até" está em ${fmtDRel(cfg.fim)}: gastos depois dessa data ficam de fora. <a href="#" onclick="document.getElementById('rl2_fim').value='';prevRel();return false">Tirar a data final</a></div>`:''}
+      ${listaP.length?`<div class="hint" style="margin-top:6px"><b>Saíram pelo nome (dentro de Construção):</b><br>${listaP.map(x=>`${fmtDRel(x.l.data)} · ${escRel(x.l.desc||'')}${x.l.forn?' · '+escRel(x.l.forn):''} · ${rmRel(x.valor)}`).join('<br>')}<br>Se algum desses não é engenheiro/arquiteto/projeto, desmarque a opção "Deixar de fora..." ou renomeie o lançamento.</div>`:''}
+    </details>`;
 }
 function dadosRelCustom(cfg){
   const {rows,fora}=linhasRel(cfg);

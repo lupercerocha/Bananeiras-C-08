@@ -162,3 +162,5 @@ Em Configurações, os totais de Lançamentos, Cotações abertas, Fotos e Notas
 Em Unificar nomes, tocar em "N reg. ›" abre a lista dos registros que usam aquele nome (data, tipo, descrição e valor); "Voltar" retorna mantendo as marcações.
 
 **Sem nomes repetidos:** ao salvar gasto, cotação, nota ou tipo, fornecedor e tipo digitados que já existem (ignorando maiúscula, acento, espaços e pontuação) passam a usar a grafia já cadastrada. Ex.: "bazar da serra" vira "Bazar da Serra". Criar um tipo que já existe é bloqueado. Para juntar nomes diferentes (ex.: "Bazar" e "Bazar da Serra"), use Unificar nomes.
+
+**Relatório personalizado — "Conferir com o Painel":** na prévia do relatório há um bloco que parte do total de Construção do Painel e mostra, linha a linha, o que ficou de fora (período De/Até, engenheiro/arquiteto/projetos pelo nome, categorias desmarcadas) até chegar ao valor do relatório. Lista também os lançamentos que saíram pelo nome e tem o atalho "Tirar a data final".
