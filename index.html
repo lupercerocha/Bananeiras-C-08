@@ -3029,9 +3029,7 @@ function gerarRelProdutos(cfg,modo){
   const dt=new Date().toLocaleDateString('pt-BR');
   document.getElementById('printArea').innerHTML=`<div class="pf">
     <div class="pf-top">
-      <div><h1>${escRel(cfg.titulo)}</h1>
-        <div class="pf-sub">Obra Bananeiras C08 · Monte das Cerejeiras, Quadra B, Lote 08 · Bananeiras-PB<br>
-        Produtos iguais somados · ${periodo} · ${sitTxt}${foraTxt.length?'<br>Não inclui: '+escRel(foraTxt.join(', ')):''}</div></div>
+      <div><h1>${escRel(cfg.titulo)}</h1></div>
       <div class="pf-data">Emitido em ${dt}<br>${L.length} produtos · ${rmRel(total)}</div>
     </div>
     <div class="pr-sec"><table>
@@ -3095,9 +3093,7 @@ function gerarRelCustom(modo){
   const dt=new Date().toLocaleDateString('pt-BR');
   document.getElementById('printArea').innerHTML=`<div class="pf">
     <div class="pf-top">
-      <div><h1>${escRel(cfg.titulo)}</h1>
-        <div class="pf-sub">Obra Bananeiras C08 · Monte das Cerejeiras, Quadra B, Lote 08 · Bananeiras-PB<br>
-        ${periodo} · ${sitTxt}${foraTxt.length?'<br>Não inclui: '+escRel(foraTxt.join(', ')):''}</div></div>
+      <div><h1>${escRel(cfg.titulo)}</h1></div>
       <div class="pf-data">Emitido em ${dt}<br>${D.rows.length} lançamentos · ${rmRel(total)}</div>
     </div>
     ${resumo}
@@ -4560,7 +4556,7 @@ const chaveProduto=desc=>alfa2(nomeProduto(desc));
 const ehMaoObra=l=>alfa2(l.familia||'')==='mao de obra';
 const nomeProdutoL=l=>ehMaoObra(l)?'Mão de obra - Todos':nomeProduto(l.desc);
 const chaveProdutoL=l=>alfa2(nomeProdutoL(l));
-const APP_VERSAO='28', APP_VERSAO_DATA='21/11/2026';   /* subir a cada entrega, junto com o sw.js */
+const APP_VERSAO='29', APP_VERSAO_DATA='21/11/2026';   /* subir a cada entrega, junto com o sw.js */
 const fmtQtd=n=>Math.round(+n||0).toLocaleString('pt-BR');   /* quantidade é sempre número inteiro */
 /* ---------- nomes sem repetição: ao salvar, usa a grafia já cadastrada (ignora maiúscula, acento, espaço e pontuação) ---------- */
 const nomeKey=s=>alfa2(s).replace(/[^a-z0-9]/g,'');

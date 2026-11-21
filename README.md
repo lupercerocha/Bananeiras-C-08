@@ -181,8 +181,10 @@ Em Unificar nomes, tocar em "N reg. ›" abre a lista dos registros que usam aqu
 
 **Produtos (itens iguais somados):** é um tipo de relatório (campo "Tipo de relatório"), só com o resumo por produto — sem lançamentos, fornecedor nem etapa. Foi retirada a opção "Produto" de "Agrupar por" do relatório detalhado, para não listar lançamentos por baixo.
 
-**Versão:** o sistema mostra a versão em Configurações (e no rodapé dos relatórios). Hoje: **versão 28 (21/11/2026)**. A cada entrega sobe junto: `APP_VERSAO` no HTML e o número do cache no `sw.js` (`obra-c08-v28`).
+**Versão:** o sistema mostra a versão em Configurações (e no rodapé dos relatórios). Hoje: **versão 29 (21/11/2026)**. A cada entrega sobe junto: `APP_VERSAO` no HTML e o número do cache no `sw.js` (`obra-c08-v29`).
 
 **Mão de obra nos produtos somados:** tudo que tem o tipo "Mão de obra" vira uma linha só, "Mão de obra - Todos" (também na tela Itens).
 
 **Resumo por fase no final:** os relatórios (detalhado e produtos somados) terminam com o "Resumo por fase da obra" (compras, valor e %); na planilha de produtos somados ele vem no fim.
+
+**Cabeçalho dos relatórios personalizados:** ficam só o título e a data de emissão (sem endereço da obra, período, situação nem lista do que não entra).
