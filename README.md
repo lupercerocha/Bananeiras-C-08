@@ -156,3 +156,9 @@ Configurações → **Unificar nomes**. Junta nomes repetidos de **fornecedor** 
 - Busque (ex.: "vitor"), marque os nomes que são a mesma coisa (ou "Marcar os que aparecem"), digite o nome final e confirme.
 - O aviso mostra quantos registros mudam antes de aplicar; vale em tudo e sincroniza com a nuvem.
 - Só some o que foi marcado; para desfazer, use Configurações → Restaurar.
+
+Em Configurações, os totais de Lançamentos, Cotações abertas, Fotos e Notas fiscais são clicáveis: abrem uma lista (com busca nos lançamentos) e tocar em um item abre o registro.
+
+Em Unificar nomes, tocar em "N reg. ›" abre a lista dos registros que usam aquele nome (data, tipo, descrição e valor); "Voltar" retorna mantendo as marcações.
+
+**Sem nomes repetidos:** ao salvar gasto, cotação, nota ou tipo, fornecedor e tipo digitados que já existem (ignorando maiúscula, acento, espaços e pontuação) passam a usar a grafia já cadastrada. Ex.: "bazar da serra" vira "Bazar da Serra". Criar um tipo que já existe é bloqueado. Para juntar nomes diferentes (ex.: "Bazar" e "Bazar da Serra"), use Unificar nomes.

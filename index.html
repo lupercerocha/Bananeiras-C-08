@@ -1464,7 +1464,7 @@ function verPendencia(tipo){
 }
 function salvarPrecoRapido(id){
   const c=DB.cot.find(x=>x.id===id); if(!c)return;
-  const v=moeda2num(val('sp_v_'+id)), f=capNomes(val('sp_f_'+id));
+  const v=moeda2num(val('sp_v_'+id)), f=nomeForn(val('sp_f_'+id));
   if(!(v>0)){toast('Informe o valor.');return}
   c.forn=f||c.forn; c.total=v; c.at=Date.now();
   if(c.itens&&c.itens.length===1&&!(+c.itens[0].u>0)){
@@ -3598,7 +3598,7 @@ function salvarNota(id){
     .map(i=>({c:i.c||'',d:(i.d||'').trim(),ncm:i.ncm||'',un:i.un||'',
       q:+i.q||0,u:+i.u||0,t:+((+i.q||0)*(+i.u||0)).toFixed(2)}));
   preencherFamilias(its);
-  const emit=capNomes(val('n_emit'));
+  const emit=nomeForn(val('n_emit'));
   if(!emit){toast('Informe o emitente da nota.');return}
   const base=panel._nota||{};
   const total=moeda2num(val('n_total'))||its.reduce((s,i)=>s+i.t,0);
@@ -4393,8 +4393,63 @@ function trocarTipoEmTudo(de,para){
     if(m)n.at=Date.now(); });
   DB.tipos=(DB.tipos||[]).filter(t=>alfa2(t)!==k);
 }
+/* ---------- resumo clicável em Configurações ---------- */
+function verResumoCfg(t){
+  const esc=x=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const dt=d=>String(d||'').slice(0,10).split('-').reverse().join('/');
+  const busca=`<input id="rc_busca" placeholder="Buscar..." oninput="rcFiltrar()" style="margin:8px 0">`;
+  const fim=`<button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`;
+  let h='';
+  if(t==='lanc'){
+    const L=DB.lanc.slice().sort((a,b)=>String(b.data).localeCompare(String(a.data)));
+    h=`<h2>Lançamentos (${L.length})</h2>${busca}<div style="max-height:62vh;overflow:auto">`+L.map(l=>
+      `<div class="item rcRow" data-k="${esc(alfa2([l.desc,l.forn,l.familia].join(' ')))}" onclick="abrirGasto(DB.lanc.find(x=>x.id==='${l.id}'))">
+        <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
+        <div class="mid"><b>${esc(l.desc)}</b><small>${esc(l.forn||'sem fornecedor')}${l.cancelado?' · cancelado':''}</small></div>
+        <div class="val mono">${brl(l.total)}</div></div>`).join('')+'</div>'+fim;
+  }else if(t==='cot'){
+    const C=DB.cot.filter(c=>c.status==='aberta');
+    h=`<h2>Cotações abertas (${C.length})</h2>`+(C.length?C.map(c=>
+      `<div class="item" onclick="verCot('${c.id}')"><div class="dt"><b class="mono">${dia(c.data).d}</b><span>${dia(c.data).m}</span></div>
+        <div class="mid"><b>${esc(c.item)}</b><small>${esc(c.forn||'sem fornecedor')}${c.conc?' · '+esc(c.conc):''}</small></div></div>`).join(''):'<div class="empty">Nenhuma cotação aberta.</div>')+fim;
+  }else if(t==='notas'){
+    const N=(DB.notas||[]).slice().sort((a,b)=>String(b.data).localeCompare(String(a.data)));
+    h=`<h2>Notas fiscais (${N.length})</h2>`+(N.length?N.map(n=>
+      `<div class="item" onclick="verNota('${n.id}')"><div class="dt"><b class="mono">${dia(n.data).d}</b><span>${dia(n.data).m}</span></div>
+        <div class="mid"><b>${esc(n.emit)}</b><small>nº ${esc(n.numero||'s/nº')} · ${(n.itens||[]).length} item(ns)</small></div>
+        <div class="val mono">${brl(n.total)}</div></div>`).join(''):'<div class="empty">Nenhuma nota.</div>')+fim;
+  }else{
+    const F=DB.fotos.slice().sort((a,b)=>String(b.dh).localeCompare(String(a.dh)));
+    h=`<h2>Fotos no álbum (${F.length})</h2>`+(F.length?`<div class="grid" style="max-height:62vh;overflow:auto">`+F.map(f=>
+      `<figure onclick="verFoto('${f.id}')"><img src="${f.thumb||f.img||''}" alt="" loading="lazy">
+       <figcaption>${f.dh.slice(8,10)}/${f.dh.slice(5,7)} ${f.dh.slice(11,16)}</figcaption></figure>`).join('')+'</div>':'<div class="empty">Álbum vazio.</div>')+fim;
+  }
+  abrir(h);
+}
+function rcFiltrar(){
+  const q=alfa2(val('rc_busca')||'');
+  document.querySelectorAll('.rcRow').forEach(r=>{ r.style.display=(!q||r.dataset.k.includes(q))?'':'none'; });
+}
+/* ---------- nomes sem repetição: ao salvar, usa a grafia já cadastrada (ignora maiúscula, acento, espaço e pontuação) ---------- */
+const nomeKey=s=>alfa2(s).replace(/[^a-z0-9]/g,'');
+function nomeCanon(v,fontes){
+  const t=capNomes(v); if(!t)return '';
+  const k=nomeKey(t), cont={};
+  fontes.forEach(x=>{ x=String(x||'').trim(); if(x&&nomeKey(x)===k)cont[x]=(cont[x]||0)+1; });
+  const ach=Object.keys(cont).sort((a,b)=>cont[b]-cont[a])[0];
+  return ach||t;
+}
+function nomeForn(v){
+  const f=[]; DB.lanc.forEach(l=>f.push(l.forn)); DB.cot.forEach(c=>f.push(c.forn)); (DB.notas||[]).forEach(n=>f.push(n.emit));
+  return nomeCanon(v,f);
+}
+function nomeTipo(v){
+  const f=(DB.tipos||[]).slice(); DB.lanc.forEach(l=>f.push(l.familia));
+  DB.cot.forEach(c=>(c.itens||[]).forEach(i=>f.push(i.familia)));
+  return nomeCanon(v,f);
+}
 /* ---------- UNIFICAR NOMES (fornecedor e tipo) ---------- */
-let UN_CAMPO='forn', UN_LISTA=[];
+let UN_CAMPO='forn', UN_LISTA=[], UN_ESTADO=null;
 function unVisitar(campo,fn){
   if(campo==='forn'){
     DB.lanc.forEach(l=>fn(l,'forn',l));
@@ -4412,7 +4467,8 @@ function unNomes(campo){
   if(campo==='tipo')(DB.tipos||[]).forEach(t=>{ t=String(t||'').trim(); if(t&&!(t in m))m[t]=0; });
   return Object.keys(m).sort((a,b)=>alfa(a,b)).map(n=>({n,q:m[n]}));
 }
-function abrirUnificar(campo){
+function abrirUnificar(campo,manter){
+  const est=manter?UN_ESTADO:null; UN_ESTADO=null;
   UN_CAMPO=campo||UN_CAMPO; UN_LISTA=unNomes(UN_CAMPO);
   const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
   const rotulo=UN_CAMPO==='forn'?'fornecedor':'tipo';
@@ -4431,13 +4487,40 @@ function abrirUnificar(campo){
   ${UN_LISTA.length?UN_LISTA.map((x,i)=>`<label class="stat unRow" data-k="${esc(alfa2(x.n))}" style="align-items:center;gap:10px;cursor:pointer">
     <input type="checkbox" class="unCk" data-i="${i}" onchange="unContar()" style="width:auto;margin:0">
     <span style="flex:1;min-width:0">${esc(x.n)}</span>
-    <small style="color:var(--ink-2)">${x.q?x.q+' reg.':'sem uso'}</small></label>`).join(''):'<div class="empty">Nenhum nome cadastrado.</div>'}
+    ${x.q?`<button type="button" class="tag" style="border:0;cursor:pointer;font-size:11px" onclick="event.preventDefault();event.stopPropagation();unVer(${i})" title="Ver os registros">${x.q} reg. ›</button>`:'<small style="color:var(--ink-2)">sem uso</small>'}</label>`).join(''):'<div class="empty">Nenhum nome cadastrado.</div>'}
   </div>
   <label style="margin-top:10px">Unificar tudo que marquei como</label>
   <input id="un_novo" data-cap="1" list="${UN_CAMPO==='forn'?'dlForn':'dlTipos'}" placeholder="Nome final, ex: ${UN_CAMPO==='forn'?'Bazar da Serra':'Ferramentas'}">
   <p class="hint" id="un_info">Marque os nomes que são a mesma coisa.</p>
   <button class="btn" id="un_ok" onclick="unAplicar()">Unificar</button>
   <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+  if(est){
+    document.getElementById('un_busca').value=est.busca; document.getElementById('un_novo').value=est.novo; unFiltrar();
+    document.querySelectorAll('.unCk').forEach(c=>{ c.checked=est.sel.has(UN_LISTA[+c.dataset.i].n); }); unContar();
+  }
+}
+function unVer(i){
+  const x=UN_LISTA[i]; if(!x)return;
+  UN_ESTADO={sel:new Set(unSel()),novo:val('un_novo')||'',busca:val('un_busca')||''};
+  const esc=t=>String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const rows=[];
+  unVisitar(UN_CAMPO,(o,k,pai)=>{
+    if(String(o[k]||'').trim()!==x.n)return;
+    const nota=(DB.notas||[]).includes(pai), cot=DB.cot.includes(pai), item=o!==pai;
+    let kind=nota?'Nota':cot?'Cotação':'Gasto', desc, v;
+    if(nota){ desc=item?(o.d||'')+' · '+pai.emit:pai.emit; v=item?(+o.t||(+o.q||0)*(+o.u||0)):pai.total; }
+    else if(cot){ desc=item?(o.d||pai.item):pai.item; v=item?(+o.q||0)*(+o.u||0):(pai.total||0); }
+    else { desc=pai.desc; v=pai.total; }
+    rows.push({d:pai.data||'',kind,desc,v,cancel:!!pai.cancelado});
+  });
+  rows.sort((a,b)=>String(b.d).localeCompare(String(a.d)));
+  const dt=d=>String(d||'').slice(0,10).split('-').reverse().join('/');
+  abrir(`<h2>${esc(x.n)}</h2><p class="sub">${rows.length} registro(s)</p>
+  <div class="card" style="box-shadow:none;max-height:62vh;overflow:auto;padding:4px 10px">
+  ${rows.map(r=>`<div class="stat" style="align-items:center;gap:10px">
+    <span style="flex:1;min-width:0">${esc(r.desc)}<div style="font-size:11.5px;color:var(--ink-2)">${dt(r.d)} · ${r.kind}${r.cancel?' · cancelado':''}</div></span>
+    <b class="mono">${brl(r.v)}</b></div>`).join('')}</div>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="abrirUnificar(UN_CAMPO,true)">Voltar</button>`);
 }
 function unFiltrar(){
   const q=alfa2(val('un_busca')||'');
@@ -4506,7 +4589,8 @@ function salvarTipo(ix){
   const novo=capNomes(val('tp_n'));
   if(!novo){toast('Informe o nome.');return}
   if(alfa2(novo)===alfa2(atual)){ verTipos(); return; }
-  const jaTem=familiasExistentes().find(t=>alfa2(t)===alfa2(novo)&&alfa2(t)!==alfa2(atual));
+  if(!atual){ const dup=familiasExistentes().find(t=>nomeKey(t)===nomeKey(novo)); if(dup){toast('Já existe o tipo "'+dup+'".');return} }
+  const jaTem=familiasExistentes().find(t=>nomeKey(t)===nomeKey(novo)&&alfa2(t)!==alfa2(atual));
   if(jaTem&&!atual){toast('Já existe o tipo "'+jaTem+'".');return}
   DB.tipos=DB.tipos||[];
   if(atual) trocarTipoEmTudo(atual,novo);
@@ -5054,10 +5138,10 @@ function salvarGasto(id){
     const its=(panel._its||[]).filter(i=>String(i.d||'').trim()&&+i.u>0);
     if(!its.length){toast('Preencha ao menos um item com descrição e valor.');return}
     if(its.some(i=>!String(i.cat||'').trim())){toast('Falta escolher a etapa de algum item.');return}
-    const data=val('x_data'), forn0=val('x_forn').trim(), pag=val('x_pag'), obs=val('x_obs').trim();
+    const data=val('x_data'), forn0=nomeForn(val('x_forn')), pag=val('x_pag'), obs=val('x_obs').trim();
     const anexos=ANX_ALVO||[], at=Date.now();
     its.forEach(it=>{
-      DB.lanc.push({id:uid(),at,data,desc:capNomes(it.d),familia:capNomes(it.familia||palpiteFamilia(it.d)||''),cat:garantirCategoria(it.cat,'con'),forn:(it.f&&it.f.trim())||forn0,
+      DB.lanc.push({id:uid(),at,data,desc:capNomes(it.d),familia:nomeTipo(it.familia||palpiteFamilia(it.d)||''),cat:garantirCategoria(it.cat,'con'),forn:nomeForn(it.f||'')||forn0,
         qtd:+it.q||1,unit:+it.u||0,total:(+it.q||0)*(+it.u||0),rateio:[],
         pag,nf:'',anexos,obs,ctrl:false,qtdRec:0,baixas:[]});
     });
@@ -5081,7 +5165,7 @@ function salvarGasto(id){
     }
   }
   const g={id:id||uid(),at:Date.now(),
-    data:val('x_data'),desc:capNomes(val('x_desc')),familia:capNomes(val('x_fam')||palpiteFamilia(val('x_desc'))||''),cat:catPrincipal,forn:capNomes(val('x_forn')),
+    data:val('x_data'),desc:capNomes(val('x_desc')),familia:nomeTipo(val('x_fam')||palpiteFamilia(val('x_desc'))||''),cat:catPrincipal,forn:nomeForn(val('x_forn')),
     qtd:+val('x_qtd')||1,unit:moeda2num(val('x_unit')),total:totalVal,rateio:rat,
     pag:val('x_pag'),nf:val('x_nf').trim(),anexos:ANX_ALVO||[],obs:val('x_obs').trim(),
     ctrl:document.getElementById('x_ctrl').checked,
@@ -5338,10 +5422,10 @@ function delItem(i){panel._its.splice(i,1);pintaItens()}
 
 function salvarCot(id){
   const its=panel._its.filter(i=>String(i.d||'').trim()||+i.u>0);
-  its.forEach(i=>{ i.d=capNomes(i.d); if(!String(i.familia||'').trim())i.familia=palpiteFamilia(i.d); });
+  its.forEach(i=>{ i.d=capNomes(i.d); if(!String(i.familia||'').trim())i.familia=palpiteFamilia(i.d); i.familia=nomeTipo(i.familia); if(i.f)i.f=nomeForn(i.f); });
   const sub=somaItens(its);
   const desconto=Math.min(Math.max(moeda2num(val('c_desc')),0),sub);
-  const c={id:id||uid(),at:Date.now(),data:hoje(),item:capNomes(val('c_item')),forn:capNomes(val('c_forn')),
+  const c={id:id||uid(),at:Date.now(),data:hoje(),item:capNomes(val('c_item')),forn:nomeForn(val('c_forn')),
     conc:(panel._cotConc||''),
     itens:its.length?its:[{c:'',d:val('c_item').trim(),q:1,u:0,f:''}],
     desconto,total:+(sub-desconto).toFixed(2),validade:val('c_val'),anexos:ANX_ALVO||[],obs:val('c_obs').trim(),status:'aberta'};
@@ -5497,7 +5581,7 @@ function confirmarCompra(){
       rateio=it.cats.map((cat,idx)=>({cat,valor:idx<n-1?cada:+(total-cada*(n-1)).toFixed(2)}));
     }
     const novoId=uid(); idsGerados.push(novoId);
-    DB.lanc.push({id:novoId,at:Date.now(),data:nota?nota.data:hoje(),desc:capNomes(it.d||c.item),familia:capNomes(it.familia||palpiteFamilia(it.d||c.item)||''),cat:it.cats[0],
+    DB.lanc.push({id:novoId,at:Date.now(),data:nota?nota.data:hoje(),desc:capNomes(it.d||c.item),familia:nomeTipo(it.familia||palpiteFamilia(it.d||c.item)||''),cat:it.cats[0],
       forn:it.f||c.forn,qtd:+it.q||1,unit,total,rateio,
       pag:pago?'Pago':'A pagar',nf:nota?(nota.numero||''):'',anexos:c.anexos||[],obs:c.obs||'',
       ctrl:false,qtdRec:0,baixas:[],notaId:nota?nota.id:''});
@@ -7519,10 +7603,10 @@ function renderIO(){
   document.getElementById('ioBody').innerHTML=`<h2>Configurações</h2>
   <p class="sub">Backup, sincronização, cadastros e ajustes da obra.</p>
   <div class="card" style="box-shadow:none;margin-top:10px">
-    <div class="stat"><span>Lançamentos</span><b class="mono">${DB.lanc.length}</b></div>
-    <div class="stat"><span>Cotações abertas</span><b class="mono">${DB.cot.filter(c=>c.status==='aberta').length}</b></div>
-    <div class="stat"><span>Fotos no álbum</span><b class="mono">${DB.fotos.length}</b></div>
-    <div class="stat"><span>Notas fiscais</span><b class="mono">${(DB.notas||[]).length}</b></div>
+    <div class="stat" style="cursor:pointer" onclick="verResumoCfg('lanc')"><span>Lançamentos</span><b class="mono">${DB.lanc.length} ›</b></div>
+    <div class="stat" style="cursor:pointer" onclick="verResumoCfg('cot')"><span>Cotações abertas</span><b class="mono">${DB.cot.filter(c=>c.status==='aberta').length} ›</b></div>
+    <div class="stat" style="cursor:pointer" onclick="verResumoCfg('fotos')"><span>Fotos no álbum</span><b class="mono">${DB.fotos.length} ›</b></div>
+    <div class="stat" style="cursor:pointer" onclick="verResumoCfg('notas')"><span>Notas fiscais</span><b class="mono">${(DB.notas||[]).length} ›</b></div>
     ${SESSAO?`<div class="stat"><span>Sincronização</span><b style="color:${SYNC_OK?'var(--green)':'var(--red)'}">${SYNC_OK?'em dia ✓':'falhou, tentando de novo'}</b></div>
     <div class="stat"><span>Conta</span><b style="font-size:12.5px">${SESSAO.user.email}</b></div>`:''}
   </div>
