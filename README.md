@@ -149,3 +149,10 @@ Lançamentos antigos podem estar sem quantidade ou valor unitário. Há um aviso
 - Filtros por motivo (sem quantidade, sem unitário, conta não bate) e o botão "Quantidade 1 nos vazios".
 - Nenhum lançamento fica sem quantidade: ao salvar, o sistema completa o que faltar.
 - O relatório personalizado agora mostra quantidade e unitário proporcionais nas compras divididas (rateio).
+
+## Unificar nomes
+
+Configurações → **Unificar nomes**. Junta nomes repetidos de **fornecedor** (gastos, cotações e itens, emitente das notas) e de **tipo** (gastos, itens de cotação e de nota). Produto/descrição não é alterado.
+- Busque (ex.: "vitor"), marque os nomes que são a mesma coisa (ou "Marcar os que aparecem"), digite o nome final e confirme.
+- O aviso mostra quantos registros mudam antes de aplicar; vale em tudo e sincroniza com a nuvem.
+- Só some o que foi marcado; para desfazer, use Configurações → Restaurar.

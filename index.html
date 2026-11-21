@@ -4393,6 +4393,83 @@ function trocarTipoEmTudo(de,para){
     if(m)n.at=Date.now(); });
   DB.tipos=(DB.tipos||[]).filter(t=>alfa2(t)!==k);
 }
+/* ---------- UNIFICAR NOMES (fornecedor e tipo) ---------- */
+let UN_CAMPO='forn', UN_LISTA=[];
+function unVisitar(campo,fn){
+  if(campo==='forn'){
+    DB.lanc.forEach(l=>fn(l,'forn',l));
+    DB.cot.forEach(c=>{ fn(c,'forn',c); (c.itens||[]).forEach(i=>fn(i,'f',c)); });
+    (DB.notas||[]).forEach(n=>{ fn(n,'emit',n); (n.itens||[]).forEach(i=>fn(i,'f',n)); });
+  }else{
+    DB.lanc.forEach(l=>fn(l,'familia',l));
+    DB.cot.forEach(c=>(c.itens||[]).forEach(i=>fn(i,'familia',c)));
+    (DB.notas||[]).forEach(n=>(n.itens||[]).forEach(i=>fn(i,'familia',n)));
+  }
+}
+function unNomes(campo){
+  const m={};
+  unVisitar(campo,(o,k)=>{ const v=String(o[k]||'').trim(); if(v)m[v]=(m[v]||0)+1; });
+  if(campo==='tipo')(DB.tipos||[]).forEach(t=>{ t=String(t||'').trim(); if(t&&!(t in m))m[t]=0; });
+  return Object.keys(m).sort((a,b)=>alfa(a,b)).map(n=>({n,q:m[n]}));
+}
+function abrirUnificar(campo){
+  UN_CAMPO=campo||UN_CAMPO; UN_LISTA=unNomes(UN_CAMPO);
+  const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  const rotulo=UN_CAMPO==='forn'?'fornecedor':'tipo';
+  abrir(`<h2>Unificar nomes</h2>
+  <p class="sub">Junta nomes repetidos em um só, em todos os gastos, cotações e notas.</p>
+  <div class="chipbar" style="margin:8px 0">
+    <button class="btn ${UN_CAMPO==='forn'?'':'ghost'}" onclick="abrirUnificar('forn')">Fornecedor</button>
+    <button class="btn ${UN_CAMPO==='tipo'?'':'ghost'}" onclick="abrirUnificar('tipo')">Tipo</button>
+  </div>
+  <input id="un_busca" placeholder="Buscar ${rotulo} (ex: vitor, bazar)" oninput="unFiltrar()">
+  <div style="display:flex;gap:8px;margin:8px 0">
+    <button class="btn ghost mini" style="flex:1" onclick="unMarcar(true)">Marcar os que aparecem</button>
+    <button class="btn ghost mini" style="flex:1" onclick="unMarcar(false)">Limpar</button>
+  </div>
+  <div class="card" style="box-shadow:none;max-height:42vh;overflow:auto;padding:4px 10px">
+  ${UN_LISTA.length?UN_LISTA.map((x,i)=>`<label class="stat unRow" data-k="${esc(alfa2(x.n))}" style="align-items:center;gap:10px;cursor:pointer">
+    <input type="checkbox" class="unCk" data-i="${i}" onchange="unContar()" style="width:auto;margin:0">
+    <span style="flex:1;min-width:0">${esc(x.n)}</span>
+    <small style="color:var(--ink-2)">${x.q?x.q+' reg.':'sem uso'}</small></label>`).join(''):'<div class="empty">Nenhum nome cadastrado.</div>'}
+  </div>
+  <label style="margin-top:10px">Unificar tudo que marquei como</label>
+  <input id="un_novo" data-cap="1" list="${UN_CAMPO==='forn'?'dlForn':'dlTipos'}" placeholder="Nome final, ex: ${UN_CAMPO==='forn'?'Bazar da Serra':'Ferramentas'}">
+  <p class="hint" id="un_info">Marque os nomes que são a mesma coisa.</p>
+  <button class="btn" id="un_ok" onclick="unAplicar()">Unificar</button>
+  <button class="btn ghost mini" style="margin-top:9px" onclick="fechar()">Fechar</button>`);
+}
+function unFiltrar(){
+  const q=alfa2(val('un_busca')||'');
+  document.querySelectorAll('.unRow').forEach(r=>{ r.style.display=(!q||r.dataset.k.includes(q))?'':'none'; });
+}
+function unMarcar(on){
+  document.querySelectorAll('.unRow').forEach(r=>{
+    const ck=r.querySelector('.unCk'); ck.checked=on&&r.style.display!=='none'; });
+  unContar();
+}
+function unSel(){ return [...document.querySelectorAll('.unCk:checked')].map(c=>UN_LISTA[+c.dataset.i].n); }
+function unContar(){
+  const sel=unSel(), q=sel.reduce((s,n)=>s+UN_LISTA.find(x=>x.n===n).q,0);
+  const el=document.getElementById('un_info');
+  if(el)el.textContent=sel.length?`${sel.length} nome(s) marcado(s) · ${q} registro(s) serão alterados.`:'Marque os nomes que são a mesma coisa.';
+}
+function unAplicar(){
+  const sel=unSel(), novo=capNomes(val('un_novo'));
+  if(!sel.length){toast('Marque pelo menos um nome.');return}
+  if(!novo){toast('Digite o nome final.');return}
+  const campo=UN_CAMPO, set=new Set(sel);
+  let n=0; unVisitar(campo,(o,k)=>{ const v=String(o[k]||'').trim(); if(set.has(v)&&v!==novo)n++; });
+  confirmar('Unificar nomes',`${sel.length} nome(s) viram "${novo}" em ${n} registro(s). Não dá para separar depois (só pelo ponto de restauração).`,'Unificar',()=>{
+    const t=Date.now();
+    unVisitar(campo,(o,k,pai)=>{ const v=String(o[k]||'').trim(); if(set.has(v)&&v!==novo){ o[k]=novo; pai.at=t; } });
+    if(campo==='tipo'){
+      DB.tipos=(DB.tipos||[]).filter(x=>!set.has(String(x).trim()));
+      if(!DB.tipos.some(x=>alfa2(x)===alfa2(novo)))DB.tipos.push(novo);
+    }
+    salvar(); render(); abrirUnificar(campo); toast(`${n} registro(s) unificados em "${novo}"`);
+  });
+}
 let TIPOS_LISTA=[];
 function verTipos(){
   TIPOS_LISTA=familiasExistentes();
@@ -7462,6 +7539,7 @@ function renderIO(){
     <button class="btn soft" onclick="abrirCfg()"><span class="ic">📐</span>Prazo e área</button>
     <button class="btn soft" onclick="verCategorias()"><span class="ic">🏷️</span>Categorias</button>
     <button class="btn soft" onclick="abrirDuplicados()"><span class="ic">🔍</span>Duplicados</button>
+    <button class="btn soft" onclick="abrirUnificar('forn')"><span class="ic">🧩</span>Unificar nomes</button>
     <button class="btn soft" onclick="verRestauracao()"><span class="ic">⏱</span>Restaurar</button>
     <button class="btn soft" onclick="migrarFotos()"><span class="ic">🧹</span>Liberar memória</button>
     <button class="btn soft" onclick="verSincronizacao()"><span class="ic">📡</span>Sincronização</button>
