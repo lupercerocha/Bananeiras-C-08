@@ -2634,7 +2634,7 @@ function gerarRelatorioObra(){
           <td class="r">${(n.itens||[]).length}</td><td class="r">${brl(n.total)}</td></tr>`).join('')
         +`<tr class="tot"><td colspan="4">Total</td><td class="r">${brl((DB.notas||[]).reduce((s,n)=>s+ +n.total,0))}</td></tr>`)):''}
 
-    <p class="pf-rod">Relatório gerado pelo sistema de gestão da obra em ${dt}. Documento de controle interno.</p>
+    <p class="pf-rod">Relatório gerado pelo sistema de gestão da obra em ${dt}. Documento de controle interno · Sistema versão ${APP_VERSAO}.</p>
   </div>`;
   OCULTAR=antes;
   fechar();
@@ -2933,7 +2933,7 @@ function linhasRel(cfg){
       if(pessoa){ fora.n++; fora.v+=p.valor; fora.pessoas+=p.valor; fora.pesG[G(p)]+=p.valor; fora.listaPes.push({l,valor:p.valor,g:G(p)}); return; }
       if(cfg.catsFora.includes(p.cat)){ fora.n++; fora.v+=p.valor; fora.cats[p.cat]=(fora.cats[p.cat]||0)+p.valor; fora.catG[G(p)]+=p.valor; return; }
       const c=cat(p.cat);
-      rows.push({l,num:NUM_LANC[l.id]||'',prodKey:chaveProduto(l.desc),prodNome:nomeProduto(l.desc),cat:p.cat,etapa:c.n,valor:p.valor,dividido:ps.length>1,data:l.data,desc:l.desc||'',forn:l.forn||'',
+      rows.push({l,num:NUM_LANC[l.id]||'',prodKey:chaveProdutoL(l),prodNome:nomeProdutoL(l),cat:p.cat,etapa:c.n,valor:p.valor,dividido:ps.length>1,data:l.data,desc:l.desc||'',forn:l.forn||'',
         tipo:l.familia||'',qtd:(l.qtd==null||l.qtd==='')?'':(ps.length>1&&somaP?+((+l.qtd)*p.valor/somaP).toFixed(3):l.qtd),unit:(l.unit===''||l.unit==null)?'':l.unit,
         sit:isPago(l)?'Pago':(pagoParcial(l)>0?'Parcial':'A pagar'),nf:l.nf||'',obs:l.obs||'',
         dig:l.at?new Date(l.at).toLocaleDateString('pt-BR'):''});
@@ -2992,6 +2992,17 @@ function dadosRelCustom(cfg){
   grupos.forEach(g=>g.rows=ordenar(g.rows));
   return {grupos,fora,rows,agrupado:true};
 }
+/* resumo por fase (etapa) da obra — vai no final dos relatórios */
+function relResumoFase(rows,total){
+  const rk=id=>{const c=cat(id);return (c.g==='con'?0:1000)+((CATS.findIndex(x=>x.id===id)+1)||999);};
+  const m=new Map();
+  rows.forEach(r=>{ const x=m.get(r.cat)||{n:r.etapa,o:rk(r.cat),v:0,ids:new Set()}; m.set(r.cat,x); x.v+=r.valor; x.ids.add(r.l.id); });
+  const L=[...m.values()].sort((a,b)=>a.o-b.o);
+  return `<div class="pr-sec"><h2>Resumo por fase da obra</h2>
+    <table><thead><tr><th class="d">Fase</th><th class="r">Compras</th><th class="r">Valor</th><th class="r">%</th></tr></thead><tbody>
+    ${L.map(x=>`<tr><td class="d">${escRel(x.n)}</td><td class="r">${x.ids.size}</td><td class="r">${rmRel(x.v)}</td><td class="r">${(total?x.v/total*100:0).toFixed(1)}%</td></tr>`).join('')}
+    <tr class="tot"><td>Total</td><td class="r">${new Set(rows.map(r=>r.l.id)).size}</td><td class="r">${rmRel(total)}</td><td class="r">100%</td></tr></tbody></table></div>`;
+}
 /* relatório de produtos somados: uma linha por produto, sem fornecedor e sem etapa */
 function gerarRelProdutos(cfg,modo){
   const {rows,fora}=linhasRel(cfg);
@@ -3012,7 +3023,7 @@ function gerarRelProdutos(cfg,modo){
   if(modo==='csv'){
     const n2=v=>(+v).toFixed(2).replace('.',',');
     const lin=L.map(x=>[x.n,x.tipo,x.ids.size,x.q>0?String(Math.round(x.q)):'',x.q>0?n2(x.v/x.q):'',n2(x.v)].join(';'));
-    baixar('produtos-obra-'+hoje()+'.csv','﻿Produto;Tipo;Compras;Qtde total;Valor unitario medio;Valor\n'+lin.join('\n')+'\nTOTAL;;;;;'+n2(total)+'\n','text/csv');
+    baixar('produtos-obra-'+hoje()+'.csv','﻿Produto;Tipo;Compras;Qtde total;Valor unitario medio;Valor\n'+lin.join('\n')+'\nTOTAL;;;;;'+n2(total)+'\n\nRESUMO POR FASE DA OBRA\nFase;Valor\n'+(()=>{const f={};rows.forEach(r=>{f[r.etapa]=(f[r.etapa]||0)+r.valor;});return Object.keys(f).map(k=>k+';'+n2(f[k])).join('\n');})()+'\n','text/csv');
     toast('Planilha gerada'); return;
   }
   const dt=new Date().toLocaleDateString('pt-BR');
@@ -3027,7 +3038,8 @@ function gerarRelProdutos(cfg,modo){
       <thead><tr><th class="d">Produto</th><th>Tipo</th><th class="r">Compras</th><th class="r">Qtde total</th><th class="r">Valor unit. médio</th><th class="r">Valor total</th><th class="r">%</th></tr></thead>
       <tbody>${L.map(x=>`<tr><td class="d">${escRel(x.n)}${(x.umin>0&&x.umax>x.umin*3)?' <span style="font-size:7pt;color:#C4534D">(preços muito diferentes — unidades misturadas?)</span>':''}</td><td class="w">${escRel(x.tipo)}</td><td class="r">${x.ids.size}</td><td class="r">${x.q>0?fmtQtd(x.q):''}</td><td class="r">${x.q>0?rmRel(x.v/x.q):''}</td><td class="r">${rmRel(x.v)}</td><td class="r">${(total?x.v/total*100:0).toFixed(1)}%</td></tr>`).join('')}
       <tr class="tot"><td colspan="5">TOTAL</td><td class="r">${rmRel(total)}</td><td class="r">100%</td></tr></tbody></table></div>
-    <p class="pf-rod">Valor unitário médio = valor total ÷ quantidade total. Relatório gerado pelo sistema de gestão da obra em ${dt}. Documento de controle interno.</p>
+    ${relResumoFase(rows,total)}
+    <p class="pf-rod">Valor unitário médio = valor total ÷ quantidade total. Relatório gerado pelo sistema de gestão da obra em ${dt}. Documento de controle interno · Sistema versão ${APP_VERSAO}.</p>
   </div>`;
   let st=document.getElementById('relPage'); if(st)st.remove();
   st=document.createElement('style'); st.id='relPage';
@@ -3090,7 +3102,8 @@ function gerarRelCustom(modo){
     </div>
     ${resumo}
     <div class="pr-sec"><h2>Lançamentos</h2><table>${tabHead}<tbody>${corpo}</tbody></table></div>
-    <p class="pf-rod">Relatório gerado pelo sistema de gestão da obra em ${dt}. Documento de controle interno.</p>
+    ${relResumoFase(D.rows,total)}
+    <p class="pf-rod">Relatório gerado pelo sistema de gestão da obra em ${dt}. Documento de controle interno · Sistema versão ${APP_VERSAO}.</p>
   </div>`;
   const paisagem=cfg.orient==='paisagem'||(cfg.orient==='auto'&&cols.length>6);
   let st=document.getElementById('relPage'); if(st)st.remove();
@@ -4325,8 +4338,8 @@ function renderItens(){
       const bate=(l.rateio&&l.rateio.length)?l.rateio.some(r=>r.cat===fe):l.cat===fe;
       if(!bate)return;
     }
-    const k=chaveProduto(l.desc);
-    const m=mat[k]=mat[k]||{nome:nomeProduto(l.desc),qtd:0,valor:0,compras:0,forns:new Set(),familia:tipoAlias(l.familia||''),umin:Infinity,umax:0,d1:l.data,d2:l.data};
+    const k=chaveProdutoL(l);
+    const m=mat[k]=mat[k]||{nome:nomeProdutoL(l),qtd:0,valor:0,compras:0,forns:new Set(),familia:tipoAlias(l.familia||''),umin:Infinity,umax:0,d1:l.data,d2:l.data};
     m.qtd+=+l.qtd||0; m.valor+=+l.total||0; m.compras++; if(l.forn)m.forns.add(l.forn);
     const u=+l.unit; if(u>0){ m.umin=Math.min(m.umin,u); m.umax=Math.max(m.umax,u); }
     if(l.data<m.d1)m.d1=l.data; if(l.data>m.d2)m.d2=l.data;
@@ -4543,6 +4556,11 @@ function nomeProduto(desc){
   return capNomes(t)||String(desc||'').trim();
 }
 const chaveProduto=desc=>alfa2(nomeProduto(desc));
+/* por lançamento: tudo que é do tipo Mão de obra vira um produto só ("Mão de obra - Todos") */
+const ehMaoObra=l=>alfa2(l.familia||'')==='mao de obra';
+const nomeProdutoL=l=>ehMaoObra(l)?'Mão de obra - Todos':nomeProduto(l.desc);
+const chaveProdutoL=l=>alfa2(nomeProdutoL(l));
+const APP_VERSAO='28', APP_VERSAO_DATA='21/11/2026';   /* subir a cada entrega, junto com o sw.js */
 const fmtQtd=n=>Math.round(+n||0).toLocaleString('pt-BR');   /* quantidade é sempre número inteiro */
 /* ---------- nomes sem repetição: ao salvar, usa a grafia já cadastrada (ignora maiúscula, acento, espaço e pontuação) ---------- */
 const nomeKey=s=>alfa2(s).replace(/[^a-z0-9]/g,'');
@@ -7716,7 +7734,7 @@ function confirmarExclusaoCategoria(id){
 }
 function renderIO(){
   document.getElementById('ioBody').innerHTML=`<h2>Configurações</h2>
-  <p class="sub">Backup, sincronização, cadastros e ajustes da obra.</p>
+  <p class="sub">Backup, sincronização, cadastros e ajustes da obra · <b>Versão ${APP_VERSAO}</b> (${APP_VERSAO_DATA})</p>
   <div class="card" style="box-shadow:none;margin-top:10px">
     <div class="stat" style="cursor:pointer" onclick="verResumoCfg('lanc')"><span>Lançamentos</span><b class="mono">${DB.lanc.length} ›</b></div>
     <div class="stat" style="cursor:pointer" onclick="verResumoCfg('cot')"><span>Cotações abertas</span><b class="mono">${DB.cot.filter(c=>c.status==='aberta').length} ›</b></div>
