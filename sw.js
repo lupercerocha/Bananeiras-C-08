@@ -1,6 +1,6 @@
 /* Service worker da Obra Bananeiras C08
    Guarda o app no aparelho para abrir mesmo sem internet no canteiro. */
-const CACHE='obra-c08-v23';
+const CACHE='obra-c08-v25';
 
 self.addEventListener('install', e=>{
   self.skipWaiting();
