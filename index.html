@@ -2788,8 +2788,19 @@ function relCfgSalva(){
   return c;
 }
 let REL_ORD=[], REL_ON=new Set();
+function relPrimeiraData(){
+  const d=DB.lanc.filter(l=>!l.cancelado&&l.data).map(l=>l.data).sort();
+  return d[0]||'';
+}
+function relToda(){
+  document.getElementById('rl2_ini').value=relPrimeiraData();
+  document.getElementById('rl2_fim').value=daquiADias(0);
+  prevRel();
+}
 function abrirRelCustom(){
   const c=relCfgSalva();
+  /* as datas não ficam salvas: abre sempre com a obra toda, até hoje */
+  c.ini=relPrimeiraData(); c.fim=daquiADias(0);
   REL_ORD=c.ordemCols.slice(); REL_ON=new Set(c.cols.concat(['valor']));
   const fora=new Set(c.catsFora);
   const grp=g=>CATS_AZ.filter(x=>x.g===g).map(x=>`<label class="chkline"><input type="checkbox" class="rl2cat" value="${x.id}" ${fora.has(x.id)?'':'checked'} onchange="prevRel()"> ${escRel(x.n)}</label>`).join('');
@@ -2809,6 +2820,7 @@ function abrirRelCustom(){
       <div><label>De (data da compra)</label><input type="date" id="rl2_ini" value="${c.ini}" onchange="prevRel()"></div>
       <div><label>Até</label><input type="date" id="rl2_fim" value="${c.fim}" onchange="prevRel()"></div>
     </div>
+    <button class="btn ghost mini" style="margin:2px 0 4px" onclick="relToda()">Toda a obra (do primeiro gasto até hoje)</button>
     <label>Categorias que entram</label>
     <div class="acoes" style="margin:2px 0 6px">
       <button class="btn ghost mini" onclick="relMarcar('con')">Só construção</button>
@@ -2876,6 +2888,8 @@ function relMarcar(modo){
     const c=CATS_AZ.find(x=>x.id===cb.value)||{};
     cb.checked = modo==='todas' ? true : modo==='con' ? c.g==='con' : !['terreno','projetos'].includes(cb.value);
   });
+  /* "Só construção" e "Todas" dão o mesmo valor do Painel; "Sem terreno e projetos" também tira engenheiro/arquiteto pelo nome */
+  const pes=document.getElementById('rl2_pes'); if(pes)pes.checked=(modo==='padrao');
   prevRel();
 }
 function lerCfgRel(){
@@ -2968,7 +2982,7 @@ function dadosRelCustom(cfg){
 }
 function gerarRelCustom(modo){
   const cfg=lerCfgRel();
-  DB.cfg=DB.cfg||{}; DB.cfg.relCustom=cfg; salvar();
+  DB.cfg=DB.cfg||{}; DB.cfg.relCustom={...cfg,ini:'',fim:''}; DB.cfg.at=Date.now(); salvar();
   const D=dadosRelCustom(cfg);
   if(!D.rows.length){toast('Nenhum lançamento com essas escolhas.');return}
   const cols=cfg.ordemCols.filter(id=>cfg.cols.includes(id)||id==='valor').map(id=>REL_COLS.find(c=>c.id===id)).filter(Boolean);
