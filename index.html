@@ -1441,7 +1441,7 @@ function verPendencia(tipo){
         ${l.data.split('-').reverse().join('/')}${l.forn?' · '+l.forn:''} · ${cat(l.cat).n}</div>
       ${tipo==='parado'
         ? `<div class="stat" style="border:0;padding:0 0 8px"><span>Ainda não entregue</span>
-             <b class="mono">${falta.toLocaleString('pt-BR')} de ${(+l.qtd).toLocaleString('pt-BR')}</b></div>
+             <b class="mono">${fmtQtd(falta)} de ${fmtQtd(+l.qtd)}</b></div>
            <div class="row2">
              <div><label style="margin-top:0">Quantidade já recebida</label>
                <input type="number" step="any" id="pd_r_${l.id}" value="${l.qtdRec}"></div>
@@ -2018,9 +2018,9 @@ function render(){
     const falta=+l.qtd - +l.qtdRec, pc=Math.round(+l.qtdRec/+l.qtd*100);
     return `<div class="item" onclick="verGasto('${l.id}')">
       <div class="mid"><b>${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-        <small>${l.forn||'—'} · recebido ${(+l.qtdRec).toLocaleString('pt-BR')} de ${(+l.qtd).toLocaleString('pt-BR')}</small>
+        <small>${l.forn||'—'} · recebido ${fmtQtd(+l.qtdRec)} de ${fmtQtd(+l.qtd)}</small>
         <div class="bar"><i style="width:${pc}%"></i></div></div>
-      <div class="val"><span class="tag pend">faltam ${falta.toLocaleString('pt-BR')}</span></div></div>`;
+      <div class="val"><span class="tag pend">faltam ${fmtQtd(falta)}</span></div></div>`;
   }).join('');
 
   /* fase atual / pendências */
@@ -2185,7 +2185,7 @@ function renderGastos(){
     return `<div class="item" onclick="${l.cancelado?`restaurarGasto('${l.id}')`:`verGasto('${l.id}')`}" style="${l.cancelado?'opacity:.55':(ab?'opacity:.72':'')}">
       <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span>${dtDig(l)}</div>
       <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-        <small>${l.cancelado?`<span style="color:var(--red)">cancelado em ${new Date(+l.canceladoEm||0).toLocaleDateString('pt-BR')} · toque para restaurar</span>`:`${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+falta.toLocaleString('pt-BR')+'</span>':''}${pp>0?' · pago '+brl(pp):''}${porDigitacao?` · <span style="color:var(--teal)">compra de ${l.data.split('-').reverse().slice(0,2).join('/')}</span>`:seloDig(l)}`}</small></div>
+        <small>${l.cancelado?`<span style="color:var(--red)">cancelado em ${new Date(+l.canceladoEm||0).toLocaleDateString('pt-BR')} · toque para restaurar</span>`:`${(l.rateio&&l.rateio.length)?'Dividido entre '+l.rateio.length+' etapas':cat(l.cat).n}${l.forn?' · '+l.forn:''}${falta>0?' · <span style="color:var(--red)">faltam '+fmtQtd(falta)+'</span>':''}${pp>0?' · pago '+brl(pp):''}${porDigitacao?` · <span style="color:var(--teal)">compra de ${l.data.split('-').reverse().slice(0,2).join('/')}</span>`:seloDig(l)}`}</small></div>
       <div class="val"><span class="mono" style="${l.cancelado?'text-decoration:line-through':''}">${brl(l.total)}</span>
         ${l.cancelado?'<div><span class="tag">↺ restaurar</span></div>':ab?`<div><span class="tag pend">${pp>0?'falta '+brl(saldoAPagar(l)):'a pagar'}</span></div>`:''}</div></div>`;
   }).join('')||'<div class="empty"><b>Nenhum gasto neste filtro</b><p>Ajuste os filtros acima.</p></div>';
@@ -2229,7 +2229,7 @@ function renderGastosAgrupado(L){
           return `<div class="item" onclick="event.stopPropagation();verGasto('${l.id}')" ${ab?'style="opacity:.72"':''}>
             <div class="dt"><b class="mono">${p.d}</b><span>${p.m}</span>${dtDig(l)}</div>
             <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-              <small>${porForn?cat(l.cat).n:(l.forn||'sem fornecedor')}${(+l.qtd>1)?' · '+(+l.qtd).toLocaleString('pt-BR')+' × '+brl(l.unit):''}${seloDig(l)}</small></div>
+              <small>${porForn?cat(l.cat).n:(l.forn||'sem fornecedor')}${(+l.qtd>1)?' · '+fmtQtd(+l.qtd)+' × '+brl(l.unit):''}${seloDig(l)}</small></div>
             <div class="val"><span class="mono">${brl(l.total)}</span>
               ${ab?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`;
         }).join('')}
@@ -2581,7 +2581,7 @@ function gerarRelatorioObra(){
     ${secs.has('materiais')?sec('Materiais comprados',
       tab([['Material'],['Tipo'],['Qtd','r'],['Preço médio','r'],['Compras','r'],['Total','r']],
         materiais.map(m=>`<tr><td>${m.nome}${m.forns.size?`<div class="sub2">${[...m.forns].join(', ')}</div>`:''}</td>
-          <td class="c">${m.fam||''}</td><td class="r">${m.q.toLocaleString('pt-BR')}</td>
+          <td class="c">${m.fam||''}</td><td class="r">${fmtQtd(m.q)}</td>
           <td class="r">${m.q>0?brl(m.v/m.q):'—'}</td><td class="r">${m.n}</td><td class="r">${brl(m.v)}</td></tr>`).join(''))
       +`<p class="pr-nota">Quantidade e preço médio pago por unidade — é esta a tabela que serve de referência para orçar a próxima obra.${totDesc<0?` Os ${brl(-totDesc)} de desconto negociado não aparecem aqui: entram como abatimento no total da obra.`:''}</p>`):''}
 
@@ -2599,7 +2599,7 @@ function gerarRelatorioObra(){
           ${tab([['Data'],['Pagamento'],['Diárias','r'],['Vlr diária','r'],['Valor','r']],
             dele.map(l=>`<tr><td class="c">${pd(l.data)}</td>
               <td>${l.desc}${l.obs?`<div class="sub2">${l.obs}</div>`:''}</td>
-              <td class="r">${(+l.qtd||0).toLocaleString('pt-BR')}</td>
+              <td class="r">${fmtQtd(+l.qtd||0)}</td>
               <td class="r">${brl(l.unit)}</td>
               <td class="r">${brl(l.total)}${isPago(l)?'':'<div class="sub2 vermelho">a pagar</div>'}</td></tr>`).join(''))}
           </div>`;}).join('')):''}
@@ -2613,7 +2613,7 @@ function gerarRelatorioObra(){
             <td>${x.l.desc}${x.dividido?'<div class="sub2">parte de compra dividida entre etapas</div>':''}${x.l.nf?`<div class="sub2">NF ${x.l.nf}</div>`:''}</td>
             <td class="c">${x.l.familia||''}</td>
             <td class="c">${x.l.forn||''}</td>
-            <td class="r">${(+x.l.qtd||0).toLocaleString('pt-BR')}</td>
+            <td class="r">${fmtQtd(+x.l.qtd||0)}</td>
             <td class="r">${brl(x.l.unit)}</td>
             <td class="r">${brl(x.valor)}${isPago(x.l)?'':'<div class="sub2 vermelho">a pagar</div>'}</td></tr>`).join(''))}
       </div>`).join('')):''}
@@ -2625,7 +2625,7 @@ function gerarRelatorioObra(){
         +`<tr class="tot"><td colspan="3">Total</td><td class="r">${brl(aPagar)}</td></tr>`):''}
       ${parados.length?`<h3 style="margin-top:10px">Material pago e não entregue</h3>`+tab([['Data'],['Descrição'],['Fornecedor'],['Falta receber','r']],
         parados.map(l=>`<tr><td class="c">${pd(l.data)}</td><td>${l.desc}</td><td class="c">${l.forn||''}</td>
-          <td class="r">${(+l.qtd-+l.qtdRec).toLocaleString('pt-BR')} de ${(+l.qtd).toLocaleString('pt-BR')}</td></tr>`).join('')):''}`):''}
+          <td class="r">${fmtQtd(+l.qtd-+l.qtdRec)} de ${fmtQtd(+l.qtd)}</td></tr>`).join('')):''}`):''}
 
     ${secs.has('notas')&&(DB.notas||[]).length?sec('Notas fiscais registradas',
       tab([['Data'],['Emitente'],['Número'],['Itens','r'],['Valor','r']],
@@ -2707,7 +2707,7 @@ function pintaListaQtd(){
 function qtdEdit(i,campo,el){
   const r=QT_ROWS[i];
   if(campo==='q'){
-    r.q=parseFloat(String(el.value).replace(',','.'))||0;
+    r.q=Math.round(parseFloat(String(el.value).replace(',','.'))||0);
     if(r.q>0){ if(r.ult==='t'&&r.t>0) r.u=r.t/r.q; else if(r.u>0) r.t=+(r.q*r.u).toFixed(2); }
   }else if(campo==='u'){
     onMoedaInput(el); r.u=moeda2num(el.value); r.ult='u';
@@ -2728,7 +2728,7 @@ function qtdAviso(i){
   row.classList.toggle('ok',pronto&&!mudaTotal&&(r.q!==r.o.q||Math.abs(r.u-r.o.u)>0.0001));
   el.innerHTML=!pronto?'<span style="color:var(--ink-2)">Falta preencher.</span>'
     :mudaTotal?`<span style="color:var(--red)">⚠ O total deste lançamento muda de ${rmRel(r.o.t)} para ${rmRel(r.t)}.</span>`
-    :`<span style="color:var(--teal)">✓ ${r.q.toLocaleString('pt-BR')} × ${rmRel(r.u)} = ${rmRel(r.t)}</span>`;
+    :`<span style="color:var(--teal)">✓ ${fmtQtd(r.q)} × ${rmRel(r.u)} = ${rmRel(r.t)}</span>`;
 }
 function qtdUmEmTodos(){
   QT_ROWS.forEach((r,i)=>{
@@ -2764,7 +2764,7 @@ const REL_COLS=[
   {id:'forn',n:'Fornecedor',cls:'w',v:r=>escRel(r.forn),csv:r=>r.forn},
   {id:'tipo',n:'Tipo de produto',cls:'w',v:r=>escRel(r.tipo),csv:r=>r.tipo},
   {id:'etapa',n:'Etapa da obra',cls:'w',v:r=>escRel(r.etapa),csv:r=>r.etapa},
-  {id:'qtd',n:'Qtde',cls:'r',v:r=>r.qtd===''?'':(+r.qtd||0).toLocaleString('pt-BR'),csv:r=>r.qtd===''?'':String(r.qtd).replace('.',',')},
+  {id:'qtd',n:'Qtde',cls:'r',v:r=>r.qtd===''?'':fmtQtd(r.qtd),csv:r=>r.qtd===''?'':String(Math.round(+r.qtd||0))},
   {id:'unit',n:'Vlr unitário',cls:'r',v:r=>r.unit===''?'':rmRel(r.unit),csv:r=>r.unit===''?'':(+r.unit).toFixed(2).replace('.',',')},
   {id:'sit',n:'Situação',cls:'c',v:r=>r.sit,csv:r=>r.sit},
   {id:'nf',n:'Nota fiscal',cls:'c',v:r=>escRel(r.nf),csv:r=>r.nf},
@@ -2785,6 +2785,7 @@ function relPadrao(){
 function relCfgSalva(){
   const base=relPadrao(), sv=(DB.cfg&&DB.cfg.relCustom)||{};
   const c={...base,...sv};
+  if(c.grupo==='prod')c.grupo='etapa';   /* o agrupamento por produto agora é o tipo de relatório "Produtos (itens iguais somados)" */
   /* colunas novas que surgirem depois entram no fim da ordem */
   REL_COLS.forEach(k=>{ if(!c.ordemCols.includes(k.id)) c.ordemCols.push(k.id); });
   return c;
@@ -2818,7 +2819,7 @@ function abrirRelCustom(){
     <label>Tipo de relatório</label>
     <select id="rl2_modo" onchange="relModo()">
       <option value="lanc" ${c.modo!=='prod'?'selected':''}>Compra por compra (detalhado)</option>
-      <option value="prod" ${c.modo==='prod'?'selected':''}>Produtos somados (sem fornecedor e sem etapa)</option></select>
+      <option value="prod" ${c.modo==='prod'?'selected':''}>Produtos (itens iguais somados) — sem lançamentos, sem fornecedor e sem etapa</option></select>
     <div class="row2">
       <div><label>Situação</label><select id="rl2_sit" onchange="prevRel()">
         <option value="pago" ${c.sit==='pago'?'selected':''}>O que já paguei</option>
@@ -2853,7 +2854,6 @@ function abrirRelCustom(){
         <option value="" ${!c.grupo?'selected':''}>Não agrupar (lista única)</option>
         <option value="etapa" ${c.grupo==='etapa'?'selected':''}>Etapa da obra</option>
         <option value="tipo" ${c.grupo==='tipo'?'selected':''}>Tipo de produto</option>
-        <option value="prod" ${c.grupo==='prod'?'selected':''}>Produto (itens iguais somados)</option>
         <option value="forn" ${c.grupo==='forn'?'selected':''}>Fornecedor</option>
         <option value="mes" ${c.grupo==='mes'?'selected':''}>Mês</option></select></div>
       <div><label>Ordenar por</label><select id="rl2_ord">
@@ -3011,7 +3011,7 @@ function gerarRelProdutos(cfg,modo){
   const foraTxt=[...cfg.catsFora.map(id=>cat(id).n),...(cfg.exclPessoas?['engenheiro, arquiteto e projetos (por nome/função)']:[])];
   if(modo==='csv'){
     const n2=v=>(+v).toFixed(2).replace('.',',');
-    const lin=L.map(x=>[x.n,x.tipo,x.ids.size,x.q>0?String(+x.q.toFixed(3)).replace('.',','):'',x.q>0?n2(x.v/x.q):'',n2(x.v)].join(';'));
+    const lin=L.map(x=>[x.n,x.tipo,x.ids.size,x.q>0?String(Math.round(x.q)):'',x.q>0?n2(x.v/x.q):'',n2(x.v)].join(';'));
     baixar('produtos-obra-'+hoje()+'.csv','﻿Produto;Tipo;Compras;Qtde total;Valor unitario medio;Valor\n'+lin.join('\n')+'\nTOTAL;;;;;'+n2(total)+'\n','text/csv');
     toast('Planilha gerada'); return;
   }
@@ -3061,7 +3061,7 @@ function gerarRelCustom(modo){
     }));
     const n2=v=>(+v).toFixed(2).replace('.',',');
     const resCsv=(cfg.grupo==='prod')?'\nRESUMO POR PRODUTO\nProduto;Compras;Qtde total;Valor unitario medio;Valor\n'
-      +D.grupos.map(g=>[g.n,g.rows.length,g.q>0?String(+g.q.toFixed(3)).replace('.',','):'',g.q>0?n2(g.v/g.q):'',n2(g.v)].join(';')).join('\n')+'\n':'';
+      +D.grupos.map(g=>[g.n,g.rows.length,g.q>0?String(Math.round(g.q)):'',g.q>0?n2(g.v/g.q):'',n2(g.v)].join(';')).join('\n')+'\n':'';
     baixar('relatorio-obra-'+hoje()+'.csv','﻿'+cab.join(';')+'\n'+linhas.join('\n')+'\n'+
       cols.map((c,i)=>i===0?'TOTAL':(c.id==='valor'?total.toFixed(2).replace('.',','):'')).join(';')+'\n'+resCsv,'text/csv');
     toast('Planilha gerada'); return;
@@ -3166,7 +3166,7 @@ function gerarImpressaoCot(){
         <thead><tr><th>Cód.</th><th>Produto</th><th class="r">Qtd</th><th class="r">Vlr unit.</th><th class="r">Total</th></tr></thead>
         <tbody>${its.map(i=>`<tr>
           <td class="c">${i.c||''}</td><td>${i.d||''}</td>
-          <td class="r">${(+i.q||0).toLocaleString('pt-BR')}</td>
+          <td class="r">${fmtQtd(+i.q||0)}</td>
           <td class="r">${brl(i.u)}</td>
           <td class="r">${brl((+i.q||0)*(+i.u||0))}</td></tr>`).join('')}</tbody>
       </table>`:'<p class="pc-vazio">Sem itens detalhados.</p>'}
@@ -3333,12 +3333,12 @@ function verComparativo(nomeGrupo){
     return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
       <b style="font-size:14px">${m.nome}</b>
       <div style="font-size:11.5px;color:var(--ink-2);margin-bottom:6px">
-        comparando ${m.qtdRef.toLocaleString('pt-BR')} un.${m.divergeQtd?' · <span style="color:var(--amber)">as propostas pediram quantidades diferentes</span>':''}</div>
+        comparando ${fmtQtd(m.qtdRef)} un.${m.divergeQtd?' · <span style="color:var(--amber)">as propostas pediram quantidades diferentes</span>':''}</div>
       ${ofertas.map((x,i)=>{
         const dif=i===0?0:(x.o.u-melhor.o.u)/melhor.o.u*100;
         return `<div class="stat" style="padding:5px 0;border:0">
           <span style="font-size:13px">${i===0?'🏆 ':''}${nomeF(x.p)}
-            ${x.o.q!==m.qtdRef?`<small style="color:var(--ink-2)">(cotou ${x.o.q.toLocaleString('pt-BR')})</small>`:''}</span>
+            ${x.o.q!==m.qtdRef?`<small style="color:var(--ink-2)">(cotou ${fmtQtd(x.o.q)})</small>`:''}</span>
           <span style="text-align:right">
             <b class="mono" style="font-size:13.5px">${brl(x.o.u)}<small style="font-weight:400;color:var(--ink-2)">/un</small></b>
             <div class="mono" style="font-size:11.5px;color:var(--ink-2)">${brl(m.qtdRef*x.o.u)}${i>0?` · +${dif.toFixed(1)}%`:''}</div>
@@ -3742,7 +3742,7 @@ function verNota(id){
   <div class="card" style="box-shadow:none;margin-top:10px">
     ${(n.itens||[]).length?(n.itens||[]).map(i=>`<div class="stat" style="align-items:flex-start">
       <span style="flex:1;padding-right:8px">${i.d}
-        <div style="font-size:11.5px;color:var(--ink-2)">${(+i.q).toLocaleString('pt-BR')}${i.un?' '+i.un:''} × ${brl(i.u)}${i.c?' · cód. '+i.c:''}${i.ncm?' · NCM '+i.ncm:''}</div>
+        <div style="font-size:11.5px;color:var(--ink-2)">${fmtQtd(+i.q)}${i.un?' '+i.un:''} × ${brl(i.u)}${i.c?' · cód. '+i.c:''}${i.ncm?' · NCM '+i.ncm:''}</div>
       </span><b class="mono">${brl(i.t)}</b></div>`).join('')
       :'<div class="empty">Sem itens detalhados</div>'}
     <div class="stat" style="border-top:1px solid var(--line);border-bottom:0;margin-top:4px;padding-top:9px">
@@ -4193,7 +4193,7 @@ function renderNotas(){
       ${consolidado.map(m=>`<div class="stat" style="align-items:flex-start">
         <span style="flex:1;padding-right:8px">${m.nome}
           <div style="font-size:11.5px;color:var(--ink-2)">${m.notas} nota${m.notas>1?'s':''}</div></span>
-        <div style="text-align:right"><b class="mono">${m.q.toLocaleString('pt-BR')}${m.un?' '+m.un:''}</b>
+        <div style="text-align:right"><b class="mono">${fmtQtd(m.q)}${m.un?' '+m.un:''}</b>
           <div class="mono" style="font-size:11.5px;color:var(--ink-2)">${brl(m.t)}</div></div></div>`).join('')}
     </div></div>`:''}
   <p class="hint">O arquivo original (PDF, XML ou foto) fica guardado no aparelho que enviou e, quando o espaço de arquivos do Supabase está criado, também na nuvem — aí abre em qualquer aparelho. O campo "link do Drive" continua valendo como cópia de segurança.</p>`;
@@ -4371,7 +4371,7 @@ function renderItens(){
         <div style="font-size:11.5px;color:var(--ink-2)">${m.compras} compra${m.compras>1?'s':''}${m.compras>1?` (${fmtDRel(m.d1).slice(0,5)} a ${fmtDRel(m.d2).slice(0,5)})`:''}${medio>0?' · valor unitário médio '+brl(medio):''}${(m.umin>0&&m.umax>m.umin*3)?' · <span style="color:var(--amber)">⚠ preços muito diferentes — unidades misturadas?</span>':''}</div>
       </span>
       <div style="text-align:right">
-        <b class="mono" style="font-size:16px">${(+m.qtd).toLocaleString('pt-BR')}</b>
+        <b class="mono" style="font-size:16px">${fmtQtd(m.qtd)}</b>
         <div style="font-size:11.5px;color:var(--ink-2)" class="mono">${brl(m.valor)}</div>
       </div></div>`;
   }).join(''):'<div class="empty">Nenhum item neste filtro</div>';
@@ -4420,7 +4420,7 @@ function gruposEtapa(fe,busca,ft){
       ${linhas.map(l=>`<div class="item" onclick="verGasto('${l.id}')">
         <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span></div>
         <div class="mid"><b>#${NUM_LANC[l.id]||''} ${l.desc}</b>${l.familia?` <span class="tag">${l.familia}</span>`:''}
-          <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${l.forn?' · '+l.forn:''}${l.dividido?' · <span style="color:var(--amber)">parte de compra dividida</span>':''}${seloDig(l)}</small></div>
+          <small>${fmtQtd(+l.qtd)} × ${brl(l.unit)}${l.forn?' · '+l.forn:''}${l.dividido?' · <span style="color:var(--amber)">parte de compra dividida</span>':''}${seloDig(l)}</small></div>
         <div class="val mono">${brl(l.valorEtapa)}</div></div>`).join('')}
       </div>`;
   }).join('') || (etapas.length?'':'<div class="card"><div class="empty">Nenhuma etapa corresponde ao filtro</div></div>');
@@ -4543,7 +4543,7 @@ function nomeProduto(desc){
   return capNomes(t)||String(desc||'').trim();
 }
 const chaveProduto=desc=>alfa2(nomeProduto(desc));
-const fmtQtd=n=>(+n||0).toLocaleString('pt-BR',{maximumFractionDigits:3});
+const fmtQtd=n=>Math.round(+n||0).toLocaleString('pt-BR');   /* quantidade é sempre número inteiro */
 /* ---------- nomes sem repetição: ao salvar, usa a grafia já cadastrada (ignora maiúscula, acento, espaço e pontuação) ---------- */
 const nomeKey=s=>alfa2(s).replace(/[^a-z0-9]/g,'');
 function nomeCanon(v,fontes){
@@ -5124,7 +5124,7 @@ function abrirGasto(l){
     <input type="checkbox" id="x_multi"> Mais de um item nesta compra</label>`}
   <div id="itemUnico">
     <div class="row3">
-      <div><label>Quantidade</label><input type="number" step="any" id="x_qtd" value="${l.qtd}"></div>
+      <div><label>Quantidade</label><input type="number" step="1" min="1" inputmode="numeric" id="x_qtd" value="${Math.round(+l.qtd||1)}"></div>
       <div><label>Valor unitário</label><input ${moedaAttrs(l.unit)} id="x_unit"></div>
       <div><label>Valor total</label><input ${moedaAttrs(l.total)} id="x_total"></div>
     </div>
@@ -5281,7 +5281,7 @@ function salvarGasto(id){
   }
   const g={id:id||uid(),at:Date.now(),
     data:val('x_data'),desc:capNomes(val('x_desc')),familia:nomeTipo(val('x_fam')||palpiteFamilia(val('x_desc'))||''),cat:catPrincipal,forn:nomeForn(val('x_forn')),
-    qtd:+val('x_qtd')||1,unit:moeda2num(val('x_unit')),total:totalVal,rateio:rat,
+    qtd:Math.max(1,Math.round(+val('x_qtd')||1)),unit:moeda2num(val('x_unit')),total:totalVal,rateio:rat,
     pag:val('x_pag'),nf:val('x_nf').trim(),anexos:ANX_ALVO||[],obs:val('x_obs').trim(),
     ctrl:document.getElementById('x_ctrl').checked,
     qtdRec:document.getElementById('x_ctrl').checked?(+val('x_rec')||0):0,
@@ -5344,12 +5344,12 @@ function verGasto(id){
   <p class="sub">${l.trabId?'Pagamento em ':'Compra em '}${l.data.split('-').reverse().join('/')} · ${(l.rateio&&l.rateio.length)?'Dividido entre etapas':cat(l.cat).n}</p>
   <div class="card" style="box-shadow:none;margin-top:10px">
     <div class="stat"><span>Valor total</span><b class="mono">${brl(l.total)}</b></div>
-    <div class="stat"><span>Quantidade</span><b class="mono">${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}</b></div>
+    <div class="stat"><span>Quantidade</span><b class="mono">${fmtQtd(+l.qtd)} × ${brl(l.unit)}</b></div>
     ${l.familia?`<div class="stat"><span>Tipo de produto</span><b>${l.familia}</b></div>`:''}
     <div class="stat"><span>Fornecedor</span><b>${l.forn||'—'}</b></div>
     <div class="stat"><span>Pagamento</span><b>${l.pag}</b></div>
     ${l.nf?`<div class="stat"><span>Nota fiscal</span><b>${l.nf}</b></div>`:''}
-    ${l.ctrl?`<div class="stat"><span>Recebido</span><b class="mono">${(+l.qtdRec).toLocaleString('pt-BR')} de ${(+l.qtd).toLocaleString('pt-BR')}</b></div>`:''}
+    ${l.ctrl?`<div class="stat"><span>Recebido</span><b class="mono">${fmtQtd(+l.qtdRec)} de ${fmtQtd(+l.qtd)}</b></div>`:''}
     <div class="stat"><span>Digitado em</span><b style="font-size:12.5px">${horaDigitada(l)}</b></div>
     ${pp>0?`<div class="stat"><span>Já pago</span><b class="mono">${brl(pp)} de ${brl(l.total)}</b></div>`:''}
   </div>
@@ -5360,12 +5360,12 @@ function verGasto(id){
   ${l.obs?`<p class="hint">${l.obs}</p>`:''}
   ${(l.anexos&&l.anexos.length)?`<button class="btn dark mini" style="width:100%" onclick='verAnexoLista(${JSON.stringify(l.anexos)})'>📎 Ver anexos (${l.anexos.length})</button>`:''}
   ${falta>0?`<div class="divider"></div>
-    <label>Registrar entrega — faltam ${falta.toLocaleString('pt-BR')}</label>
+    <label>Registrar entrega — faltam ${fmtQtd(falta)}</label>
     <div class="row2"><input type="number" step="any" id="b_qtd" placeholder="Quantidade recebida">
     <button class="btn mini" onclick="darBaixa('${l.id}')">Dar baixa</button></div>
     <p class="hint">A baixa é só física. O dinheiro já foi lançado e não muda.</p>`:''}
   ${l.baixas&&l.baixas.length?'<div class="divider"></div><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)">Entregas</h3>'+
-    l.baixas.map(b=>`<div class="stat"><span>${b.d.split('-').reverse().join('/')}</span><b class="mono">+${(+b.q).toLocaleString('pt-BR')}</b></div>`).join(''):''}
+    l.baixas.map(b=>`<div class="stat"><span>${b.d.split('-').reverse().join('/')}</span><b class="mono">+${fmtQtd(+b.q)}</b></div>`).join(''):''}
   ${!isPago(l)?`<div class="divider"></div>
     <label>Registrar pagamento — saldo ${brl(saldo)}</label>
     <div class="row2"><input ${moedaAttrs('')} id="p_valor" oninput="onMoedaInput(this)" placeholder="Valor pago">
@@ -5555,7 +5555,7 @@ function verCot(id){
   <div class="card" style="box-shadow:none;margin-top:10px">
     ${its.map(i=>`<div class="stat" style="align-items:flex-start">
       <span style="flex:1;padding-right:8px">${i.d||'—'}${i.familia?` <span class="tag">${i.familia}</span>`:''}
-        <div style="font-size:11.5px;color:var(--ink-2)">${(+i.q||0).toLocaleString('pt-BR')} × ${brl(i.u)}${i.c?' · cód. '+i.c:''}${i.f?' · '+i.f:''}</div>
+        <div style="font-size:11.5px;color:var(--ink-2)">${fmtQtd(+i.q||0)} × ${brl(i.u)}${i.c?' · cód. '+i.c:''}${i.f?' · '+i.f:''}</div>
       </span><b class="mono">${brl((+i.q||0)*(+i.u||0))}</b></div>`).join('')}
     <div class="stat" style="border-top:1px solid var(--line);border-bottom:0;margin-top:4px;padding-top:9px">
       <span${+c.desconto>0?'':' style="font-weight:700"'}>${+c.desconto>0?'Soma dos itens':'Total'}</span>
@@ -5627,7 +5627,7 @@ function pintaItensCompra(){
     const valorItem=+(bruto-corte).toFixed(2);
     return `<div class="grp" style="background:var(--surface-2);margin-bottom:8px">
      <h4>${it.d||'—'}${it.familia?` <span class="tag">${it.familia}</span>`:''}</h4>
-     <div class="qt">${(+it.q||0).toLocaleString('pt-BR')} × ${brl(it.u)}${corte>0?` = ${brl(bruto)} <span style="color:var(--green)">− ${brl(corte)} de desconto</span>`:''} = <b class="mono">${brl(valorItem)}</b>${it.c?' · cód. '+it.c:''}</div>
+     <div class="qt">${fmtQtd(+it.q||0)} × ${brl(it.u)}${corte>0?` = ${brl(bruto)} <span style="color:var(--green)">− ${brl(corte)} de desconto</span>`:''} = <b class="mono">${brl(valorItem)}</b>${it.c?' · cód. '+it.c:''}</div>
      <label style="margin-top:6px">Tipo de produto</label>
      <div class="combo"><input data-item-index="${i}" data-alvo="itC" autocomplete="off" value="${(it.familia||'').replace(/"/g,'&quot;')}"
        placeholder="Ex: Ferramentas, Hidráulica..."
@@ -6562,7 +6562,7 @@ function renderEquipe(){
         ${pg.length?pg.map(l=>`<div class="item" data-gasto="${l.id}" ${!isPago(l)?'style="opacity:.72"':''}>
           <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span>${dtDig(l)}</div>
           <div class="mid"><b>${l.desc}</b>
-            <small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${rotuloPeriodoLanc(l)}${l.obs?' · '+l.obs.replace(/ · trabalhou de .*$/,'').slice(0,60):''}</small></div>
+            <small>${fmtQtd(+l.qtd)} × ${brl(l.unit)}${rotuloPeriodoLanc(l)}${l.obs?' · '+l.obs.replace(/ · trabalhou de .*$/,'').slice(0,60):''}</small></div>
           <div class="val"><span class="mono">${brl(l.total)}</span>
             ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
           :'<p class="hint">Nenhum pagamento neste período.</p>'}
@@ -6626,7 +6626,7 @@ function verTodosPagamentos(){
   </div>
   ${L.length?L.map(l=>`<div class="item" onclick="verGasto('${l.id}')" ${!isPago(l)?'style="opacity:.72"':''}>
     <div class="dt"><b class="mono">${dia(l.data).d}</b><span>${dia(l.data).m}</span>${dtDig(l)}</div>
-    <div class="mid"><b>${l.desc}</b><small>${(+l.qtd).toLocaleString('pt-BR')} × ${brl(l.unit)}${rotuloPeriodoLanc(l)}${l.obs?' · '+l.obs.replace(/ · trabalhou de .*$/,'').slice(0,60):''}</small></div>
+    <div class="mid"><b>${l.desc}</b><small>${fmtQtd(+l.qtd)} × ${brl(l.unit)}${rotuloPeriodoLanc(l)}${l.obs?' · '+l.obs.replace(/ · trabalhou de .*$/,'').slice(0,60):''}</small></div>
     <div class="val"><span class="mono">${brl(l.total)}</span>
       ${!isPago(l)?'<div><span class="tag pend">a pagar</span></div>':''}</div></div>`).join('')
    :'<p class="hint">Nenhum pagamento neste filtro.</p>'}
