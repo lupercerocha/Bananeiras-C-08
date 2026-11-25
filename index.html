@@ -501,6 +501,7 @@ svg.chart{width:100%;height:auto;display:block;overflow:visible}
 .combo-list div:last-child{border-bottom:0}
 .combo-list div:active{background:var(--surface-2)}
 .combo-list.pcima{top:auto;bottom:calc(100% + 4px)}
+.arrastando{outline:3px dashed var(--teal);outline-offset:-8px}
 .combo-list div.hl{background:var(--teal);color:#fff}
 .combo.seta>input{padding-right:32px}
 .combo.seta::after{content:'';position:absolute;right:13px;top:calc(50% - 6px);width:7px;height:7px;pointer-events:none;
@@ -1242,6 +1243,7 @@ let ANX_ALVO=null; // array em edição (panel._anx)
 function pintaAnexos(elId){
   const box=document.getElementById(elId);
   if(!box)return;
+  ANX_ELID=elId; box.classList.add('anxdrop');
   box.innerHTML=(ANX_ALVO||[]).map((a,i)=>`
     <div class="anx" onclick="verAnexo(${i})">
       <div class="ic">${a.tipo==='imagem'?`<img src="${a.thumb||a.dado}">`:a.tipo==='arquivo'?(/pdf/i.test(a.mime||a.nome)?'📄':'📎'):'🔗'}</div>
@@ -1252,7 +1254,7 @@ function pintaAnexos(elId){
       <input id="anx_link" placeholder="Colar link (Drive, foto...)" style="flex:1;min-width:0">
       <button class="btn mini ghost" style="flex:0 0 auto;width:auto;padding:11px 14px" onclick="addAnexoLink('${elId}')">+ Link</button>
     </div>
-    <button class="btn mini ghost" style="margin-top:7px;width:100%" onclick="abrirAnexoFoto('${elId}')">📎 Anexar PDF ou foto (pode escolher vários)</button>`;
+    <button class="btn mini ghost" style="margin-top:7px;width:100%" onclick="abrirAnexoFoto('${elId}')">📎 Anexar PDF ou foto — ou arraste os arquivos para cá</button>`;
 }
 function addAnexoLink(elId){
   const v=document.getElementById('anx_link').value.trim();
@@ -1262,8 +1264,9 @@ function addAnexoLink(elId){
 }
 function abrirAnexoFoto(elId){ ANX_ELID=elId; document.getElementById('anexoInput').click(); }
 let ANX_ELID=null;
-document.getElementById('anexoInput').onchange=async e=>{
-  const files=[...e.target.files]; e.target.value=''; if(!files.length)return;
+document.getElementById('anexoInput').onchange=e=>{ const files=[...e.target.files]; e.target.value=''; processarAnexos(files); };
+async function processarAnexos(files){
+  if(!files||!files.length||!ANX_ALVO)return;
   for(const f of files){
     if(/^image\//.test(f.type)){
       try{
@@ -1283,7 +1286,24 @@ document.getElementById('anexoInput').onchange=async e=>{
     pintaAnexos(ANX_ELID);
   }
   toast(files.length>1?files.length+' anexos adicionados':'Anexo adicionado');
-};
+}
+/* arrastar arquivos para a janela de anexos (cotação e compra) */
+(function(){
+  const temArq=e=>e.dataTransfer&&[...(e.dataTransfer.types||[])].includes('Files');
+  const zona=()=>panel.querySelector('.anxdrop');
+  ['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{
+    if(!temArq(e)||!zona()||!sheet.classList.contains('on'))return;
+    e.preventDefault(); e.dataTransfer.dropEffect='copy'; panel.classList.add('arrastando');
+  }));
+  document.addEventListener('dragleave',e=>{ if(!e.relatedTarget)panel.classList.remove('arrastando'); });
+  document.addEventListener('drop',e=>{
+    if(!temArq(e))return;
+    panel.classList.remove('arrastando');
+    if(!zona()||!sheet.classList.contains('on'))return;
+    e.preventDefault();
+    processarAnexos([...e.dataTransfer.files]);
+  });
+})();
 function rmAnexo(i,elId){ ANX_ALVO.splice(i,1); pintaAnexos(elId); }
 function verAnexo(i){
   const a=ANX_ALVO[i];
@@ -1878,9 +1898,9 @@ document.addEventListener('mousedown',e=>{
   e.preventDefault();
   const wrap=it.closest('.combo'), inp=wrap.querySelector('input');
   inp.value=it.dataset.v;
-  wrap.querySelector('.combo-list').style.display='none';
-  inp.dispatchEvent(new Event('input',{bubbles:true}));
+  inp.dispatchEvent(new Event('input',{bubbles:true}));     /* o 'input' reabre a lista; por isso fecha depois dele */
   inp.dispatchEvent(new Event('change',{bubbles:true}));
+  const lst=wrap.querySelector('.combo-list'); lst.style.display='none'; lst.innerHTML='';
 });
 /* teclado: seta para baixo/cima percorre e marca, Enter ou Tab confirma, Esc fecha */
 document.addEventListener('keydown',e=>{
@@ -1903,6 +1923,11 @@ document.addEventListener('keydown',e=>{
   }else if((e.key==='Enter'||e.key==='Tab')&&aberta&&atual>=0){
     if(e.key==='Enter') e.preventDefault();
     itens[atual].dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true}));
+  }else if(e.key==='Tab'&&aberta){
+    /* Tab sem item marcado: se o texto é igual a um da lista, usa a grafia da lista; senão só fecha */
+    const ig=itens.find(d=>alfa2(d.dataset.v||d.textContent)===alfa2(inp.value));
+    if(ig&&ig.dataset.v&&ig.dataset.v!==inp.value) ig.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true}));
+    else { lst.style.display='none'; lst.innerHTML=''; }
   }else if(e.key==='Escape'&&aberta){
     e.preventDefault(); e.stopPropagation(); lst.style.display='none';
   }
@@ -4556,7 +4581,7 @@ const chaveProduto=desc=>alfa2(nomeProduto(desc));
 const ehMaoObra=l=>alfa2(l.familia||'')==='mao de obra';
 const nomeProdutoL=l=>ehMaoObra(l)?'Mão de obra - Todos':nomeProduto(l.desc);
 const chaveProdutoL=l=>alfa2(nomeProdutoL(l));
-const APP_VERSAO='29', APP_VERSAO_DATA='21/11/2026';   /* subir a cada entrega, junto com o sw.js */
+const APP_VERSAO='30', APP_VERSAO_DATA='25/11/2026';   /* subir a cada entrega, junto com o sw.js */
 const fmtQtd=n=>Math.round(+n||0).toLocaleString('pt-BR');   /* quantidade é sempre número inteiro */
 /* ---------- nomes sem repetição: ao salvar, usa a grafia já cadastrada (ignora maiúscula, acento, espaço e pontuação) ---------- */
 const nomeKey=s=>alfa2(s).replace(/[^a-z0-9]/g,'');
@@ -4779,7 +4804,7 @@ function comboEscolherFamilia(el,valor){
 }
 function comboFechar(input){
   const wrap=input.closest('.combo'); if(!wrap)return;
-  setTimeout(()=>{ wrap.querySelector('.combo-list').style.display='none'; },150);
+  setTimeout(()=>{ const l=wrap.querySelector('.combo-list'); l.style.display='none'; l.innerHTML=''; },120);
 }
 
 /* indicadores */
@@ -5501,15 +5526,6 @@ function pintaItens(){
        <div><label>Total</label><div class="mono itot" id="it_${i}">${brl((+it.q||0)*(+it.u||0))}</div></div>
        <div>${panel._its.length>1?`<button class="iconbtn" style="background:var(--surface);color:var(--red);width:34px;height:34px" onclick="delItem(${i})">×</button>`:''}</div>
      </div>
-     <details class="mais" style="margin-top:8px;background:transparent" ${(it.c||it.f)?'open':''}>
-       <summary>Código e fornecedor do item</summary>
-       <div class="maisb"><div class="row2">
-         <div><label style="margin-top:8px">Cód.</label>
-           <input value="${q(it.c)}" oninput="chgItem(${i},'c',this.value)"></div>
-         <div><label style="margin-top:8px">Fornecedor</label>
-           <input value="${q(it.f)}" list="dlForn" data-cap="1" oninput="chgItem(${i},'f',this.value)"></div>
-       </div></div>
-     </details>
    </div>`).join('');
   aplicarCombos(document.getElementById(ITENS_DIV));
   totItens();
