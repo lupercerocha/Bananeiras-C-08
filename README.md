@@ -181,7 +181,7 @@ Em Unificar nomes, tocar em "N reg. ›" abre a lista dos registros que usam aqu
 
 **Produtos (itens iguais somados):** é um tipo de relatório (campo "Tipo de relatório"), só com o resumo por produto — sem lançamentos, fornecedor nem etapa. Foi retirada a opção "Produto" de "Agrupar por" do relatório detalhado, para não listar lançamentos por baixo.
 
-**Versão:** o sistema mostra a versão em Configurações (e no rodapé dos relatórios). Hoje: **versão 30 (25/11/2026)**. A cada entrega sobe junto: `APP_VERSAO` no HTML e o número do cache no `sw.js` (`obra-c08-v30`).
+**Versão:** o sistema mostra a versão em Configurações (e no rodapé dos relatórios). Hoje: **versão 31 (25/11/2026)**. A cada entrega sobe junto: `APP_VERSAO` no HTML e o número do cache no `sw.js` (`obra-c08-v31`).
 
 **Mão de obra nos produtos somados:** tudo que tem o tipo "Mão de obra" vira uma linha só, "Mão de obra - Todos" (também na tela Itens).
 
@@ -190,3 +190,12 @@ Em Unificar nomes, tocar em "N reg. ›" abre a lista dos registros que usam aqu
 **Cabeçalho dos relatórios personalizados:** ficam só o título e a data de emissão (sem endereço da obra, período, situação nem lista do que não entra).
 
 **Versão 30 — listas, anexos e item da cotação:** (1) a lista de sugestões de fornecedor/descrição/tipo fecha ao escolher (clique, Enter ou Tab) e ao sair do campo; Tab com o texto igual a um nome da lista passa a usar a grafia da lista. (2) Nos anexos de cotação e compra dá para **arrastar vários arquivos** (PDF, foto, XML...) para a janela. (3) Removido "Código e fornecedor do item" do item da cotação (os dados já importados continuam guardados).
+
+
+## Importar orçamento por foto ou PDF escaneado (versão 31)
+Em **Cotações → Importar PDF / foto** agora dá para mandar uma foto (JPG/PNG) do orçamento impresso da loja ou um PDF escaneado (CamScanner etc.). O app gira a foto sozinho até achar o lado certo, limpa sombras e lê o texto no próprio aparelho (precisa de internet só para baixar o leitor na primeira vez). Para o layout de loja (código, descrição quebrada em duas linhas, qtd, unitário, total, "Desconto no Item", Frete e TOTAL):
+- cada conta é conferida (qtd × unitário = total); se a leitura trocou um dígito, vale a conta que fecha;
+- o desconto do item entra no preço unitário (unitário já líquido), para comparar fornecedores pelo preço real;
+- o frete vira um item "Frete";
+- no fim aparece "✓ fecha com o TOTAL" ou, se não fechou, quanto falta (item não lido). Nada é salvo antes de você conferir o formulário.
+- O nome do fornecedor vem do nome do arquivo quando ele é um nome de verdade (ex.: "Nota carajas.pdf" → Carajas).

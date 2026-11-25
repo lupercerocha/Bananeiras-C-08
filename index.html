@@ -697,7 +697,7 @@ a{color:var(--teal)}
 <section class="view" id="v-cot">
   <button class="btn" onclick="abrirCot()">+ Nova cotação</button>
   <div class="acoes">
-    <button class="btn soft" onclick="document.getElementById('pdfCotInput').click()"><span class="ic">📄</span>Importar PDF</button>
+    <button class="btn soft" onclick="document.getElementById('pdfCotInput').click()"><span class="ic">📄</span>Importar PDF / foto</button>
     <button class="btn soft" onclick="colarOrcamento()"><span class="ic">✍️</span>Colar texto</button>
     <button class="btn soft" onclick="montarConcorrencia()"><span class="ic">⚖</span>Concorrência</button>
     <button class="btn soft" onclick="compraEmLote()"><span class="ic">✔</span>Comprar</button>
@@ -855,7 +855,7 @@ a{color:var(--teal)}
 
 <input type="file" id="anexoInput" accept="image/*,application/pdf,.pdf,.xml,.xlsx,.doc,.docx" multiple hidden>
 <input type="file" id="fotoPerfilInput" accept="image/*" hidden>
-<input type="file" id="pdfCotInput" accept="application/pdf,.pdf" hidden>
+<input type="file" id="pdfCotInput" accept="application/pdf,.pdf,image/*" hidden>
 <input type="file" id="notaInput" multiple hidden>
 <input type="file" id="qrInput" accept="image/*" capture="environment" hidden>
 <input type="file" id="compInput" accept=".pdf,application/pdf,image/*" multiple hidden>
@@ -4581,7 +4581,7 @@ const chaveProduto=desc=>alfa2(nomeProduto(desc));
 const ehMaoObra=l=>alfa2(l.familia||'')==='mao de obra';
 const nomeProdutoL=l=>ehMaoObra(l)?'Mão de obra - Todos':nomeProduto(l.desc);
 const chaveProdutoL=l=>alfa2(nomeProdutoL(l));
-const APP_VERSAO='30', APP_VERSAO_DATA='25/11/2026';   /* subir a cada entrega, junto com o sw.js */
+const APP_VERSAO='31', APP_VERSAO_DATA='25/11/2026';   /* subir a cada entrega, junto com o sw.js */
 const fmtQtd=n=>Math.round(+n||0).toLocaleString('pt-BR');   /* quantidade é sempre número inteiro */
 /* ---------- nomes sem repetição: ao salvar, usa a grafia já cadastrada (ignora maiúscula, acento, espaço e pontuação) ---------- */
 const nomeKey=s=>alfa2(s).replace(/[^a-z0-9]/g,'');
@@ -6284,6 +6284,175 @@ function parseOrcamentoRelaxado(linhas){
   return out;
 }
 
+/* ---------- orçamento de loja impresso (foto ou PDF escaneado) ----------
+   layout: linha do código + descrição (quebra no meio da palavra), linha "qtd unit total",
+   "Desconto no Item: x", "Frete: x", "TOTAL x". O texto de foto vem com erros de leitura, por isso
+   cada conta é conferida (qtd × unitário = total) e o fecha-contas final mostra se bateu. */
+function numLoja(t){
+  const m=String(t||'').match(/\d+(?:\s?[.,]\s?\d{1,3})?/g);
+  return m?m.map(x=>parseFloat(x.replace(/\s/g,'').replace(',','.'))):[];
+}
+function moedasLoja(t){
+  const m=String(t||'').match(/\d{1,6}\s?[.,]\s?\d{2}(?!\d)/g)||[];
+  return m.map(x=>parseFloat(x.replace(/\s/g,'').replace(',','.')));
+}
+function corrigirDescLoja(d){
+  return String(d||'')
+    .replace(/(\dX\d{2,3})4(?=\s+[A-Z])/g,'$1A')          /* 100X1004 → 100X100A */
+    .replace(/\bTRAY\b/g,'TRAV').replace(/\bGERAM\b/g,'CERAM')
+    .replace(/[ÁÀÂÃ]/g,'A').replace(/[ÉÊ]/g,'E').replace(/Í/g,'I').replace(/[ÓÔÕ]/g,'O').replace(/Ú/g,'U').replace(/Ç/g,'C')
+    .replace(/\s{2,}/g,' ').trim();
+}
+function parseOrcamentoLoja(linhas){
+  const L=(linhas||[]).map(t=>String(t).replace(/^[\s|!\[\]\/\\_-]+/,'').replace(/[|]/g,' ').trim()).filter(Boolean);
+  const temDesc=L.some(t=>/desconto\s*no\s*[it]t?em|desconto\s*no\s*item/i.test(t));
+  const itens=[]; let cur=null, frete=0, tot=0, orc='', aguardaDesc=false, aguardaFrete=false;
+  const reCod=/^([0-9SOIBZDl]{7,12})\s+([A-Z].{6,})$/;
+  const reQtd=/^0*(\d{1,5})\s?[.,]\s?(\d{3})\s+(.+)$/;
+  const soMoeda=t=>/^[^A-Za-z]*\d{1,6}\s?[.,]\s?\d{2}[^A-Za-z]*$/.test(t);
+  L.forEach(t=>{
+    const mo=t.match(/or[çc]amento\s*:?\s*(\d+)/i); if(mo&&!orc)orc=mo[1];
+    if(aguardaDesc&&soMoeda(t)&&cur){ cur.desc=moedasLoja(t)[0]; aguardaDesc=false; return; }
+    if(aguardaFrete&&soMoeda(t)){ frete=moedasLoja(t)[0]; aguardaFrete=false; return; }
+    aguardaDesc=false;
+    let m=t.match(reCod);
+    if(m&&(m[1].replace(/\D/g,'').length>=4)&&!/^desconto|^frete|^total/i.test(m[2])){
+      const cod=/^\d+$/.test(m[1])?m[1]:'';                       /* código com letra trocada pelo OCR: melhor vazio que errado */
+      cur={c:cod,d:m[2],lenL1:m[2].length,desc:null,q:0,u:0,t:0}; itens.push(cur); return;
+    }
+    if(/desconto\s*n[oa]?\s*[it]/i.test(t)||/^desconto/i.test(t)){
+      const v=moedasLoja(t); if(cur){ if(v.length)cur.desc=v[v.length-1]; else aguardaDesc=true; } return;
+    }
+    if(/^frete/i.test(t)){ const v=moedasLoja(t); if(v.length)frete=v[v.length-1]; else aguardaFrete=true; cur=null; return; }
+    if(/^\W*total\b/i.test(t)){ const v=moedasLoja(t); if(v.length&&!tot)tot=v[v.length-1]; cur=null; return; }
+    if(!cur)return;
+    m=t.match(reQtd);
+    if(m&&!cur.q){
+      const v=moedasLoja(m[3]);
+      if(v.length>=1){ cur.q=parseFloat(m[1]+'.'+m[2]); cur.u=v[0]; cur.t=v.length>1?v[1]:0; return; }
+    }
+    if(!cur.q && /[A-Za-z]/.test(t)) cur.d2=(cur.d2?cur.d2+' ':'')+t;     /* continuação da descrição */
+  });
+  const bons=itens.filter(i=>i.q>0&&i.u>0);
+  if(!bons.length||!(temDesc||tot))return null;
+  const ls=bons.map(i=>i.lenL1).sort((a,b)=>b-a), W=ls[Math.floor(ls.length*0.25)];   /* largura da coluna: a maioria das linhas vem cheia */
+  const avisos=[];
+  /* qtd × unitário = total: quando não fecha, descobre qual dos dois a leitura errou */
+  bons.forEach(i=>{
+    const calc=Math.round(i.q*i.u*100)/100;
+    if(!i.t){ i.t=calc; return; }
+    if(Math.abs(calc-i.t)<=0.02)return;
+    const pu=i.t/i.q;
+    if(Math.abs(Math.round(pu*100)/100*i.q-i.t)<0.011){ i.u=Math.round(pu*100)/100; }   /* total lido bate com um preço redondo: o unitário que veio errado */
+    else i.t=calc;                                                                   /* senão vale a conta pelo unitário */
+    avisos.push(i.c||i.d.slice(0,12));
+  });
+  /* desconto: nesse tipo de orçamento é um percentual único; leitura fora do padrão é corrigida por ele */
+  const rat=bons.filter(i=>i.desc!=null&&i.t>0).map(i=>i.desc/i.t).sort((a,b)=>a-b);
+  let r=0;
+  if(rat.length>=3){
+    const med=rat[Math.floor(rat.length/2)];
+    if(rat.filter(x=>Math.abs(x-med)<0.0015).length>=Math.ceil(rat.length*0.6)) r=med;
+  }
+  const out=[];
+  bons.forEach(i=>{
+    let desc=i.desc;
+    if(r){
+      const esp=Math.round(i.t*r*100)/100;
+      if(desc==null||Math.abs(desc-esp)>Math.max(0.05,i.t*0.0015)){ if(desc!=null||temDesc){ desc=esp; avisos.push('desc. '+(i.c||i.d.slice(0,12))); } }
+    }
+    desc=desc||0;
+    const liq=Math.max(0,i.t-desc);
+    const d=i.d2 ? i.d+((i.lenL1>=W-1&&!/^\d[,.]\d/.test(i.d2))?'':' ')+i.d2 : i.d;   /* linha cheia = palavra cortada no meio (medida tipo 2,2M2 começa palavra nova) */
+    out.push({c:i.c,d:capNomes(corrigirDescLoja(d).replace(/(\s+[^A-Za-z0-9]{1,3})+$/,'').replace(/^[^A-Za-z0-9]+/,'')),q:i.q,u:Math.round(liq/i.q*1e6)/1e6,f:'',bruto:i.u,desc});
+  });
+  if(frete>0) out.push({c:'',d:'Frete',q:1,u:frete,f:''});
+  return {itens:out,tot,orc,avisos};
+}
+/* foto/PDF escaneado: vira imagem (girada se preciso) e passa pelo Tesseract no próprio aparelho */
+async function imagemParaCanvas(src,rot,maxLado){
+  let w,h,draw;
+  if(src instanceof HTMLCanvasElement){ w=src.width;h=src.height;draw=(c)=>c.drawImage(src,0,0); }
+  else{
+    const bm=await createImageBitmap(src,{imageOrientation:'from-image'}); w=bm.width;h=bm.height;
+    draw=(c)=>c.drawImage(bm,0,0);
+  }
+  const k=Math.min(1,maxLado/Math.max(w,h));
+  const cw=Math.round(w*k), ch=Math.round(h*k);
+  const tmp=document.createElement('canvas'); tmp.width=cw; tmp.height=ch;
+  const tc=tmp.getContext('2d'); tc.scale(k,k); draw(tc);
+  const cv=document.createElement('canvas'); const g=rot%180!==0;
+  cv.width=g?ch:cw; cv.height=g?cw:ch;
+  const c=cv.getContext('2d'); c.fillStyle='#fff'; c.fillRect(0,0,cv.width,cv.height);
+  c.translate(cv.width/2,cv.height/2); c.rotate(rot*Math.PI/180); c.drawImage(tmp,-cw/2,-ch/2);
+  c.setTransform(1,0,0,1,0,0);
+  /* limiar local: cada ponto é comparado com a média da vizinhança — tira sombra, dobra do papel e fundo da foto */
+  const im=c.getImageData(0,0,cv.width,cv.height), d=im.data, W=cv.width, H=cv.height;
+  const gray=new Float32Array(W*H);
+  for(let i=0;i<W*H;i++) gray[i]=0.3*d[i*4]+0.59*d[i*4+1]+0.11*d[i*4+2];
+  const I=new Float64Array((W+1)*(H+1));
+  for(let y=1;y<=H;y++){ let row=0; for(let x=1;x<=W;x++){ row+=gray[(y-1)*W+x-1]; I[y*(W+1)+x]=I[(y-1)*(W+1)+x]+row; } }
+  const R=Math.max(8,Math.round(Math.max(W,H)/96));
+  for(let y=0;y<H;y++){
+    const y0=Math.max(0,y-R), y1=Math.min(H,y+R+1);
+    for(let x=0;x<W;x++){
+      const x0=Math.max(0,x-R), x1=Math.min(W,x+R+1);
+      const soma=I[y1*(W+1)+x1]-I[y0*(W+1)+x1]-I[y1*(W+1)+x0]+I[y0*(W+1)+x0];
+      const media=soma/((x1-x0)*(y1-y0));
+      const v=gray[y*W+x]>media-20?255:0, k=(y*W+x)*4;
+      d[k]=d[k+1]=d[k+2]=v;
+    }
+  }
+  c.putImageData(im,0,0);
+  return cv;
+}
+async function linhasDeImagemGirada(src,avisar){
+  await carregarTesseract();
+  /* 1) olhada rápida nas 4 posições, para achar de que lado está o texto */
+  let melhor=0, nota=-1;
+  for(const r of [0,90,270,180]){
+    if(avisar)avisar('Procurando o lado certo da foto...');
+    const cv=await imagemParaCanvas(src,r,900);
+    const {data}=await window.Tesseract.recognize(cv,'por');
+    const n=(data.words||[]).filter(w=>w.confidence>75&&/[A-Za-z0-9]{3,}/.test(w.text)).length;
+    if(n>nota){nota=n;melhor=r}
+    if(n>=25)break;
+  }
+  /* 2) leitura completa na posição escolhida, em dois modos; vale o que melhor fecha com o TOTAL do papel */
+  if(avisar)avisar('Lendo o texto da imagem...');
+  const cv=await imagemParaCanvas(src,melhor,2400);
+  const worker=await window.Tesseract.createWorker('por');
+  const cands=[];
+  try{
+    for(const psm of ['3','6']){
+      await worker.setParameters({tessedit_pageseg_mode:psm});
+      const {data}=await worker.recognize(cv);
+      cands.push((data.text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean));
+      const r=parseOrcamentoLoja(cands[cands.length-1]);
+      if(r&&r.tot>0){ const soma=r.itens.reduce((a,i)=>a+i.q*i.u,0); if(Math.abs(soma-r.tot)<0.02)break; }
+      if(avisar&&psm==='3')avisar('Conferindo a leitura...');
+    }
+  } finally { try{await worker.terminate()}catch(e){} }
+  let best=cands[0], bs=-1e9;
+  cands.forEach(l=>{
+    const r=parseOrcamentoLoja(l);
+    let sc=r?100+r.itens.length+(r.tot>0?-Math.min(50,Math.abs(r.itens.reduce((a,i)=>a+i.q*i.u,0)-r.tot)):0):l.length/1000;
+    if(sc>bs){bs=sc;best=l}
+  });
+  return best;
+}
+async function paginasDoPdfComoImagem(file,max){
+  await carregarPdfJs();
+  const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+  const out=[];
+  for(let n=1;n<=Math.min(max,pdf.numPages);n++){
+    const pg=await pdf.getPage(n); const vp=pg.getViewport({scale:3});
+    const cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+    await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+    out.push(cv);
+  }
+  return out;
+}
 function carregarTesseract(){
   return new Promise((ok,err)=>{
     if(window.Tesseract){ok();return}
@@ -6316,16 +6485,37 @@ function carregarPdfJs(){
 }
 document.getElementById('pdfCotInput').onchange=async e=>{
   const f=e.target.files[0]; e.target.value=''; if(!f)return;
-  toast('Lendo o PDF...');
+  const ehImg=/^image\//.test(f.type)||/\.(jpe?g|png|webp|heic)$/i.test(f.name);
   let linhas;
-  try{ linhas=await linhasDoPdf(f); }
-  catch(x){ toast('Não consegui abrir o PDF. Precisa de internet na primeira vez.'); return; }
+  try{
+    if(ehImg){
+      linhas=await linhasDeImagemGirada(f,toast);
+    }else{
+      toast('Lendo o PDF...');
+      linhas=await linhasDoPdf(f);
+      if(linhas.join('').replace(/\s/g,'').length<40){          /* PDF escaneado: não tem texto, só imagem */
+        const pgs=await paginasDoPdfComoImagem(f,3); linhas=[];
+        for(let i=0;i<pgs.length;i++){
+          const l=await linhasDeImagemGirada(pgs[i],m=>toast((pgs.length>1?'Página '+(i+1)+': ':'')+m));
+          linhas=linhas.concat(l);
+        }
+      }
+    }
+  }
+  catch(x){ toast('Não consegui ler o arquivo. Precisa de internet na primeira vez (leitor de texto).'); return; }
   processarLinhasOrcamento(linhas,f.name);
 };
 function processarLinhasOrcamento(linhas,origem){
-  const itens=parseOrcamento(linhas), tot=totalDeclarado(linhas);
-  const soma=itens.reduce((s,i)=>s+i.q*i.u,0);
-  PDF_LIDO={itens,linhas,tot,soma,nome:origem,forn:palpiteFornecedor(linhas),val:palpiteValidade(linhas)};
+  const loja=parseOrcamentoLoja(linhas);
+  const itens=loja?loja.itens:parseOrcamento(linhas), tot=loja&&loja.tot?loja.tot:totalDeclarado(linhas);
+  const soma=Math.round(itens.reduce((s,i)=>s+i.q*i.u,0)*100)/100;
+  let fornPalpite=loja?'':palpiteFornecedor(linhas);
+  if(loja){                                        /* o nome da loja vem do nome do arquivo, se for um nome de verdade */
+    const nf=String(origem||'').replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').replace(/\b(nota|or[cç]amento|cota[cç][aã]o|pedido|scan|pdf)\b/ig,'').trim();
+    if(nf.replace(/[^A-Za-z]/g,'').length>=3&&!/^(img|image|foto|photo|whatsapp|screenshot|full\s*size)/i.test(nf)&&!/\d{4,}/.test(nf)) fornPalpite=nf;
+  }
+  PDF_LIDO={itens,linhas,tot,soma,loja:!!loja,nome:origem,forn:fornPalpite,val:palpiteValidade(linhas),
+    obs:loja?('Orçamento da loja'+(loja.orc?' nº '+loja.orc:'')+' · preço unitário já com o desconto do item'+(loja.avisos.length?' · conferir a leitura de '+loja.avisos.join(', '):'')):''};
   const dif=tot>0?Math.round((tot-soma)*100)/100:0;
   const poucoTexto=linhas.join('').replace(/\s/g,'').length<40;
   if(!itens.length){
@@ -6346,9 +6536,12 @@ function processarLinhasOrcamento(linhas,origem){
   <div class="card" style="box-shadow:none;margin-top:10px">
     <div class="stat"><span>Itens encontrados</span><b class="mono">${itens.length}</b></div>
     <div class="stat"><span>Soma dos itens</span><b class="mono">${brl(soma)}</b></div>
+    ${loja&&Math.abs(dif)<0.01?'<div class="stat"><span>Conferência</span><b style="color:var(--ok,#2e7d32)">✓ fecha com o TOTAL</b></div>':''}
     ${tot>0?`<div class="stat"><span>Total no arquivo</span><b class="mono">${brl(tot)}</b></div>`:''}
   </div>
-  ${Math.abs(dif)>=0.01?`<p class="hint">${dif<0
+  ${loja&&Math.abs(dif)>=0.01?`<p class="hint">⚠ Não fechou com o TOTAL do papel: ${dif>0?'faltam ':'sobram '}${brl(Math.abs(dif))}. Provavelmente algum item não foi lido (foto torta ou borrada) ou um número saiu errado. Crie a cotação, confira item por item e inclua o que faltar.</p>
+  <button class="btn" onclick="usarOrcamentoLido(false)">Conferir e criar cotação</button>`
+  :Math.abs(dif)>=0.01?`<p class="hint">${dif<0
       ? 'O arquivo dá um desconto de '+brl(-dif)+' sobre a soma dos itens — dá para já trazer esse desconto preenchido.'
       : 'O total do arquivo é '+brl(dif)+' maior que a soma dos itens — costuma ser frete.'}</p>
   <button class="btn" onclick="usarOrcamentoLido(true)">${dif<0?'Conferir, já com o desconto':'Conferir, incluindo o frete'}</button>
@@ -6371,7 +6564,7 @@ function usarOrcamentoLido(ajustar){
   preencherFamilias(itens);
   const obsExtra=(p.val&&p.val!==daquiADias(5))?` · o documento declara validade até ${p.val.split('-').reverse().join('/')}`:'';
   abrirCot({id:'',item:'',forn:capNomes(p.forn||''),validade:daquiADias(5),itens,desconto,
-    obs:'Importado de '+p.nome+obsExtra});
+    obs:'Importado de '+p.nome+(p.obs?' · '+p.obs:'')+obsExtra});
 }
 function verTextoPdf(){
   const p=PDF_LIDO; if(!p)return;
